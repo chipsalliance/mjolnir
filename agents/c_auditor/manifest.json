@@ -8,7 +8,7 @@
     "run_shell_command"
   ],
   "supported_backends": [
-    "gemini",
+    "gemini"
   ],
   "version": "0.1.0"
 }

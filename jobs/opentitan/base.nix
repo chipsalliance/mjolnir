@@ -1,9 +1,9 @@
 { pkgs }:
-{ subjobName, searchPaths, subdir, extensions ? [ "c" "h" ], timeout ? 900, backend ? "gemini" }:
+{ subjobName, searchPaths, subdir, extensions ? [ "c" "h" "s" ], timeout ? 900, backend ? "gemini" }:
 let
-  # Helper to build fd flags for extensions: [ "c" "h" ] -> "-e c -e h"
+  # Helper to build fd flags for extensions: [ "c" "h" "s" ] -> "-e c -e h -e s"
   fdExtFlags = pkgs.lib.concatMapStringsSep " " (ext: "-e ${ext}") extensions;
-  # Helper to build fd exclude flags: [ "c" "h" ] -> "-E '*.c' -E '*.h'"
+  # Helper to build fd exclude flags: [ "c" "h" "s" ] -> "-E '*.c' -E '*.h' -E '*.s'"
   fdExcludeFlags = pkgs.lib.concatMapStringsSep " " (ext: "-E '*.${ext}'") extensions;
   fdSearchFlags = pkgs.lib.concatMapStringsSep " " (path: "--search-path ${path}") searchPaths;
 in
