@@ -11,36 +11,12 @@ from pathlib import Path
 import shutil
 import sys
 import tomllib
+import dashboard_builder
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-
-FILENAME_MAPPINGS = {
-    "dashboard.html": ("Interactive Dashboard", "bg-html", "HTML"),
-    "main_report.md": ("Main Vulnerability Report", "bg-md", "MD"),
-    "main_report.toml": ("Main Vulnerability Report", "bg-toml", "TOML"),
-    "reviewed_report.md": ("Agent Filtered Vulnerability Report", "bg-md", "MD"),
-}
-
-
-def load_components(config_paths):
-    """Loads and merges components from multiple TOML files."""
-    components = {}
-    for path_str in config_paths:
-        path = Path(path_str)
-        if not path.exists():
-            logging.error(f"Components config file not found: {path}")
-            sys.exit(1)
-        try:
-            with open(path, "rb") as f:
-                data = tomllib.load(f)
-                components.update(data)
-        except Exception as e:
-            logging.error(f"Failed to parse components file {path}: {e}")
-            sys.exit(1)
-    return components
 
 
 def resolve_default_components():
@@ -86,18 +62,6 @@ FILES_TO_COPY = [
     "reviewed_report.md",
 ]
 
-CARD_TEMPLATE = """
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">{display_name}</h5>
-                    <div class="scan-info">📂 <code>{scan_dir}</code></div>
-                    <div class="list-group">
-                        {links_html}
-                    </div>
-                </div>
-            </div>
-"""
-
 
 def find_latest_scan(component_dir: Path) -> Path:
     """Finds the latest scan directory in the given component directory.
@@ -141,21 +105,6 @@ def find_latest_scan(component_dir: Path) -> Path:
     return run_dirs[-1]
 
 
-def generate_link_html(comp_key: str, filename: str) -> str:
-    """Generates HTML link for a report file."""
-    relative_link = f"{comp_key}/{filename}"
-
-    mapping = FILENAME_MAPPINGS.get(filename)
-    if mapping:
-        link_text, badge_class, badge_text = mapping
-        badge_html = f'<span class="badge {badge_class}">{badge_text}</span>'
-    else:
-        link_text = filename
-        badge_html = ""
-
-    return f'<a href="{relative_link}" class="list-group-item">{link_text}{badge_html}</a>\n'
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Aggregate vulnerability scan results."
@@ -189,7 +138,7 @@ def main():
         parser.error(
             "No components file specified and default components.toml not found in standard locations."
         )
-    components = load_components(args.components)
+    components = dashboard_builder.load_components(args.components)
 
     if args.jobs:
         invalid_jobs = [j for j in args.jobs if j not in components]
@@ -221,12 +170,11 @@ def main():
         logging.error("Cannot proceed due to missing assets.")
         return
 
-    with open(shared_css_path, "r", encoding="utf-8") as f:
-        shared_css = f.read()
-    with open(mjolnir_css_path, "r", encoding="utf-8") as f:
-        mjolnir_css = f.read()
-    with open(template_path, "r", encoding="utf-8") as f:
-        html_template = f.read()
+    shared_css, mjolnir_css, html_template = dashboard_builder.get_assets(
+        dashboards_dir
+    )
+    if not html_template:
+        return
 
     cards_html = ""
 
@@ -289,17 +237,17 @@ def main():
                     dst_file = comp_target_dir / filename
                     shutil.copy2(src_file, dst_file)
                     copied_files_count += 1
-                    links_html += generate_link_html(comp_key, filename)
+                    links_html += dashboard_builder.generate_link_html(
+                        filename, f"{comp_key}/{filename}"
+                    )
                 else:
                     logging.info(
                         f"File {filename} not found in {latest_scan_path.name}"
                     )
 
             if copied_files_count > 0:
-                cards_html += CARD_TEMPLATE.format(
-                    display_name=display_name,
-                    scan_dir=latest_scan_path.name,
-                    links_html=links_html,
+                cards_html += dashboard_builder.generate_card_html(
+                    display_name, latest_scan_path.name, links_html
                 )
             else:
                 logging.warning(f"No files copied for {display_name}, skipping card.")
@@ -326,13 +274,13 @@ def main():
                     dst_file = comp_target_dir / filename
                     if dst_file.exists():
                         existing_files_count += 1
-                        links_html += generate_link_html(comp_key, filename)
+                        links_html += dashboard_builder.generate_link_html(
+                            filename, f"{comp_key}/{filename}"
+                        )
 
                 if existing_files_count > 0:
-                    cards_html += CARD_TEMPLATE.format(
-                        display_name=display_name,
-                        scan_dir=scan_dir,
-                        links_html=links_html,
+                    cards_html += dashboard_builder.generate_card_html(
+                        display_name, scan_dir, links_html
                     )
                 else:
                     logging.warning(
@@ -342,10 +290,9 @@ def main():
                 logging.info(f"No existing results to preserve for {display_name}.")
 
     if cards_html:
-        # Perform triple injection using .replace()
-        index_html_content = html_template.replace("{{dashboard_css}}", shared_css)
-        index_html_content = index_html_content.replace("{{mjolnir_css}}", mjolnir_css)
-        index_html_content = index_html_content.replace("{{cards_html}}", cards_html)
+        index_html_content = dashboard_builder.build_dashboard(
+            html_template, shared_css, mjolnir_css, cards_html
+        )
 
         index_path = target_base / "index.html"
         with open(index_path, "w", encoding="utf-8") as f:

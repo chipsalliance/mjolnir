@@ -8,40 +8,12 @@ from pathlib import Path
 import subprocess
 import sys
 import tomllib
+import dashboard_builder
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-
-FILENAME_MAPPINGS = {
-    "dashboard.html": ("Interactive Dashboard", "bg-html", "HTML"),
-    "main_report.md": ("Main Vulnerability Report", "bg-md", "MD"),
-    "main_report.toml": ("Main Vulnerability Report", "bg-toml", "TOML"),
-    "reviewed_report.md": (
-        "Agent Filtered Vulnerability Report",
-        "bg-md",
-        "MD",
-    ),
-}
-
-
-def load_components(config_paths):
-    """Loads and merges components from multiple TOML files."""
-    components = {}
-    for path_str in config_paths:
-        path = Path(path_str)
-        if not path.exists():
-            logging.error(f"Components config file not found: {path}")
-            sys.exit(1)
-        try:
-            with open(path, "rb") as f:
-                data = tomllib.load(f)
-                components.update(data)
-        except Exception as e:
-            logging.error(f"Failed to parse components file {path}: {e}")
-            sys.exit(1)
-    return components
 
 
 def run_gsutil(args):
@@ -74,41 +46,6 @@ def find_latest_scan_gcs(bucket, prefix):
     return dirs[-1].rstrip("/")
 
 
-def generate_link_html(bucket, comp_key, run_dir_name, filename):
-    """Generates HTML link for a report file in GCS."""
-    # Assuming public access URL structure
-    # https://storage.googleapis.com/[bucket]/[path_in_bucket]/[filename]
-    parts = run_dir_name.split(f"gs://{bucket}/")
-    if len(parts) < 2:
-        return ""
-    path_in_bucket = parts[1]
-
-    url = f"https://storage.googleapis.com/{bucket}/{path_in_bucket}/{filename}"
-
-    mapping = FILENAME_MAPPINGS.get(filename)
-    if mapping:
-        link_text, badge_class, badge_text = mapping
-        badge_html = f'<span class="badge {badge_class}">{badge_text}</span>'
-    else:
-        link_text = filename
-        badge_html = ""
-
-    return f'<a href="{url}" class="list-group-item">{link_text}{badge_html}</a>\n'
-
-
-CARD_TEMPLATE = """
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">{display_name}</h5>
-                    <div class="scan-info">📂 <code>{scan_dir}</code></div>
-                    <div class="list-group">
-                        {links_html}
-                    </div>
-                </div>
-            </div>
-"""
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Aggregate vulnerability scan results from GCS."
@@ -134,7 +71,7 @@ def main():
     )
     args = parser.parse_args()
 
-    components = load_components([args.components])
+    components = dashboard_builder.load_components([args.components])
 
     # Find dashboards dir
     dashboards_dir = (
@@ -143,21 +80,11 @@ def main():
         else Path(__file__).resolve().parent.parent / "dashboards"
     )
 
-    shared_css_path = dashboards_dir / "dashboard.css"
-    mjolnir_css_path = dashboards_dir / "mjolnir_dashboard.css"
-    template_path = dashboards_dir / "mjolnir_dashboard.html.tpl"
-
-    # Read assets
-    if not template_path.exists():
-        logging.error(f"Template not found: {template_path}")
+    shared_css, mjolnir_css, html_template = dashboard_builder.get_assets(
+        dashboards_dir
+    )
+    if not html_template:
         sys.exit(1)
-
-    with open(shared_css_path, "r") as f:
-        shared_css = f.read()
-    with open(mjolnir_css_path, "r") as f:
-        mjolnir_css = f.read()
-    with open(template_path, "r") as f:
-        html_template = f.read()
 
     cards_html = ""
 
@@ -165,7 +92,6 @@ def main():
         display_name = comp_info["display_name"]
         logging.info(f"Processing {display_name}...")
 
-        # Assume path in bucket is prefix / comp_key
         gcs_prefix = f"{args.prefix}/{comp_key}"
         latest_run = find_latest_scan_gcs(args.bucket, gcs_prefix)
 
@@ -178,7 +104,6 @@ def main():
         logging.info(f"Found latest scan: {latest_run}")
 
         links_html = ""
-        # Check which files exist in that latest run
         files_output = run_gsutil(["ls", latest_run])
         if not files_output:
             continue
@@ -196,24 +121,24 @@ def main():
         linked_count = 0
         for filename in files_to_link:
             if filename in existing_files:
-                links_html += generate_link_html(
-                    args.bucket, comp_key, latest_run, filename
-                )
+                parts = latest_run.split(f"gs://{args.bucket}/")
+                path_in_bucket = parts[1] if len(parts) > 1 else ""
+                url = f"https://storage.googleapis.com/{args.bucket}/{path_in_bucket}/{filename}"
+
+                links_html += dashboard_builder.generate_link_html(filename, url)
                 linked_count += 1
 
         if linked_count > 0:
-            cards_html += CARD_TEMPLATE.format(
-                display_name=display_name,
-                scan_dir=os.path.basename(latest_run),
-                links_html=links_html,
+            cards_html += dashboard_builder.generate_card_html(
+                display_name, os.path.basename(latest_run), links_html
             )
         else:
             logging.warning(f"No supported report files found in {latest_run}")
 
     if cards_html:
-        index_html_content = html_template.replace("{{dashboard_css}}", shared_css)
-        index_html_content = index_html_content.replace("{{mjolnir_css}}", mjolnir_css)
-        index_html_content = index_html_content.replace("{{cards_html}}", cards_html)
+        index_html_content = dashboard_builder.build_dashboard(
+            html_template, shared_css, mjolnir_css, cards_html
+        )
 
         with open(args.output, "w") as f:
             f.write(index_html_content)
