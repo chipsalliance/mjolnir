@@ -1,0 +1,25 @@
+load("@aspect_rules_lint//format:defs.bzl", "format_multirun", "format_test")
+load("@npm//:prettier/package_json.bzl", prettier_bin = "bin")
+
+prettier_bin.prettier_binary(
+    name = "prettier",
+    env = {"BAZEL_BINDIR": "."},
+)
+
+# Run all formatters.
+format_multirun(
+    name = "format",
+    markdown = ":prettier",
+    python = "@aspect_rules_lint//format:ruff",
+    starlark = "@buildifier_prebuilt//:buildifier",
+)
+
+# Check all formatting.
+format_test(
+    name = "format_check",
+    markdown = ":prettier",
+    no_sandbox = True,
+    python = "@aspect_rules_lint//format:ruff",
+    starlark = "@buildifier_prebuilt//:buildifier",
+    workspace = "//:MODULE.bazel",
+)

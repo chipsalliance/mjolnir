@@ -1,0 +1,23 @@
+name: Format Check
+
+on:
+  push:
+    branches: [ "linting" ]
+  pull_request:
+    branches: [ "linting" ]
+
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@v0.8.1
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
+
+      - name: Run Format Check
+        run: bazel test //quality:format_check
