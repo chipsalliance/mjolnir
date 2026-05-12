@@ -189,6 +189,32 @@ access to both HTML dashboards and Markdown reports.
 
 ---
 
+### Aggregating Results from GCS
+
+Mjolnir also includes a script to aggregate results directly from a GCS bucket without downloading them. This script scans the bucket for the latest results of each component and generates an `index.html` dashboard with links pointing directly to the objects in GCS.
+
+#### Usage
+
+To aggregate results from GCS, run the `aggregate_gcs_results.py` script:
+
+```bash
+python3 scripts/aggregate_gcs_results.py --bucket <bucket_name> [options]
+```
+
+#### Options
+
+- `--bucket <name>`: (Required) The name of the GCS bucket.
+- `--prefix <prefix>`: The prefix in the bucket where reports are stored (default: `v0`).
+- `--components <file>`: Path to the TOML file containing component definitions. Defaults to `gcs_components.toml` in the script directory.
+- `--output <file>`: The name of the generated HTML file (default: `index.html`).
+- `--upload`: Automatically upload the generated `index.html` to the root of the specified GCS bucket.
+
+#### Output
+
+The script generates a single HTML file (default: `index.html`) containing the dashboard. If the `--upload` flag is used, it will be uploaded to `gs://<bucket_name>/index.html` and the public URL will be printed.
+
+---
+
 ## Assembling a New Job
 
 There are two ways to assemble a new auditing job:

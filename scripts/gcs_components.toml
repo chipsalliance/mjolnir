@@ -1,0 +1,23 @@
+["Beyond Integration Test"]
+display_name = "Beyond Integration Test"
+
+["Beyond Test Hook"]
+display_name = "Beyond Test Hook"
+
+["Caliptra DPE 1.x"]
+display_name = "Caliptra DPE 1.x"
+
+["Jetski Test Hook"]
+display_name = "Jetski Test Hook"
+
+["OpenTitan Earlgrey A2 SW Scan - ROM"]
+display_name = "OpenTitan Earlgrey A2 SW Scan - ROM"
+
+["OpenTitan Earlgrey A2 SW Scan - ROM_EXT"]
+display_name = "OpenTitan Earlgrey A2 SW Scan - ROM_EXT"
+
+["Smoke Test"]
+display_name = "Smoke Test"
+
+["smoke-test"]
+display_name = "smoke-test"
