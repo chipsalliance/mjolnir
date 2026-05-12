@@ -1,4 +1,6 @@
-"""Gemini Backend Orchestrator (Clean Open-Source Version).
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
+"""Gemini Backend Orchestrator.
 
 This script invokes the Gemini CLI using standard GCP credentials/project to analyze either:
 1. A list of files in parallel for security threats (Batch Mode).

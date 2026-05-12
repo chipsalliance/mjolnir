@@ -585,7 +585,7 @@
     "@@aspect_rules_js+//npm:extensions.bzl%npm": {
       "general": {
         "bzlTransitiveDigest": "jDkhSeZLse5nGPYRful0JR916aGxsJyDGiZASS+CkJo=",
-        "usagesDigest": "ju5UX9iGRGjsw3X4ts4q0pHWiYzOMtJlzENhepiOB0c=",
+        "usagesDigest": "YiKMiel/mSPLIbvEqghMowuuWdlWKBE09FJzXVms9+E=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},

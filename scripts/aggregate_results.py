@@ -1,3 +1,5 @@
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
 #!/usr/bin/env python3
 """Aggregates vulnerability scan results and generates a landing page."""
 

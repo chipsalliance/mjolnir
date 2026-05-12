@@ -1,5 +1,7 @@
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
 {
-  description = "AI Security Analysis Orchestration Tool - Open Source Core";
+  description = "AI Security Analysis Orchestration Tool";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";

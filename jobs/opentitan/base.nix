@@ -1,3 +1,5 @@
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
 { pkgs }:
 { subjobName, searchPaths, subdir, extensions ? [ "c" "h" "s" ], timeout ? 900, backend ? "gemini" }:
 let

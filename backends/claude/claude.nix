@@ -1,3 +1,5 @@
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
 # NOTE: This backend is currently a PLACEHOLDER and is NOT YET WORKING OR TESTED.
 { pkgs }:
 {

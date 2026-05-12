@@ -1,3 +1,5 @@
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
 """Common threat analysis orchestrator utilities.
 
 This module provides shared logic for executing LLM clients to perform
