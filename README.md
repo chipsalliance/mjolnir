@@ -151,6 +151,7 @@ The script looks for the latest scan results for the following components
 - **OpenTitan ROM EXT** (source: `opentitan-sw-output/rom_ext`)
 - **OpenTitan Manuf** (source: `opentitan-sw-output/manuf`)
 - **OpenTitan Lib** (source: `opentitan-sw-output/lib`)
+- **OpenTitan Crypto** (source: `opentitan-sw-output/crypto`)
 
 #### Usage
 

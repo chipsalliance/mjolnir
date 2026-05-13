@@ -4,5 +4,7 @@
 import ./base.nix { inherit pkgs; } {
   subjobName = "LIB";
   subdir = "lib";
-  searchPath = "sw/device/silicon_creator/lib";
+  searchPaths = [
+    "sw/device/silicon_creator/lib"
+  ];
 }

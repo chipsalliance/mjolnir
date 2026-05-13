@@ -38,6 +38,7 @@
           opentitan-rom-ext = makeOrchestrator { jobFile = ./jobs/opentitan/rom_ext.nix; };
           opentitan-manuf = makeOrchestrator { jobFile = ./jobs/opentitan/manuf.nix; };
           opentitan-lib = makeOrchestrator { jobFile = ./jobs/opentitan/lib.nix; };
+          opentitan-crypto = makeOrchestrator { jobFile = ./jobs/opentitan/crypto.nix; };
 
           # Group (test) jobs
           scan-all-test = makeJobGroup {
@@ -60,6 +61,7 @@
               { name = "opentitan-rom-ext"; pkg = opentitan-rom-ext; }
               { name = "opentitan-manuf"; pkg = opentitan-manuf; }
               { name = "opentitan-lib"; pkg = opentitan-lib; }
+              { name = "opentitan-crypto"; pkg = opentitan-crypto; }
             ];
           };
 
@@ -71,13 +73,14 @@
               { name = "opentitan-rom-ext"; pkg = opentitan-rom-ext; }
               { name = "opentitan-manuf"; pkg = opentitan-manuf; }
               { name = "opentitan-lib"; pkg = opentitan-lib; }
+              { name = "opentitan-crypto"; pkg = opentitan-crypto; }
             ];
           };
         in
         {
           inherit smoke-test
                   caliptra-sw-2p1-latest caliptra-mcu-sw-2p0-latest
-                  opentitan-rom opentitan-rom-ext opentitan-manuf opentitan-lib
+                  opentitan-rom opentitan-rom-ext opentitan-manuf opentitan-lib opentitan-crypto
                   opentitan-all
                   caliptra-dpe-latest
                   caliptra-dpe-1x
