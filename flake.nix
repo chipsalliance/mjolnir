@@ -28,6 +28,7 @@
 
           # Individual (test) jobs
           smoke-test = makeOrchestrator { jobFile = ./jobs/smoke-test.nix; };
+          postprocessing-test = makeOrchestrator { jobFile = ./jobs/tests/postprocessing-test.nix; };
 
           # Individual (real) jobs
           caliptra-sw-2p1-latest = makeOrchestrator { jobFile = ./jobs/caliptra-sw-2p1-latest.nix; };
@@ -78,7 +79,7 @@
           };
         in
         {
-          inherit smoke-test
+          inherit smoke-test postprocessing-test
                   caliptra-sw-2p1-latest caliptra-mcu-sw-2p0-latest
                   opentitan-rom opentitan-rom-ext opentitan-manuf opentitan-lib opentitan-crypto
                   opentitan-all
