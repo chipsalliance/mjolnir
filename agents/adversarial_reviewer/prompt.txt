@@ -12,7 +12,7 @@ For each finding in a security audit, perform the following:
 - Use `read_file` and `grep_search` to examine the source code referenced in the finding.
 - Use `grep_search` and `glob` to perform research into architectural dependencies, data flow across modules, and cross-cutting security invariants that might mitigate or exacerbate the finding.
 - Understand the surrounding logic, data flow, and any existing mitigations (e.g., bounds checks, hardware locks, previous initialization steps).
-- Verify if the architectural assumptions made by the auditor are correct for the Caliptra MCU environment.
+- Verify if the architectural assumptions made by the auditor are correct.
 
 ## 2. Exploitability Analysis
 - If the finding is a potential vulnerability, describe a concrete attack vector.
