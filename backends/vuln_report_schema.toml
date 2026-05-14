@@ -1,0 +1,44 @@
+[file]
+default = "Unknown"
+multiline = false
+hint = "relative/path/to/file.c"
+
+[title]
+default = "Untitled Finding"
+multiline = false
+hint = "Vulnerability Title"
+
+[severity]
+default = "Informational"
+multiline = false
+hint = "Critical|High|Medium|Low|Informational"
+
+[location]
+default = "N/A"
+multiline = false
+hint = "Line XX or function_name"
+
+[description]
+default = "No description provided."
+multiline = true
+hint = "Detailed technical description."
+
+[recommendation]
+default = "No recommendation provided."
+multiline = true
+hint = "Recommended fix."
+
+[verdict]
+default = "Informational"
+multiline = false
+hint = "Exploitable|Not Exploitable|False Positive"
+
+[justification]
+default = "Not explicitly reviewed."
+multiline = true
+hint = "Detailed explanation."
+
+[attack_vector]
+default = ""
+multiline = true
+hint = "Step-by-step description of how to trigger."

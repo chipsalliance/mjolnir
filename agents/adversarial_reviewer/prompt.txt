@@ -35,15 +35,4 @@ For each finding in a security audit, perform the following:
 Output ONLY valid TOML without any markdown code blocks or other text. The output should be a list of vulnerabilities matching the input, but updated with your verdict and revised severity.
 
 Schema:
-```toml
-[[vulnerabilities]]
-file = "relative/path/to/file.rs"
-title = "Vulnerability Title"
-severity = "Critical|High|Medium|Low|Informational" # Revised severity
-location = "Line XX or function_name"
-description = "Detailed description of the vulnerability and its impact."
-recommendation = "Recommended fix."
-verdict = "Exploitable|Not Exploitable|False Positive|Informational"
-justification = "Detailed explanation of your reasoning, citing specific lines of code or hardware behaviors."
-attack_vector = "Step-by-step description of how to trigger the exploit (if applicable)."
-```
+{TOML_SCHEMA}

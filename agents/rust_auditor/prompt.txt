@@ -41,15 +41,7 @@ You are an expert security analyst specialized in finding vulnerabilities in emb
 ## Reporting Requirements
 1. **Format:** All reports must be generated as valid TOML. Output ONLY the raw TOML content without any markdown code blocks or other text.
 2. **Schema:**
-```toml
-[[vulnerabilities]]
-file = "relative/path/to/file.rs"
-title = "Vulnerability Title"
-severity = "Critical|High|Medium|Low|Informational"
-location = "Line XX or function_name"
-description = "Detailed description of the vulnerability and its impact."
-recommendation = "Recommended fix."
-```
+{TOML_SCHEMA}
 
 ## Methodology
 

@@ -34,6 +34,9 @@ def run_single_query(
     with open(system_prompt_path, "r") as f:
         prompt = f.read().strip()
 
+    # Replace the prompt with the keys of the TOML format from common.py
+    prompt = prompt.replace("{TOML_SCHEMA}", common.generate_prompt_schema())
+
     cmd = [
         gemini_bin,
         "--model",
@@ -129,18 +132,34 @@ def run_analysis(
             print(
                 f"Error analyzing {file_rel_path}: Job hung and timed out after {timeout_secs}s."
             )
-            return (
-                file_rel_path,
-                common.format_timeout_error(file_rel_path, timeout_secs),
-                False,
+            report = common.generate_fallback_toml(
+                {
+                    "file": file_rel_path,
+                    "title": "Error during analysis: Timeout",
+                    "description": f"Job hung and timed out after {timeout_secs}s.",
+                }
             )
+            return file_rel_path, report, False
         except subprocess.CalledProcessError as e:
             print(f"Error analyzing {file_rel_path}: {e.stderr}")
-            return (
-                file_rel_path,
-                common.format_process_failure(file_rel_path, e.stderr),
-                False,
+            report = common.generate_fallback_toml(
+                {
+                    "file": file_rel_path,
+                    "title": "Error during analysis: Process Failure",
+                    "description": f"Subprocess failed with error:\n{e.stderr}",
+                }
             )
+            return file_rel_path, report, False
+        except Exception as e:
+            print(f"CRITICAL: Unexpected error for {file_rel_path}: {e}")
+            report = common.generate_fallback_toml(
+                {
+                    "file": file_rel_path,
+                    "title": "Error during analysis: Unexpected Failure",
+                    "description": f"Unexpected error occurred:\n{str(e)}",
+                }
+            )
+            return file_rel_path, report, False
 
     common.run_orchestrator(
         src_dir=src_dir,

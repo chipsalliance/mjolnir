@@ -10,8 +10,48 @@ outputs.
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import sys
+import tomllib
 
 DEFAULT_TIMEOUT_SECS = 600
+
+# The TOML output of the agent's report
+SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "vuln_report_schema.toml")
+try:
+    with open(SCHEMA_PATH, "rb") as f:
+        VULN_SCHEMA = tomllib.load(f)
+except Exception as e:
+    print(f"CRITICAL ERROR: Failed to load {SCHEMA_PATH}: {e}")
+    sys.exit(1)
+
+KNOWN_KEYS = list(VULN_SCHEMA.keys())
+
+
+def generate_prompt_schema():
+    """Generates the TOML schema block to inject into prompts."""
+    lines = ["[[vulnerabilities]]"]
+    for key, config in VULN_SCHEMA.items():
+        hint = config["hint"]
+        if config["multiline"]:
+            lines.append(f'{key} = """\n{hint}\n"""')
+        else:
+            lines.append(f'{key} = "{hint}"')
+    return "\n".join(lines)
+
+
+def generate_fallback_toml(overrides):
+    """Generates a schema-compliant TOML block using provided overrides."""
+    lines = ["[[vulnerabilities]]"]
+    for key, config in VULN_SCHEMA.items():
+        val = overrides.get(key, config["default"])
+
+        if config["multiline"] or "\n" in str(val):
+            safe_val = str(val).replace('"""', "'''")
+            lines.append(f'{key} = """\n{safe_val}\n"""')
+        else:
+            safe_val = str(val).replace('"', '\\"')
+            lines.append(f'{key} = "{safe_val}"')
+
+    return "\n".join(lines) + "\n\n"
 
 
 def clean_toml_output(stdout):
@@ -34,46 +74,33 @@ def clean_toml_output(stdout):
 
 
 def format_timeout_error(file_rel_path, timeout_secs):
-    """Generates a standard vulnerability record for timeout failures.
-
-    Args:
-        file_rel_path: Relative path of the file that failed.
-        timeout_secs: Timeout limit in seconds.
-
-    Returns:
-        Standard TOML block describing the timeout error.
-    """
-    return f"""
-[[vulnerabilities]]
-file = "{file_rel_path}"
-title = "Error during analysis: Timeout"
-severity = "Informational"
-location = "N/A"
-description = "Job hung and timed out after {timeout_secs}s."
-recommendation = "N/A"
-\n"""
+    """Generates a standard vulnerability record for timeout failures."""
+    return generate_fallback_toml(
+        {
+            KEY_FILE: file_rel_path,
+            KEY_TITLE: "Error during analysis: Timeout",
+            KEY_SEVERITY: "Informational",
+            KEY_LOCATION: "N/A",
+            KEY_DESC: f"Job hung and timed out after {timeout_secs}s.",
+            KEY_REC: "N/A",
+            KEY_VERDICT: "Informational",
+        }
+    )
 
 
 def format_process_failure(file_rel_path, error_msg):
-    """Generates a standard vulnerability record for process exit failures.
-
-    Args:
-        file_rel_path: Relative path of the file that failed.
-        error_msg: Subprocess stderr output.
-
-    Returns:
-        Standard TOML block describing the process failure.
-    """
-    error_msg_escaped = error_msg.replace('"', '\\"')  # Escape quotes for TOML
-    return f"""
-[[vulnerabilities]]
-file = "{file_rel_path}"
-title = "Error during analysis: Process Failure"
-severity = "Informational"
-location = "N/A"
-description = "Subprocess failed with error: {error_msg_escaped}"
-recommendation = "N/A"
-\n"""
+    """Generates a standard vulnerability record for process exit failures."""
+    return generate_fallback_toml(
+        {
+            KEY_FILE: file_rel_path,
+            KEY_TITLE: "Error during analysis: Process Failure",
+            KEY_SEVERITY: "Informational",
+            KEY_LOCATION: "N/A",
+            KEY_DESC: f"Subprocess failed with error:\n{error_msg}",
+            KEY_REC: "N/A",
+            KEY_VERDICT: "Informational",
+        }
+    )
 
 
 def run_orchestrator(
