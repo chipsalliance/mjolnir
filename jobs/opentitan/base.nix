@@ -1,7 +1,7 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 { pkgs }:
-{ subjobName, searchPaths, subdir, extensions ? [ "c" "h" "s" ], timeout ? 900, backend ? "gemini" }:
+{ subjobName, searchPaths, subdir, extensions ? [ "c" "h" "s" ], timeout ? 3600, backend ? "gemini" }:
 let
   # Helper to build fd flags for extensions: [ "c" "h" "s" ] -> "-e c -e h -e s"
   fdExtFlags = pkgs.lib.concatMapStringsSep " " (ext: "-e ${ext}") extensions;
@@ -22,7 +22,7 @@ import ../default_job.nix { inherit pkgs; } {
     repoUrl = "https://github.com/lowrisc/opentitan";
     repoName = "opentitan";
     commit = "earlgrey_1.0.0";
-    fileCommand = "${pkgs.fd}/bin/fd -t f ${fdExtFlags} ${fdSearchFlags}";
+    fileCommand = "${pkgs.fd}/bin/fd -t f ${fdExtFlags} ${fdSearchFlags} -E '*test*' -E '*mock*'";
   };
 
   postExtract = ''
