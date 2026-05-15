@@ -4,7 +4,7 @@
 import ./base.nix { inherit pkgs; } {
   subjobName = "ROM";
   subdir = "rom";
-  searchPath = [
+  searchPaths = [
     "sw/device/silicon_creator/rom"
   ];
 }

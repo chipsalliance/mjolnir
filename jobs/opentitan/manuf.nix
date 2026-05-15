@@ -4,7 +4,7 @@
 import ./base.nix { inherit pkgs; } {
   subjobName = "MANUF";
   subdir = "manuf";
-  searchPath = [
+  searchPaths = [
     "sw/device/silicon_creator/manuf"
   ];
 }
