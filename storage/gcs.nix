@@ -10,12 +10,12 @@
   upload =
     { runDir }:
     ''
-      echo "Uploading run directory to GCS bucket ${bucket}..."
       RUN_DIR_NAME=$(basename "${runDir}")
-      DEST="gs://${bucket}/v0/${path}/$RUN_DIR_NAME"
+      GCSDEST="''${GCSDEST:-gs://${bucket}/v0/${path}/$RUN_DIR_NAME}"
+      echo "Uploading run directory to $GCSDEST..."
 
       # Use gcloud storage to copy the contents of the directory
-      ${pkgs.google-cloud-sdk}/bin/gcloud storage cp -r "${runDir}/." "$DEST/"
-      echo "Uploaded to $DEST"
+      ${pkgs.google-cloud-sdk}/bin/gcloud storage cp -r "${runDir}/." "$GCSDEST/"
+      echo "Uploaded to $GCSDEST"
     '';
 }

@@ -54,6 +54,9 @@ Backends are typically LLMs that perform the actual security analyses.
     - `systemPrompt`: Path to a file with the system instruction.
     - `src`: Path to the directory containing the source code.
     - `output`: Path where the agent should write its report.
+- **Runtime Environment Overrides** (for Gemini):
+  - `GOOGLE_CLOUD_PROJECT`: Overrides the default GCP Project ID used for Vertex AI API billing.
+  - `PARALLEL`: Overrides the default number of parallel threads used during batch file processing.
 
 ### Prompts Component
 
@@ -71,6 +74,8 @@ The Storage component handles the outputs of the backend component, e.g. the vul
 - **Attributes**:
   - `name`: String, for logging purposes.
   - `upload { runDir }`: Returns a Bash snippet to handle the results in the provided directory.
+- **Runtime Environment Overrides** (for GCS):
+  - `GCSDEST`: Completely overrides the destination Google Cloud Storage URI (e.g., `gs://my-custom-bucket/path/`).
 
 ---
 

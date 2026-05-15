@@ -35,7 +35,7 @@
         --gemini-bin "${geminiBin}" \
         --parallel "''${PARALLEL:-${toString parallel}}" \
         ${if silentMissing then "--silent-missing" else ""} \
-        ${if googleCloudProject != null then "--project \"${googleCloudProject}\"" else ""} \
+        ${if googleCloudProject != null then "--project \"\${GOOGLE_CLOUD_PROJECT:-${googleCloudProject}}\"" else "\${GOOGLE_CLOUD_PROJECT:+--project $GOOGLE_CLOUD_PROJECT}"} \
         ${if timeout != null then "--timeout ${toString timeout}" else ""}
     '';
 
@@ -56,7 +56,7 @@
         --prompt "${systemPrompt}" \
         --model "${model}" \
         --gemini-bin "${geminiBin}" \
-        ${if googleCloudProject != null then "--project \"${googleCloudProject}\"" else ""} \
+        ${if googleCloudProject != null then "--project \"\${GOOGLE_CLOUD_PROJECT:-${googleCloudProject}}\"" else "\${GOOGLE_CLOUD_PROJECT:+--project $GOOGLE_CLOUD_PROJECT}"} \
         ${if timeout != null then "--timeout ${toString timeout}" else ""}
     '';
 }
