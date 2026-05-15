@@ -163,6 +163,12 @@ it will use the `components.toml` configuration file located in the scripts dire
 python3 scripts/aggregate_results.py <target_dir> [options]
 ```
 
+Alternatively, using Nix:
+
+```bash
+nix run .#aggregate-results -- <target_dir> [options]
+```
+
 #### Options
 
 - `--components <file>`: Path to TOML file containing component definitions. Can be specified multiple times to merge different configurations.
@@ -200,6 +206,12 @@ To aggregate results from GCS, run the `aggregate_gcs_results.py` script:
 
 ```bash
 python3 scripts/aggregate_gcs_results.py --bucket <bucket_name> [options]
+```
+
+Alternatively, using Nix:
+
+```bash
+nix run .#aggregate-gcs-results -- --bucket <bucket_name> [options]
 ```
 
 #### Options

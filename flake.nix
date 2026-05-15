@@ -26,6 +26,8 @@
           # Function to create a group of jobs to run sequentially
           makeJobGroup = import ./job_group.nix { inherit pkgs; };
 
+          scripts = import ./scripts/scripts.nix { inherit pkgs; };
+
           # Individual (test) jobs
           smoke-test = makeOrchestrator { jobFile = ./jobs/smoke-test.nix; };
 
@@ -85,6 +87,7 @@
                   caliptra-dpe-latest
                   caliptra-dpe-1x
                   scan-all scan-all-test;
+          inherit (scripts) aggregate-results aggregate-gcs-results;
         }
       );
     };
