@@ -14,8 +14,8 @@
       RUN_DIR_NAME=$(basename "${runDir}")
       DEST="gs://${bucket}/v0/${path}/$RUN_DIR_NAME"
 
-      # Use gsutil to copy the contents of the directory
-      ${pkgs.google-cloud-sdk}/bin/gsutil cp -r "${runDir}/." "$DEST/"
+      # Use gcloud storage to copy the contents of the directory
+      ${pkgs.google-cloud-sdk}/bin/gcloud storage cp -r "${runDir}/." "$DEST/"
       echo "Uploaded to $DEST"
     '';
 }

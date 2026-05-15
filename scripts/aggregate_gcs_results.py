@@ -16,14 +16,14 @@ logging.basicConfig(
 )
 
 
-def run_gsutil(args):
-    """Runs gsutil command and returns output."""
-    cmd = ["gsutil"] + args
+def run_gcloud_storage(args):
+    """Runs gcloud storage command and returns output."""
+    cmd = ["gcloud", "storage"] + args
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return result.stdout
     except subprocess.CalledProcessError as e:
-        logging.error(f"gsutil command failed: {e}")
+        logging.error(f"gcloud storage command failed: {e}")
         logging.error(f"stderr: {e.stderr}")
         return None
 
@@ -31,12 +31,12 @@ def run_gsutil(args):
 def find_latest_scan_gcs(bucket, prefix):
     """Finds the latest scan directory in GCS for a given prefix."""
     path = f"gs://{bucket}/{prefix}/"
-    output = run_gsutil(["ls", path])
+    output = run_gcloud_storage(["ls", path])
     if not output:
         return None
 
     lines = output.splitlines()
-    # Filter for directories (they end with / in gsutil ls output)
+    # Filter for directories (they end with / in gcloud storage ls output)
     dirs = [line for line in lines if line.endswith("/")]
     if not dirs:
         return None
@@ -104,7 +104,7 @@ def main():
         logging.info(f"Found latest scan: {latest_run}")
 
         links_html = ""
-        files_output = run_gsutil(["ls", latest_run])
+        files_output = run_gcloud_storage(["ls", latest_run])
         if not files_output:
             continue
 
@@ -145,7 +145,7 @@ def main():
         logging.info(f"Generated landing page at: {args.output}")
         if args.upload:
             logging.info(f"Uploading {args.output} to gs://{args.bucket}/")
-            run_gsutil(["cp", args.output, f"gs://{args.bucket}/"])
+            run_gcloud_storage(["cp", args.output, f"gs://{args.bucket}/"])
             url = f"https://storage.googleapis.com/{args.bucket}/{args.output}"
             logging.info(f"Public URL: {url}")
     else:
