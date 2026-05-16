@@ -117,7 +117,16 @@ in
     preExtract = ''
       echo "${name}: Before extraction"
     '';
-    inherit postExtract;
+    postExtract = ''
+      export DEPENDENCY_GRAPH_FILE="$WORKSPACE_DIR/dependency_graph.toml"
+
+      ${pkgs.python3}/bin/python3 ${../backends/extract_deps.py} \
+          --src "$CODE_DIR" \
+          --output "$DEPENDENCY_GRAPH_FILE" \
+          --filter-list "$ANALYSIS_FILES_FILE"
+
+      ${postExtract}
+    '';
     postTransform = ''
       echo "${name}: Adversarial security review ..."
       
