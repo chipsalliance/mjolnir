@@ -17,9 +17,14 @@ Mjolnir is built using Nix to facilitate reproducibility, flexibility, and ease 
 
 Mjolnir performs its analyses in phases, described below.
 
-1.  **Extract**: The tool prepares a unique checkout directory within your workspace and uses the **Target** component to clone and checkout the code.
-2.  **Transform**: It prepares the **Prompts** and executes the **Backend** model. The backend model analyzes the code in the checkout directory and writes a report to a unique, timestamped run directory.
-3.  **Load**: It delegates the results handling to the **Storage** backend, which may move or upload the entire run directory.
+1.  **Extract**: The tool prepares a unique checkout directory within your workspace and uses the **Target** component to clone and checkout the code. During extraction, Mjolnir also builds a structural **Dependency Graph** of the codebase.
+2.  **Transform (Analysis & Review)**: The core AI engine executes in a multi-stage pipeline:
+    - **Initial Scan (Phase 1)**: The backend model analyzes individual source files in parallel, flagging any potential weaknesses to generate a broad, high-recall vulnerability report.
+    - **Contextual Clustering**: To prepare for a deep review, vulnerabilities are dynamically mapped into **Architectural Threat Zones**. Rather than relying on rigid directories or non-deterministic heuristics, Mjolnir uses a fast, overlapping graph-clustering method:
+      - _Proximity Merge:_ Vulnerable files are grouped together if they share a direct link (e.g., `aes.c` and `aes.h` depend on each other).
+      - _1-Hop Context Expansion:_ Once a threat zone is defined, the system performs a 1-hop expansion (an Ego Graph expansion) to pull in all immediate direct dependencies for the files in that cluster. This ensures the AI has the precise local context (headers, structs, macros) needed to understand the bug.
+    - **Adversarial Review (Phase 2)**: A specialized adversarial agent performs a secondary reasoning pass over each contextual Threat Zone. It evaluates reachability, formulates step-by-step attack vectors, and provides technical justifications (verdicts), effectively distilling the raw scan into a high-signal report.
+3.  **Load**: It delegates the results handling to the **Storage** backend, which aggregates the reports, generates interactive HTML dashboards, and uploads the final run directory to local or remote storage.
 
 ### Infrastructure Concepts
 

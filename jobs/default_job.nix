@@ -128,38 +128,83 @@ in
       ${postExtract}
     '';
     postTransform = ''
-      echo "${name}: Adversarial security review ..."
-      
-      # Raw Agent Output
-      RAW_REVIEW_TXT="$VULN_RUN_DIR/raw_ai_review.txt"
-      
+      echo "${name}: Adversarial security review preparation..."
+
       # Final merged TOML
       REVIEWED_TOML="$VULN_RUN_DIR/reviewed_report.toml"
-      
-      case "$BACKEND" in
-        ${builtins.concatStringsSep "\n" (builtins.map (bName: ''
-          "${bName}")
-            ${singleRunBackends.${bName}.runSingle {
-              systemPrompt = adversarialPrompt.backendArgs.systemPrompt;
-              input = "$REPORT_FILE";
-              output = "$RAW_REVIEW_TXT";
-            }}
-            ;;
-        '') (builtins.attrNames singleRunBackends))}
-        *)
-          echo "Error: Backend $BACKEND does not support adversarial review." >&2
-          exit 1
-          ;;
-      esac
 
-      echo "${name}: Merging review with original findings..."
-      ${pkgs.python3}/bin/python3 ${../backends}/sanitize_report.py \
+      # Create a target directory for the clusters
+      CLUSTER_DIR="$VULN_RUN_DIR/clusters"
+      mkdir -p "$CLUSTER_DIR"
+
+      echo "${name}: Pre-sanitizing initial agent output..."
+      CLEAN_REPORT_FILE="$VULN_RUN_DIR/clean_initial_report.toml"
+      python3 ${../backends}/sanitize_report.py \
           --original "$REPORT_FILE" \
+          --review /dev/null \
+          --output "$CLEAN_REPORT_FILE"
+
+      # Slice findings into context-bounded packages
+      echo "${name}: Clustering phase 1 findings via graph analysis..."
+      python3 ${../backends}/cluster_report.py \
+          --report "$REPORT_FILE" \
+          --deps "$DEPENDENCY_GRAPH_FILE" \
+          --outdir "$CLUSTER_DIR" \
+          --max-size 15
+
+      # Target directory for cluster-specific adversarial judgments
+      RAW_REVIEWS_DIR="$VULN_RUN_DIR/raw_reviews"
+      mkdir -p "$RAW_REVIEWS_DIR"
+
+      # Run the review engine per cluster
+      echo "${name}: Executing parallel adversarial reviews..."
+
+      # We loop through every generated cluster TOML file dynamically in bash
+      for CLUSTER_FILE in "$CLUSTER_DIR"/cluster_*.toml; do
+          # Skip loop if no files matched the pattern
+          [ -e "$CLUSTER_FILE" ] || continue
+
+          CLUSTER_ID=$(basename "$CLUSTER_FILE" .toml)
+          CLUSTER_REVIEW_TXT="$RAW_REVIEWS_DIR/review_''${CLUSTER_ID}.txt"
+
+          echo " -> Reviewing findings for ''${CLUSTER_ID}..."
+
+          case "$BACKEND" in
+            ${builtins.concatStringsSep "\n" (builtins.map (bName: ''
+              "${bName}")
+                ${singleRunBackends.${bName}.runSingle {
+                  systemPrompt = adversarialPrompt.backendArgs.systemPrompt;
+                  input = "$CLUSTER_FILE";
+                  output = "$CLUSTER_REVIEW_TXT";
+                }}
+                ;;
+            '') (builtins.attrNames singleRunBackends))}
+            *)
+              echo "Error: Backend $BACKEND does not support adversarial review." >&2
+              exit 1
+              ;;
+          esac
+      done
+
+      # Raw agent output is now an aggregate file containing all reviews
+      RAW_REVIEW_TXT="$VULN_RUN_DIR/raw_ai_review.txt"
+      touch "$RAW_REVIEW_TXT" # Ensure the file exists even if 0 reviews were made
+
+      # Safely concatenate only if files exist
+      for REV_FILE in "$RAW_REVIEWS_DIR"/review_*.txt; do
+          [ -e "$REV_FILE" ] || continue
+          cat "$REV_FILE" >> "$RAW_REVIEW_TXT"
+          echo "" >> "$RAW_REVIEW_TXT" # Add a safe newline between agent outputs
+      done
+
+      echo "${name}: Merging reviewed clusters into final report..."
+      python3 ${../backends}/sanitize_report.py \
+          --original "$CLEAN_REPORT_FILE" \
           --review "$RAW_REVIEW_TXT" \
           --output "$REVIEWED_TOML"
 
       echo "${name}: Generating Markdown report..."
-      ${pkgs.python3}/bin/python3 ${../backends/generate_markdown.py} --input "$REVIEWED_TOML" --output "$VULN_RUN_DIR/reviewed_report.md"
+      python3 ${../backends}/generate_markdown.py --input "$REVIEWED_TOML" --output "$VULN_RUN_DIR/reviewed_report.md"
 
       echo "${name}: Generating consolidated dashboard..."
       ${dashboardGenerator.run {

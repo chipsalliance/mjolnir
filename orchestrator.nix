@@ -10,6 +10,8 @@ let
   jobExpr = import jobFile;
   job = if builtins.isFunction jobExpr then jobExpr { inherit pkgs; } else jobExpr;
 
+  pythonEnv = pkgs.python3.withPackages (ps: with ps; [ networkx ]);
+
   # Fallback for hooks if missing entirely
   hooks = job.hooks or { };
 
@@ -168,6 +170,8 @@ let
 
     TOP_DIR=$(pwd)
     START_TIME=$(date +%s)
+
+    export PATH="${pythonEnv}/bin:$PATH"
 
     # Create unique output folder for all artifacts
     RUN_ID="''${BACKEND}_${job.target.repoName}_$(date +%Y%m%d_%H%M%S)"
