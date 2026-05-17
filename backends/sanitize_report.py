@@ -91,11 +91,11 @@ def main():
         print("WARNING: Original report contained no valid vulnerabilities.")
         original_vulns = [
             {
-                common.KEY_FILE: "Pipeline",
-                common.KEY_TITLE: "Initial Audit Failed",
-                common.KEY_SEVERITY: "Informational",
-                common.KEY_DESC: "The initial security auditor produced unparsable output.",
-                common.KEY_REC: "Check the raw execution logs.",
+                "file": "Pipeline",
+                "title": "Initial Audit Failed",
+                "severity": "Informational",
+                "description": "The initial security auditor produced unparsable output.",
+                "recommendation": "Check the raw execution logs.",
             }
         ]
 
@@ -113,6 +113,7 @@ def main():
     reviews_map = {f"{v.get('file')}::{v.get('title')}": v for v in reviewed_vulns_list}
 
     # Merge Data & Apply Defaults
+    final_vulns = []
     for vuln in original_vulns:
         key = f"{vuln.get('file')}::{vuln.get('title')}"
 
@@ -122,16 +123,40 @@ def main():
         if "justification" not in vuln:
             vuln["justification"] = "Not explicitly reviewed by AI or failed to parse."
 
+        # Try exact match first
+        rev = reviews_map.get(key)
+
+        # Fallback: Minimal fuzzy match if LLM changed the title slightly
+        if not rev:
+            for r_vuln in reviewed_vulns_list:
+                if vuln.get("file", "") == r_vuln.get("file", ""):
+                    t1 = set(vuln.get("title", "").lower().split())
+                    t2 = set(r_vuln.get("title", "").lower().split())
+                    if len(t1.intersection(t2)) >= 2 or len(t1) < 2:
+                        rev = r_vuln
+                        break
+
         # If the agent analyzed it, overwrite with their keys
-        if key in reviews_map:
-            rev = reviews_map[key]
+        if rev:
             for k in ["verdict", "severity", "justification", "attack_vector"]:
                 if rev.get(k):
                     vuln[k] = rev[k]
 
+        # Deletion logic: Skip adding false positives to the final list
+        verdict_str = str(vuln.get("verdict", "")).lower()
+        severity_str = str(vuln.get("severity", "")).lower()
+        if "false positive" in verdict_str or "false positive" in severity_str:
+            continue
+
+        final_vulns.append(vuln)
+
+    def escape_toml_string(s):
+        # Escape backslashes first, then quotes
+        return str(s).replace("\\", "\\\\").replace('"', '\\"')
+
     # Write out the final TOML
     with open(args.output, "w") as f:
-        for vuln in original_vulns:
+        for vuln in final_vulns:
             f.write("[[vulnerabilities]]\n")
             for k, v in vuln.items():
                 if not v:
@@ -147,7 +172,7 @@ def main():
                     safe_v = str(v).replace('"""', "'''")
                     f.write(f'{k} = """\n{safe_v}\n"""\n')
                 else:
-                    safe_v = str(v).replace('"', '\\"')
+                    safe_v = escape_toml_string(v)
                     f.write(f'{k} = "{safe_v}"\n')
             f.write("\n")
 

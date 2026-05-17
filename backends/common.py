@@ -23,8 +23,6 @@ except Exception as e:
     print(f"CRITICAL ERROR: Failed to load {SCHEMA_PATH}: {e}")
     sys.exit(1)
 
-KNOWN_KEYS = list(VULN_SCHEMA.keys())
-
 
 def generate_prompt_schema():
     """Generates the TOML schema block to inject into prompts."""
@@ -87,33 +85,46 @@ def clean_toml_output(stdout):
 
 
 def format_timeout_error(file_rel_path, timeout_secs):
-    """Generates a standard vulnerability record for timeout failures."""
-    return generate_fallback_toml(
-        {
-            KEY_FILE: file_rel_path,
-            KEY_TITLE: "Error during analysis: Timeout",
-            KEY_SEVERITY: "Informational",
-            KEY_LOCATION: "N/A",
-            KEY_DESC: f"Job hung and timed out after {timeout_secs}s.",
-            KEY_REC: "N/A",
-            KEY_VERDICT: "Informational",
-        }
-    )
+    """Generates a standard vulnerability record for timeout failures.
+
+    Args:
+        file_rel_path: Relative path of the file that failed.
+        timeout_secs: Timeout limit in seconds.
+
+    Returns:
+        Standard TOML block describing the timeout error.
+    """
+    return f"""
+[[vulnerabilities]]
+file = "{file_rel_path}"
+title = "Error during analysis: Timeout"
+severity = "Informational"
+location = "N/A"
+description = "Job hung and timed out after {timeout_secs}s."
+recommendation = "N/A"
+\n"""
 
 
 def format_process_failure(file_rel_path, error_msg):
-    """Generates a standard vulnerability record for process exit failures."""
-    return generate_fallback_toml(
-        {
-            KEY_FILE: file_rel_path,
-            KEY_TITLE: "Error during analysis: Process Failure",
-            KEY_SEVERITY: "Informational",
-            KEY_LOCATION: "N/A",
-            KEY_DESC: f"Subprocess failed with error:\n{error_msg}",
-            KEY_REC: "N/A",
-            KEY_VERDICT: "Informational",
-        }
-    )
+    """Generates a standard vulnerability record for process exit failures.
+
+    Args:
+        file_rel_path: Relative path of the file that failed.
+        error_msg: Subprocess stderr output.
+
+    Returns:
+        Standard TOML block describing the process failure.
+    """
+    error_msg_escaped = error_msg.replace('"', '\\"')  # Escape quotes for TOML
+    return f"""
+[[vulnerabilities]]
+file = "{file_rel_path}"
+title = "Error during analysis: Process Failure"
+severity = "Informational"
+location = "N/A"
+description = "Subprocess failed with error: {error_msg_escaped}"
+recommendation = "N/A"
+\n"""
 
 
 def run_orchestrator(
