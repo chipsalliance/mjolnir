@@ -47,12 +47,18 @@ def main():
             location = vuln.get("location", "Unknown")
             description = vuln.get("description", "No description provided.")
             recommendation = vuln.get("recommendation", "No recommendation provided.")
+            justification = vuln.get("justification")
+            attack_vector = vuln.get("attack_vector")
 
             f.write(f"## File: {file_path}\n\n")
             f.write(f"### {title}\n")
             f.write(f"**Severity:** {severity}\n")
             f.write(f"**Location:** {location}\n\n")
             f.write(f"#### Description\n{description}\n\n")
+            if attack_vector:
+                f.write(f"#### Attack Vector\n{attack_vector}\n\n")
+            if justification:
+                f.write(f"#### Adversarial Justification\n{justification}\n\n")
             f.write(f"#### Recommendation\n{recommendation}\n\n")
             f.write("---\n\n")
 

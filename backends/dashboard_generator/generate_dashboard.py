@@ -81,7 +81,18 @@ if __name__ == "__main__":
             "title": v.get("title", "Untitled"),
             "severity": v.get("severity", "Unknown"),
             "description": v.get("description", "")
-            + f"\n\n**Location:** {v.get('location', 'N/A')}\n\n**Recommendation:** {v.get('recommendation', 'N/A')}",
+            + f"\n\n**Location:** {v.get('location', 'N/A')}"
+            + f"\n\n**Recommendation:** {v.get('recommendation', 'N/A')}"
+            + (
+                f"\n\n**Justification:** {v.get('justification', 'N/A')}"
+                if v.get("justification")
+                else ""
+            )
+            + (
+                f"\n\n**Attack Vector:** {v.get('attack_vector', 'N/A')}"
+                if v.get("attack_vector")
+                else ""
+            ),
         }
 
         sev = vuln["severity"].lower()
