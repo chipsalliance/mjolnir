@@ -38,6 +38,19 @@ def generate_prompt_schema():
     return "\n".join(lines)
 
 
+def generate_reporting_requirements():
+    """Generates the strict TOML formatting rules alongside the schema."""
+    schema_block = generate_prompt_schema()
+
+    return f"""1. **Format:** All reports must be generated as valid TOML. Output ONLY the raw TOML content without any markdown fences (```) or conversational text.
+   - **CRITICAL:** You MUST use `[[vulnerabilities]]` as the root array for every finding.
+   - **CRITICAL:** DO NOT use nested tables (e.g., avoid `[vulnerability.description]`). Keep all keys perfectly FLAT.
+   - **CRITICAL:** Use the exact keys shown in the schema below (e.g., use `description`, not `details`).
+   - Use triple double-quotes (`\"\"\"`) for all multi-line strings.
+2. **Schema:**
+{schema_block}"""
+
+
 def generate_fallback_toml(overrides):
     """Generates a schema-compliant TOML block using provided overrides."""
     lines = ["[[vulnerabilities]]"]
@@ -125,6 +138,10 @@ def run_orchestrator(
     # Read model prompt
     with open(system_prompt_path, "r") as f:
         prompt = f.read().strip()
+
+    prompt = prompt.replace(
+        "{REPORTING_REQUIREMENTS}", generate_reporting_requirements()
+    )
 
     # Ensure output is clean
     with open(output_path, "w") as out_f:

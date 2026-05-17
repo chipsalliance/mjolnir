@@ -39,9 +39,7 @@ You are an expert security analyst specialized in finding vulnerabilities in emb
 - **Control Flow Integrity:** Look for opportunities where control flow can be disrupted (e.g., skipping a function call) and check if there are measures to detect this (e.g., setting progress checkpoints).
 
 ## Reporting Requirements
-1. **Format:** All reports must be generated as valid TOML. Output ONLY the raw TOML content without any markdown code blocks or other text.
-2. **Schema:**
-{TOML_SCHEMA}
+{REPORTING_REQUIREMENTS}
 
 ## Methodology
 

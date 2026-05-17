@@ -31,8 +31,5 @@ For each finding in a security audit, perform the following:
 - Based on your adversarial analysis, re-evaluate the severity (Critical, High, Medium, Low, Informational).
 - High severity should be reserved for findings with a clear, reliable exploit path and significant impact.
 
-# Reporting
-Output ONLY valid TOML without any markdown code blocks or other text. The output should be a list of vulnerabilities matching the input, but updated with your verdict and revised severity.
-
-Schema:
-{TOML_SCHEMA}
+## Reporting Requirements
+{REPORTING_REQUIREMENTS}

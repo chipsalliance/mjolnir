@@ -35,7 +35,9 @@ def run_single_query(
         prompt = f.read().strip()
 
     # Replace the prompt with the keys of the TOML format from common.py
-    prompt = prompt.replace("{TOML_SCHEMA}", common.generate_prompt_schema())
+    prompt = prompt.replace(
+        "{REPORTING_REQUIREMENTS}", common.generate_reporting_requirements()
+    )
 
     cmd = [
         gemini_bin,
