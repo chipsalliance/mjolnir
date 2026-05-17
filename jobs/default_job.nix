@@ -152,50 +152,25 @@ in
           --outdir "$CLUSTER_DIR" \
           --max-size 15
 
-      # Target directory for cluster-specific adversarial judgments
-      RAW_REVIEWS_DIR="$VULN_RUN_DIR/raw_reviews"
-      mkdir -p "$RAW_REVIEWS_DIR"
+      # Execute phase 2 adversarial review 
+      echo "${name}: Executing parallel adversarial reviews via native batch mode..."
 
-      # Run the review engine per cluster
-      echo "${name}: Executing parallel adversarial reviews..."
+      # Create a text file listing all the cluster files
+      ls -1 "$CLUSTER_DIR" > "$VULN_RUN_DIR/cluster_list.txt"
 
-      # We loop through every generated cluster TOML file dynamically in bash
-      for CLUSTER_FILE in "$CLUSTER_DIR"/cluster_*.toml; do
-          # Skip loop if no files matched the pattern
-          [ -e "$CLUSTER_FILE" ] || continue
-
-          CLUSTER_ID=$(basename "$CLUSTER_FILE" .toml)
-          CLUSTER_REVIEW_TXT="$RAW_REVIEWS_DIR/review_''${CLUSTER_ID}.txt"
-
-          echo " -> Reviewing findings for ''${CLUSTER_ID}..."
-
-          case "$BACKEND" in
-            ${builtins.concatStringsSep "\n" (builtins.map (bName: ''
-              "${bName}")
-                ${singleRunBackends.${bName}.runSingle {
-                  systemPrompt = adversarialPrompt.backendArgs.systemPrompt;
-                  input = "$CLUSTER_FILE";
-                  output = "$CLUSTER_REVIEW_TXT";
-                }}
-                ;;
-            '') (builtins.attrNames singleRunBackends))}
-            *)
-              echo "Error: Backend $BACKEND does not support adversarial review." >&2
-              exit 1
-              ;;
-          esac
-      done
-
-      # Raw agent output is now an aggregate file containing all reviews
+      # The final aggregated output will go straight into raw_ai_review.txt
       RAW_REVIEW_TXT="$VULN_RUN_DIR/raw_ai_review.txt"
-      touch "$RAW_REVIEW_TXT" # Ensure the file exists even if 0 reviews were made
 
-      # Safely concatenate only if files exist
-      for REV_FILE in "$RAW_REVIEWS_DIR"/review_*.txt; do
-          [ -e "$REV_FILE" ] || continue
-          cat "$REV_FILE" >> "$RAW_REVIEW_TXT"
-          echo "" >> "$RAW_REVIEW_TXT" # Add a safe newline between agent outputs
-      done
+      # Run the backend from phase 1 for phase 2
+      ${loadedBackends.${resolvedBackend}.run {
+        systemPrompt = adversarialPrompt.backendArgs.systemPrompt;
+        src = "$CLUSTER_DIR";
+        files = "$VULN_RUN_DIR/cluster_list.txt";
+        output = "$RAW_REVIEW_TXT";
+      }}
+
+      # Ensure the file exists even if 0 clusters were generated
+      touch "$RAW_REVIEW_TXT"
 
       echo "${name}: Merging reviewed clusters into final report..."
       python3 ${../backends}/sanitize_report.py \
