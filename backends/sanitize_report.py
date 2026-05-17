@@ -8,29 +8,65 @@ import common
 def extract_sloppy_toml_blocks(text):
     """
     Extracts TOML output from RAW agent output.
-    Ignores preambles, postambles, and gracefully handles unescaped quotes.
+    Uses a synonym mapper to catch LLM hallucinations and normalizes them.
     """
     # Split the text by the TOML array header
     blocks = re.split(r"\[\[vulnerabilit(?:ies|y)\]\]", text, flags=re.IGNORECASE)
 
     parsed_vulns = []
 
+    # Map hallucinated keys to our official schema keys
+    KEY_SYNONYMS = {
+        "file_path": "file",
+        "filename": "file",
+        "name": "title",
+        "headline": "title",
+        "summary": "title",
+        "details": "description",
+        "remediation": "recommendation",
+    }
+
+    # Official keys we want to extract
+    OFFICIAL_KEYS = [
+        "file",
+        "title",
+        "severity",
+        "description",
+        "recommendation",
+        "attack_vector",
+        "justification",
+        "verdict",
+    ]
+
+    # We search for ALL official keys AND their known synonyms
+    search_keys = OFFICIAL_KEYS + list(KEY_SYNONYMS.keys())
+
     for block in blocks:
+        if not block.strip():
+            continue
+
         vuln = {}
-        for key in common.KNOWN_KEYS:
-            # Try to match triple-quoted multi-line strings first
+        for search_key in search_keys:
+            # Try to match triple-quoted or single-quoted multi-line strings (""" or ''')
             triple_match = re.search(
-                rf'^{key}\s*=\s*"""(.*?)"""', block, re.MULTILINE | re.DOTALL
+                rf'^{search_key}\s*=\s*(?:"""|\'\'\')(.*?)(?:"""|\'\'\')',
+                block,
+                re.MULTILINE | re.DOTALL,
             )
             if triple_match:
-                vuln[key] = triple_match.group(1).strip()
+                val = triple_match.group(1).strip()
+                normalized_key = KEY_SYNONYMS.get(search_key, search_key)
+                vuln[normalized_key] = val
                 continue
 
-            # Try to match single-quoted lines.
-            # The (.*) absorbs unescaped inner quotes
-            single_match = re.search(rf'^{key}\s*=\s*"(.*)"\s*$', block, re.MULTILINE)
+            # Try to match standard single-line strings ("...")
+            single_match = re.search(
+                rf'^{search_key}\s*=\s*"(.*?)"\s*$', block, re.MULTILINE
+            )
             if single_match:
-                vuln[key] = single_match.group(1).strip()
+                val = single_match.group(1).strip()
+                normalized_key = KEY_SYNONYMS.get(search_key, search_key)
+                vuln[normalized_key] = val
 
         if vuln.get("title") and vuln.get("file"):
             parsed_vulns.append(vuln)
