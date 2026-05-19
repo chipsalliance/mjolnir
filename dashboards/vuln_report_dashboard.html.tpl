@@ -165,13 +165,24 @@
                     continue;
                 }
 
-                // Inline formatting for text lines
-                let processedLine = line
+                // Extract inline code to protect it from formatting
+                let inlineCodes = [];
+                let processedLine = line.replace(/`([^`]+)`/g, function(match, codeSegment) {
+                    inlineCodes.push(codeSegment);
+                    return `@@INLINE_CODE_${inlineCodes.length - 1}@@`; // Changed to @@
+                });
+
+                // Apply formatting, using negative lookarounds to prevent intra-word emphasis
+                processedLine = processedLine
                     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/__(.*?)__/g, '<strong>$1</strong>')
+                    .replace(/(?<!\w)__(.*?)__(?!\w)/g, '<strong>$1</strong>')
                     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                    .replace(/_(.*?)_/g, '<em>$1</em>')
-                    .replace(/`([^`]+)`/g, '<code>$1</code>');
+                    .replace(/(?<!\w)_(.*?)_(?!\w)/g, '<em>$1</em>');
+
+                // Restore inline code
+                processedLine = processedLine.replace(/@@INLINE_CODE_(\d+)@@/g, function(match, index) {
+                    return `<code>${inlineCodes[index]}</code>`;
+                });
 
                 htmlResult.push(processedLine + '\n');
             }
