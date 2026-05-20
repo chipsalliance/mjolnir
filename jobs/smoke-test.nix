@@ -6,6 +6,7 @@ import ./default_job.nix { inherit pkgs; } {
   workspaceDir = "/tmp/smoke-test-workspace";
   outputDir = "./test-output";
   backend = "mock";
+  enableGcsUpload = false;
 
   target = {
     repoUrl = "https://github.com/chipsalliance/caliptra-sw.git";

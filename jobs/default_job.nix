@@ -12,6 +12,7 @@
   contextFile ? null,
   timeout ? null,
   backend ? "gemini", # Default backend name
+  enableGcsUpload ? true,
 }:
 let
   # Dynamic Backend Loading
@@ -101,10 +102,10 @@ in
     local = import ../storage/local.nix { inherit pkgs; path = outputDir; };
     gcs = import ../storage/gcs.nix { inherit pkgs; path = name; };
   in {
-    name = "local+gcs";
+    name = if enableGcsUpload then "local+gcs" else "local";
     upload = { runDir }: ''
       ${local.upload { inherit runDir; }}
-      ${gcs.upload { inherit runDir; }}
+      ${if enableGcsUpload then gcs.upload { inherit runDir; } else ""}
     '';
   };
 
