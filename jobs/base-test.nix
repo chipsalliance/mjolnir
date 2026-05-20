@@ -7,9 +7,10 @@
   outputDir,
   backend ? null,
   numFiles ? 10,
+  enableGcsUpload ? true,
 }:
 import ./default_job.nix { inherit pkgs; } {
-  inherit name workspaceDir outputDir backend;
+  inherit name workspaceDir outputDir backend enableGcsUpload;
   parallel = 5;
 
   target = {
