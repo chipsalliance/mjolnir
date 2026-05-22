@@ -1,35 +1,35 @@
 [caliptra-mcu-sw-2p0]
-source_dir = "caliptra-mcu-sw-2p0-output"
+source_dir = "output/caliptra/mcu-sw-2p0"
 display_name = "Caliptra MCU SW 2.0"
 
 [caliptra-sw-2p1]
-source_dir = "caliptra-sw-2p1-output"
+source_dir = "output/caliptra/sw-2p1"
 display_name = "Caliptra SW 2.1"
 
 [opentitan-rom]
-source_dir = "opentitan-sw-output/rom"
+source_dir = "output/opentitan/rom"
 display_name = "OpenTitan ROM"
 
 [opentitan-rom-ext]
-source_dir = "opentitan-sw-output/rom_ext"
+source_dir = "output/opentitan/rom_ext"
 display_name = "OpenTitan ROM EXT"
 
 [opentitan-manuf]
-source_dir = "opentitan-sw-output/manuf"
+source_dir = "output/opentitan/manuf"
 display_name = "OpenTitan Manuf"
 
 [opentitan-lib]
-source_dir = "opentitan-sw-output/lib"
+source_dir = "output/opentitan/lib"
 display_name = "OpenTitan Lib"
 
 [opentitan-crypto]
-source_dir = "opentitan-sw-output/crypto"
+source_dir = "output/opentitan/crypto"
 display_name = "OpenTitan Crypto"
 
 [caliptra-dpe]
-source_dir = "caliptra-dpe-output"
+source_dir = "output/caliptra/dpe"
 display_name = "Caliptra DPE"
 
 [caliptra-dpe-1x]
-source_dir = "caliptra-dpe-1x-output"
+source_dir = "output/caliptra/dpe-1x"
 display_name = "Caliptra DPE 1.x"

@@ -1,10 +1,10 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 { pkgs }:
-import ./default_job.nix { inherit pkgs; } {
+import ../default_job.nix { inherit pkgs; } {
   name = "Caliptra DPE";
   workspaceDir = "/tmp/caliptra-dpe-workspace";
-  outputDir = "./caliptra-dpe-output";
+  outputDir = "./output/caliptra/dpe";
   backend = "gemini";
 
   target = {

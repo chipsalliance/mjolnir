@@ -1,10 +1,10 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 { pkgs }:
-import ./default_job.nix { inherit pkgs; } {
+import ../default_job.nix { inherit pkgs; } {
   name = "Smoke Test";
   workspaceDir = "/tmp/smoke-test-workspace";
-  outputDir = "./test-output";
+  outputDir = "./test-output/smoke-test";
   backend = "mock";
   enableGcsUpload = false;
 

@@ -20,7 +20,7 @@ in
 import ../default_job.nix { inherit pkgs; } {
   name = "Malformed Postprocessing Handling Test";
   workspaceDir = "/tmp/postprocessing-test-workspace";
-  outputDir = "./postprocessing-test-output";
+  outputDir = "./test-output/postprocessing-test";
   backend = "gemini"; 
 
   contextFile = null;

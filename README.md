@@ -127,6 +127,10 @@ Job groups allow executing multiple audits sequentially. This is useful for full
   ```bash
   nix run .#opentitan-all
   ```
+- **`caliptra-all`**: Runs all Caliptra subjobs sequentially.
+  ```bash
+  nix run .#caliptra-all
+  ```
 - **`scan-all-test`**: Runs test/smoke scans (`smoke-test`).
   ```bash
   nix run .#scan-all-test
@@ -150,13 +154,13 @@ for getting a high-level overview of all security audits.
 The script looks for the latest scan results for the following components
 (expected to be present in the repository root):
 
-- **Caliptra MCU SW 2.0** (source: `caliptra-mcu-sw-2p0-output`)
-- **Caliptra SW 2.1** (source: `caliptra-sw-2p1-output`)
-- **OpenTitan ROM** (source: `opentitan-sw-output/rom`)
-- **OpenTitan ROM EXT** (source: `opentitan-sw-output/rom_ext`)
-- **OpenTitan Manuf** (source: `opentitan-sw-output/manuf`)
-- **OpenTitan Lib** (source: `opentitan-sw-output/lib`)
-- **OpenTitan Crypto** (source: `opentitan-sw-output/crypto`)
+- **Caliptra MCU SW 2.0** (source: `output/caliptra/mcu-sw-2p0`)
+- **Caliptra SW 2.1** (source: `output/caliptra/sw-2p1`)
+- **OpenTitan ROM** (source: `output/opentitan/rom`)
+- **OpenTitan ROM EXT** (source: `output/opentitan/rom_ext`)
+- **OpenTitan Manuf** (source: `output/opentitan/manuf`)
+- **OpenTitan Lib** (source: `output/opentitan/lib`)
+- **OpenTitan Crypto** (source: `output/opentitan/crypto`)
 
 #### Usage
 
@@ -338,4 +342,4 @@ To verify the tool with mocks:
 nix run .#smoke-test
 ```
 
-Results will be in the `test-output` directory.
+Results will be in the `test-output/smoke-test` directory.

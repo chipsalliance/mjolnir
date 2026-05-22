@@ -12,7 +12,7 @@ in
 import ../default_job.nix { inherit pkgs; } {
   name = "OpenTitan Earlgrey A2 SW Scan - ${subjobName}";
   workspaceDir = "/tmp/opentitan-workspace/${subdir}";
-  outputDir = "./opentitan-sw-output/${subdir}";
+  outputDir = "./output/opentitan/${subdir}";
   agentDir = ../../agents/c_auditor;
   inherit timeout;
   inherit backend;

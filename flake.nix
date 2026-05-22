@@ -27,14 +27,14 @@
           makeJobGroup = import ./job_group.nix { inherit pkgs; };
 
           # Individual (test) jobs
-          smoke-test = makeOrchestrator { jobFile = ./jobs/smoke-test.nix; };
+          smoke-test = makeOrchestrator { jobFile = ./jobs/tests/smoke-test.nix; };
           postprocessing-test = makeOrchestrator { jobFile = ./jobs/tests/postprocessing-test.nix; };
 
           # Individual (real) jobs
-          caliptra-sw-2p1-latest = makeOrchestrator { jobFile = ./jobs/caliptra-sw-2p1-latest.nix; };
-          caliptra-mcu-sw-2p0-latest = makeOrchestrator { jobFile = ./jobs/caliptra-mcu-sw-2p0-latest.nix; };
-          caliptra-dpe-latest = makeOrchestrator { jobFile = ./jobs/caliptra-dpe-latest.nix; };
-          caliptra-dpe-1x = makeOrchestrator { jobFile = ./jobs/caliptra-dpe-1x.nix; };
+          caliptra-sw-2p1-latest = makeOrchestrator { jobFile = ./jobs/caliptra/sw-2p1-latest.nix; };
+          caliptra-mcu-sw-2p0-latest = makeOrchestrator { jobFile = ./jobs/caliptra/mcu-sw-2p0-latest.nix; };
+          caliptra-dpe-latest = makeOrchestrator { jobFile = ./jobs/caliptra/dpe-latest.nix; };
+          caliptra-dpe-1x = makeOrchestrator { jobFile = ./jobs/caliptra/dpe-1x.nix; };
           opentitan-rom = makeOrchestrator { jobFile = ./jobs/opentitan/rom.nix; };
           opentitan-rom-ext = makeOrchestrator { jobFile = ./jobs/opentitan/rom_ext.nix; };
           opentitan-manuf = makeOrchestrator { jobFile = ./jobs/opentitan/manuf.nix; };
@@ -47,6 +47,7 @@
             description = "All Test/Smoke Vulnerability Scans";
             jobs = [
               { name = "smoke-test"; pkg = smoke-test; }
+              { name = "postprocessing-test"; pkg = postprocessing-test; }
             ];
           };
 
@@ -77,12 +78,23 @@
               { name = "opentitan-crypto"; pkg = opentitan-crypto; }
             ];
           };
+
+          caliptra-all = makeJobGroup {
+            name = "caliptra-all";
+            description = "All Caliptra Vulnerability Scans";
+            jobs = [
+              { name = "caliptra-sw-2p1-latest"; pkg = caliptra-sw-2p1-latest; }
+              { name = "caliptra-mcu-sw-2p0-latest"; pkg = caliptra-mcu-sw-2p0-latest; }
+              { name = "caliptra-dpe-latest"; pkg = caliptra-dpe-latest; }
+              { name = "caliptra-dpe-1x"; pkg = caliptra-dpe-1x; }
+            ];
+          };
         in
         {
           inherit smoke-test postprocessing-test
                   caliptra-sw-2p1-latest caliptra-mcu-sw-2p0-latest
                   opentitan-rom opentitan-rom-ext opentitan-manuf opentitan-lib opentitan-crypto
-                  opentitan-all
+                  opentitan-all caliptra-all
                   caliptra-dpe-latest
                   caliptra-dpe-1x
                   scan-all scan-all-test;

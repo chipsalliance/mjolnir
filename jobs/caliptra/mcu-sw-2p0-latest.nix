@@ -1,10 +1,10 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 { pkgs }:
-import ./default_job.nix { inherit pkgs; } {
+import ../default_job.nix { inherit pkgs; } {
   name = "Caliptra MCU SW Analysis";
   workspaceDir = "/tmp/caliptra-mcu-sw-workspace";
-  outputDir = "./caliptra-mcu-sw-2p0-output";
+  outputDir = "./output/caliptra/mcu-sw-2p0";
   backend = "gemini";
 
   target = {

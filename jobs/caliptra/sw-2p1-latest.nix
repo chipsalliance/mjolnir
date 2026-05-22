@@ -1,12 +1,12 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 { pkgs }:
-import ./default_job.nix { inherit pkgs; } {
+import ../default_job.nix { inherit pkgs; } {
   name = "Caliptra SW Analysis";
   workspaceDir = "/tmp/caliptra-sw-workspace";
-  outputDir = "./caliptra-sw-2p1-output";
+  outputDir = "./output/caliptra/sw-2p1";
   backend = "gemini";
-  contextFile = ../threat-models/caliptra/THREAT_MODEL_FIRMWARE_SMALL.md;
+  contextFile = ../../threat-models/caliptra/THREAT_MODEL_FIRMWARE_SMALL.md;
 
   target = {
     repoUrl = "https://github.com/chipsalliance/caliptra-sw.git";

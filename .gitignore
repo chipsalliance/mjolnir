@@ -7,7 +7,12 @@
 __pycache__/
 *.pyc
 
+# Generated test vulnerability reports
+test-output/
+
 # Generated vulnerability reports
-caliptra-mcu-sw-2p0-output/
-caliptra-sw-2p1-output/
-opentitan-sw-output/
+output/
+
+# Environment
+.env
+.envrc
