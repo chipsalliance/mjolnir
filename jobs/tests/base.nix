@@ -6,11 +6,13 @@
   workspaceDir,
   outputDir,
   backend ? null,
+  model ? "unused-testing-default",
   numFiles ? 10,
-  enableGcsUpload ? true,
+  enableGcsUpload ? false,
 }:
 import ../default_job.nix { inherit pkgs; } {
-  inherit name workspaceDir outputDir backend enableGcsUpload;
+  inherit name workspaceDir outputDir backend enableGcsUpload model;
+  agentDir = ../../agents/rust_auditor;
   parallel = 5;
 
   target = {

@@ -22,6 +22,7 @@ import ../default_job.nix { inherit pkgs; } {
   workspaceDir = "/tmp/postprocessing-test-workspace";
   outputDir = "./test-output/postprocessing-test";
   backend = "gemini"; 
+  enableGcsUpload = false;
 
   contextFile = null;
   agentDir = ../../agents/postprocessing_test;
