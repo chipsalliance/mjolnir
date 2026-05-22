@@ -28,8 +28,10 @@
 
           # Individual (test) jobs
           smoke-test = makeOrchestrator { jobFile = ./jobs/tests/smoke-test.nix; };
-          postprocessing-test = makeOrchestrator { jobFile = ./jobs/tests/postprocessing-test.nix; };
+          gcs-test = makeOrchestrator { jobFile = ./jobs/tests/gcs-test.nix; };
           gemini-test = makeOrchestrator { jobFile = ./jobs/tests/gemini-test.nix; };
+          gemini-gcs-test = makeOrchestrator { jobFile = ./jobs/tests/gemini-gcs-test.nix; };
+          postprocessing-test = makeOrchestrator { jobFile = ./jobs/tests/postprocessing-test.nix; };
 
           # Individual (real) jobs
           caliptra-sw-2p1-latest = makeOrchestrator { jobFile = ./jobs/caliptra/sw-2p1-latest.nix; };
@@ -93,7 +95,7 @@
           };
         in
         {
-          inherit smoke-test postprocessing-test gemini-test
+          inherit smoke-test gcs-test gemini-test gemini-gcs-test postprocessing-test
                   caliptra-sw-2p1-latest caliptra-mcu-sw-2p0-latest
                   opentitan-rom opentitan-rom-ext opentitan-manuf opentitan-lib opentitan-crypto
                   opentitan-all caliptra-all
