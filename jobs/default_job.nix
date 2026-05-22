@@ -6,9 +6,10 @@
   workspaceDir,
   outputDir,
   target,
-  parallel ? 10,
+  model ? null,
+  parallel ? null,
   postExtract ? "",
-  agentDir ? ../agents/rust_auditor,
+  agentDir,
   contextFile ? null,
   timeout ? null,
   backend ? "gemini", # Default backend name
@@ -55,9 +56,9 @@ let
       allArgs = {
         inherit pkgs;
         silentMissing = true;
-        inherit parallel;
         inherit timeout;
-      };
+      } // (if parallel != null then { inherit parallel; } else {})
+        // (if model != null then { inherit model; } else {});
       filteredArgs = pkgs.lib.filterAttrs (argName: _: expectedArgs ? ${argName}) allArgs;
     in
       backendFunc filteredArgs;

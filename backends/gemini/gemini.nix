@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 {
   pkgs,
-  model ? "gemini-2.5-pro",
-  googleCloudProject ? "caliptra-github-ci",
+  model,
+  googleCloudProject ? null,
   geminiBin ? "${pkgs.gemini-cli}/bin/gemini",
   silentMissing ? false,
-  parallel ? 1,
+  parallel ? 10,
   timeout ? null,
 }:
 {

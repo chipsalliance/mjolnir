@@ -16,6 +16,32 @@ import common
 DEFAULT_TIMEOUT_SECS = 600
 
 
+def resolve_api_env(project, silent=False):
+    """Logs the active API mode (if not silent) and returns the resolved environment."""
+    env = os.environ.copy()
+    is_gemini_api = "GEMINI_API_KEY" in env
+
+    if not silent:
+        if is_gemini_api:
+            print(
+                " -> [API Mode] Public Gemini Developer API (using GEMINI_API_KEY)",
+                flush=True,
+            )
+        else:
+            project_id = env.get("GOOGLE_CLOUD_PROJECT", project)
+            print(
+                f" -> [API Mode] Google Cloud Vertex AI (Project: {project_id or 'default'})",
+                flush=True,
+            )
+
+    if is_gemini_api:
+        env.pop("GOOGLE_CLOUD_PROJECT", None)
+    elif project:
+        env["GOOGLE_CLOUD_PROJECT"] = project
+
+    return env
+
+
 def run_single_query(
     input_path,
     output_path,
@@ -26,6 +52,8 @@ def run_single_query(
     timeout_secs,
 ):
     """Invokes the Gemini CLI on a single input file and writes the output."""
+    env = resolve_api_env(project)
+
     print(
         f" -> Running single query on {input_path} using Gemini ({model})...",
         flush=True,
@@ -54,13 +82,6 @@ def run_single_query(
     if code_dir:
         cmd.extend(["--include-directories", code_dir])
 
-    env = os.environ.copy()
-    if project:
-        env["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.expanduser(
-            "~/.config/gcloud/application_default_credentials.json"
-        )
-        env["GOOGLE_CLOUD_PROJECT"] = project
-
     with open(input_path, "r") as in_f, open(output_path, "w") as out_f:
         subprocess.run(
             cmd,
@@ -86,6 +107,7 @@ def run_analysis(
     timeout_secs,
 ):
     """Runs threat analysis on a list of files in parallel using Gemini."""
+    base_env = resolve_api_env(project)
 
     def analyze_single_file(file_rel_path, file_index, total_files, prompt):
         full_path = os.path.join(src_dir, file_rel_path)
@@ -102,12 +124,7 @@ def run_analysis(
             f" -> ({file_index}/{total_files}) Analyzing {file_rel_path}...", flush=True
         )
 
-        env = os.environ.copy()
-        if project:
-            env["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.expanduser(
-                "~/.config/gcloud/application_default_credentials.json"
-            )
-            env["GOOGLE_CLOUD_PROJECT"] = project
+        env = base_env.copy()
 
         cmd = [
             gemini_bin,

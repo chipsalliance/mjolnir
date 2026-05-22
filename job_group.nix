@@ -13,7 +13,7 @@ pkgs.writeShellScriptBin name ''
     echo "=================================================="
     echo " Running job: ${j.name}"
     echo "=================================================="
-    ${j.pkg}/bin/vuln-orchestrator
+    ${j.pkg}/bin/vuln-orchestrator "$@"
   '') jobs}
 
   echo ""

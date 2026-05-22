@@ -1,7 +1,15 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 { pkgs }:
-{ subjobName, searchPaths, subdir, extensions ? [ "c" "h" "s" ], timeout ? 3600, backend ? "gemini" }:
+{
+  subjobName,
+  searchPaths,
+  subdir,
+  extensions ? [ "c" "h" "s" ],
+  timeout ? 3600,
+  backend ? null,
+  model ? "gemini-2.5-pro",
+}:
 let
   # Helper to build fd flags for extensions: [ "c" "h" "s" ] -> "-e c -e h -e s"
   fdExtFlags = pkgs.lib.concatMapStringsSep " " (ext: "-e ${ext}") extensions;
@@ -14,8 +22,7 @@ import ../default_job.nix { inherit pkgs; } {
   workspaceDir = "/tmp/opentitan-workspace/${subdir}";
   outputDir = "./output/opentitan/${subdir}";
   agentDir = ../../agents/c_auditor;
-  inherit timeout;
-  inherit backend;
+  inherit timeout backend model;
   contextFile = ../../threat-models/opentitan/THREAT_MODEL_FIRMWARE_SMALL.md;
 
   target = {
