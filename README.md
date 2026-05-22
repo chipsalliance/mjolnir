@@ -138,11 +138,25 @@ Job groups allow executing multiple audits sequentially. This is useful for full
 
 #### C. Test Targets
 
-Used for verifying the infrastructure and authentication.
+Used for verifying the infrastructure, LLM authentication, and GCS storage uploads.
 
-- **`smoke-test`**: Runs a quick analysis using a mock backend.
+- **`smoke-test`**: Runs a quick, local analysis using a mock backend (takes 2s, free, safe default).
   ```bash
   nix run .#smoke-test
+  ```
+- **`gcs-test`**: Verifies the GCS upload path using the mock backend. Requires the `MJOLNIR_GCS_BUCKET` environment variable to be set.
+  ```bash
+  export MJOLNIR_GCS_BUCKET="my-bucket"
+  nix run .#gcs-test
+  ```
+- **`gemini-test`**: Runs a real Gemini scan on a small subset (first 10 files) of `caliptra-sw`. Requires a `GEMINI_API_KEY` or active GCP Vertex AI credentials.
+  ```bash
+  nix run .#gemini-test
+  ```
+- **`gemini-gcs-test`**: Runs a real Gemini scan (10 files) and uploads results to GCS. Requires both API key/GCP setup and `MJOLNIR_GCS_BUCKET`.
+  ```bash
+  export MJOLNIR_GCS_BUCKET="my-bucket"
+  nix run .#gemini-gcs-test
   ```
 
 ### Aggregating Scan Results
@@ -316,30 +330,81 @@ EOF
 
 ## Authentication & Operation Modes
 
-Mjolnir uses **Application Default Credentials (ADC)** to authenticate with Google Cloud Vertex AI:
+Mjolnir uses **Application Default Credentials (ADC)** to authenticate with Google Cloud Vertex AI. You can configure authentication in one of two ways:
+
+### Option A: Using a Service Account Key (Recommended for automated environments)
+
+Export the `GOOGLE_APPLICATION_CREDENTIALS` environment variable pointing to your Service Account JSON key file:
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/service-account-key.json"
+```
+
+### Option B: Using User Credentials (Recommended for local development)
 
 1.  **Install gcloud**: Ensure you have the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) installed.
-2.  **Login**: Run the following command on your host machine to generate ADC:
+2.  **Login**: Run the following command to generate your local ADC credentials:
     ```bash
     gcloud auth application-default login
     ```
-3.  **Project ID**: Ensure your job configuration (or standard environment) specifies the correct billing GCP project.
+3.  **Set Path (if using custom location)**: By default, the SDK looks at `~/.config/gcloud/application_default_credentials.json`. If your credentials are at a custom path, export `GOOGLE_APPLICATION_CREDENTIALS`:
+    ```bash
+    export GOOGLE_APPLICATION_CREDENTIALS="/path/to/application_default_credentials.json"
+    ```
 
-The orchestrator will look for the credentials file at the standard location:
-`$HOME/.config/gcloud/application_default_credentials.json`
+Ensure your environment also specifies the correct billing GCP project and location:
+
+```bash
+export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+export GOOGLE_CLOUD_LOCATION="us-central1"
+```
 
 ## Testing
 
-To verify the Nix infrastructure builds:
+Mjolnir includes a 2x2 smoke test suite to verify both local pipelines and GCS uploads, using either mocks or real LLMs.
 
-```
+### 1. Verification of Nix Infrastructure (Mocks)
+
+To verify that the Nix derivations build cleanly without downloading external dependencies:
+
+```bash
 nix build .#smoke-test --no-link
 ```
 
-To verify the tool with mocks:
+To run a local mock test (instantly verifies the python runner and local file system hooks):
 
 ```bash
 nix run .#smoke-test
 ```
 
-Results will be in the `test-output/smoke-test` directory.
+Results will be saved locally in the `test-output/smoke-test` directory.
+
+To verify GCS storage uploads with mock data:
+
+```bash
+export MJOLNIR_GCS_BUCKET="your-bucket"
+nix run .#gcs-test
+```
+
+### 2. Verification of LLM Integration (Real Scans)
+
+To verify your `GEMINI_API_KEY` or GCP Vertex AI credentials against a real Gemini model (runs on the first 10 files of `caliptra-sw` to minimize quota usage):
+
+```bash
+# Option A: Using API Key
+export GEMINI_API_KEY="AIzaSy..."
+nix run .#gemini-test
+
+# Option B: Using GCP Vertex AI
+export GOOGLE_CLOUD_PROJECT="your-project"
+export GOOGLE_CLOUD_LOCATION="us-central1"
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/application_default_credentials.json"
+nix run .#gemini-test
+```
+
+To verify end-to-end LLM scan and GCS upload:
+
+```bash
+export MJOLNIR_GCS_BUCKET="your-bucket"
+nix run .#gemini-gcs-test
+```

@@ -9,7 +9,7 @@
     "run_shell_command"
   ],
   "supported_backends": [
-    "generic-llm"
+    "gemini"
   ],
   "version": "0.1.0"
 }
