@@ -47,6 +47,7 @@ def run_single_query(
         prompt,
         "--approval-mode",
         "yolo",
+        "--skip-trust",
     ]
 
     code_dir = os.environ.get("CODE_DIR")
