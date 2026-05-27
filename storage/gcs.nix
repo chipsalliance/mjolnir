@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 {
   pkgs,
-  bucket ? null,
   path ? null,
 }:
 {
@@ -12,7 +11,7 @@
     ''
       RUN_DIR_NAME=$(basename "${runDir}")
       
-      GCS_BUCKET="''${MJOLNIR_GCS_BUCKET:-${if bucket != null then bucket else ""}}"
+      GCS_BUCKET="$MJOLNIR_GCS_BUCKET"
 
       if [ -z "$GCS_BUCKET" ]; then
         echo "Error: GCS upload enabled but no GCS bucket is configured." >&2

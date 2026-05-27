@@ -6,13 +6,13 @@
   workspaceDir,
   outputDir,
   target,
-  model ? null,
   parallel ? null,
   postExtract ? "",
   agentDir,
   contextFile ? null,
   timeout ? null,
-  backend ? "gemini", # Default backend name
+  backend ? null,
+  model ? null,
   enableGcsUpload ? true,
 }:
 let
@@ -49,16 +49,14 @@ let
   # Merge open-source backends with private backends injected via pkgs
   allBackendFuncs = openSourceBackendFuncs // (pkgs.privateBackends or {});
 
-  # Evaluate all backend functions with job-specific parameters
+  # Evaluate all backend functions with static job parameters
   evaluateBackend = name: backendFunc:
     let
       expectedArgs = builtins.functionArgs backendFunc;
       allArgs = {
         inherit pkgs;
         silentMissing = true;
-        inherit timeout;
-      } // (if parallel != null then { inherit parallel; } else {})
-        // (if model != null then { inherit model; } else {});
+      };
       filteredArgs = pkgs.lib.filterAttrs (argName: _: expectedArgs ? ${argName}) allArgs;
     in
       backendFunc filteredArgs;
@@ -68,7 +66,7 @@ let
   dashboardGenerator = import ../backends/dashboard_generator/dashboard_generator.nix { inherit pkgs; };
 
   # Select backend
-  resolvedBackend = if backend != null then backend else "gemini";
+  resolvedBackend = if backend != null then backend else "mock";
 
   # Load adversarial filtering prompt using chosen backend's name
   adversarialPrompt = import ../agents/load.nix {
@@ -113,6 +111,7 @@ in
   # Backend Configuration
   backends = loadedBackends;
   backend = resolvedBackend;
+  inherit model;
 
   # Hooks
   hooks = {
@@ -129,7 +128,7 @@ in
       # Final merged TOML
       REVIEWED_TOML="$VULN_RUN_DIR/reviewed_report.toml"
       
-      case "$BACKEND" in
+      case "$MJOLNIR_BACKEND" in
         ${builtins.concatStringsSep "\n" (builtins.map (bName: ''
           "${bName}")
             ${singleRunBackends.${bName}.runSingle {
@@ -140,7 +139,7 @@ in
             ;;
         '') (builtins.attrNames singleRunBackends))}
         *)
-          echo "Error: Backend $BACKEND does not support adversarial review." >&2
+          echo "Error: Backend $MJOLNIR_BACKEND does not support adversarial review." >&2
           exit 1
           ;;
       esac

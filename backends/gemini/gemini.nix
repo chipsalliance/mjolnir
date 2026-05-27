@@ -2,12 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 {
   pkgs,
-  model,
-  googleCloudProject ? null,
-  geminiBin ? "${pkgs.gemini-cli}/bin/gemini",
   silentMissing ? false,
-  parallel ? 10,
-  timeout ? null,
 }:
 {
   name = "gemini";
@@ -21,22 +16,24 @@
       output,
     }:
     ''
-      echo "Running Gemini backend (${model}) in Batch Mode..."
+      echo "Running Gemini backend ($MJOLNIR_MODEL) in Batch Mode..."
 
       # Set PYTHONPATH to backends/ directory so that gemini/gemini.py
       # can import the shared common.py module.
+      # Still export GOOGLE_APPLICATION_CREDENTIALS so Google Auth library
+      # can locate the ADC JSON file.
       PYTHONPATH="${../.}" \
       ${pkgs.python3}/bin/python3 ${./gemini.py} \
         --src "${src}" \
         --files "${files}" \
         --output "${output}" \
         --prompt "${systemPrompt}" \
-        --model "${model}" \
-        --gemini-bin "${geminiBin}" \
-        --parallel "''${PARALLEL:-${toString parallel}}" \
-        ${if silentMissing then "--silent-missing" else ""} \
-        ${if googleCloudProject != null then "--project \"\${GOOGLE_CLOUD_PROJECT:-${googleCloudProject}}\"" else "\${GOOGLE_CLOUD_PROJECT:+--project $GOOGLE_CLOUD_PROJECT}"} \
-        ${if timeout != null then "--timeout ${toString timeout}" else ""}
+        --model "$MJOLNIR_MODEL" \
+        --parallel "$MJOLNIR_PARALLEL" \
+        --api-key "$GEMINI_API_KEY" \
+        --project "$GOOGLE_CLOUD_PROJECT" \
+        --location "$GOOGLE_CLOUD_LOCATION" \
+        ${if silentMissing then "--silent-missing" else ""}
     '';
 
   # Single-File Mode: Analyzes or processes a single file
@@ -47,16 +44,16 @@
       output,
     }:
     ''
-      echo "Running Gemini backend (${model}) in Single-File Mode..."
+      echo "Running Gemini backend ($MJOLNIR_MODEL) in Single-File Mode..."
 
       PYTHONPATH="${../.}" \
       ${pkgs.python3}/bin/python3 ${./gemini.py} \
         --input "${input}" \
         --output "${output}" \
         --prompt "${systemPrompt}" \
-        --model "${model}" \
-        --gemini-bin "${geminiBin}" \
-        ${if googleCloudProject != null then "--project \"\${GOOGLE_CLOUD_PROJECT:-${googleCloudProject}}\"" else "\${GOOGLE_CLOUD_PROJECT:+--project $GOOGLE_CLOUD_PROJECT}"} \
-        ${if timeout != null then "--timeout ${toString timeout}" else ""}
+        --model "$MJOLNIR_MODEL" \
+        --api-key "$GEMINI_API_KEY" \
+        --project "$GOOGLE_CLOUD_PROJECT" \
+        --location "$GOOGLE_CLOUD_LOCATION"
     '';
 }

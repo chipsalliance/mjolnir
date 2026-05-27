@@ -2,44 +2,55 @@
 # SPDX-License-Identifier: Apache-2.0
 """Gemini Backend Orchestrator.
 
-This script invokes the Gemini CLI using standard GCP credentials/project to analyze either:
+This script uses the official Google GenAI SDK to analyze either:
 1. A list of files in parallel for security threats (Batch Mode).
 2. A single file with a custom query/prompt (Single-File Mode).
+
+It enforces a Pydantic structured response schema matching Mjolnir's TOML output.
+All configurations and credentials are passed explicitly as CLI arguments.
 """
 
 import argparse
 import os
-
-import subprocess
+from google import genai
+from google.genai import types
 import common
+from common import SecurityReport
 
 DEFAULT_TIMEOUT_SECS = 600
 
+# ---------------------------------------------------------------------------
 
-def resolve_api_env(project, silent=False):
-    """Logs the active API mode (if not silent) and returns the resolved environment."""
-    env = os.environ.copy()
-    is_gemini_api = "GEMINI_API_KEY" in env
+# ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
 
-    if not silent:
-        if is_gemini_api:
-            print(
-                " -> [API Mode] Public Gemini Developer API (using GEMINI_API_KEY)",
-                flush=True,
-            )
-        else:
-            project_id = env.get("GOOGLE_CLOUD_PROJECT", project)
-            print(
-                f" -> [API Mode] Google Cloud Vertex AI (Project: {project_id or 'default'})",
-                flush=True,
-            )
 
-    if is_gemini_api:
-        env.pop("GOOGLE_CLOUD_PROJECT", None)
-    elif project:
-        env["GOOGLE_CLOUD_PROJECT"] = project
+def get_sdk_client(api_key=None, project=None, location=None):
+    """Initializes and returns the unified google-genai Client exclusively from parsed CLI parameters."""
+    resolved_api_key = (api_key or "").strip()
+    resolved_project = (project or "").strip()
+    resolved_location = (location or "").strip()
 
-    return env
+    if resolved_api_key:
+        print(
+            " -> [API Mode] Public Gemini Developer API (using explicit API key)",
+            flush=True,
+        )
+        return genai.Client(api_key=resolved_api_key)
+
+    print(
+        f" -> [API Mode] Google Cloud Vertex AI (Project: {resolved_project}, Location: {resolved_location})",
+        flush=True,
+    )
+    return genai.Client(
+        vertexai=True, project=resolved_project, location=resolved_location
+    )
+
+
+# ---------------------------------------------------------------------------
+# Execution Modes
+# ---------------------------------------------------------------------------
 
 
 def run_single_query(
@@ -47,12 +58,12 @@ def run_single_query(
     output_path,
     system_prompt_path,
     model,
-    gemini_bin,
-    project,
-    timeout_secs,
+    api_key=None,
+    project=None,
+    location=None,
 ):
-    """Invokes the Gemini CLI on a single input file and writes the output."""
-    env = resolve_api_env(project)
+    """Invokes the Gemini SDK on a single input file and writes the output."""
+    client = get_sdk_client(api_key=api_key, project=project, location=location)
 
     print(
         f" -> Running single query on {input_path} using Gemini ({model})...",
@@ -62,36 +73,28 @@ def run_single_query(
     with open(system_prompt_path, "r") as f:
         prompt = f.read().strip()
 
-    # Replace the prompt with the keys of the TOML format from common.py
+    # Replace reporting requirements in the prompt template
     prompt = prompt.replace(
         "{REPORTING_REQUIREMENTS}", common.generate_reporting_requirements()
     )
 
-    cmd = [
-        gemini_bin,
-        "--model",
-        model,
-        "--prompt",
-        prompt,
-        "--approval-mode",
-        "yolo",
-        "--skip-trust",
-    ]
+    with open(input_path, "r") as in_f:
+        file_content = in_f.read()
 
-    code_dir = os.environ.get("CODE_DIR")
-    if code_dir:
-        cmd.extend(["--include-directories", code_dir])
+    full_prompt = f"{prompt}\n\nInput Content:\n{file_content}"
 
-    with open(input_path, "r") as in_f, open(output_path, "w") as out_f:
-        subprocess.run(
-            cmd,
-            stdin=in_f,
-            stdout=out_f,
-            env=env,
-            cwd=code_dir,
-            check=True,
-            timeout=timeout_secs,
+    try:
+        response = client.models.generate_content(
+            model=model,
+            contents=full_prompt,
         )
+
+        with open(output_path, "w") as out_f:
+            out_f.write(response.text)
+
+    except Exception as e:
+        print(f"Error running single query: {e}")
+        raise e
 
 
 def run_analysis(
@@ -100,16 +103,16 @@ def run_analysis(
     output_path,
     system_prompt_path,
     model,
-    gemini_bin,
-    project,
     silent_missing,
     parallel,
-    timeout_secs,
+    api_key=None,
+    project=None,
+    location=None,
 ):
-    """Runs threat analysis on a list of files in parallel using Gemini."""
-    base_env = resolve_api_env(project)
+    """Runs threat analysis on a list of files in parallel using the Gemini SDK."""
+    client = get_sdk_client(api_key=api_key, project=project, location=location)
 
-    def analyze_single_file(file_rel_path, file_index, total_files, prompt):
+    def analyze_single_file(file_rel_path, file_index, total_files, system_prompt):
         full_path = os.path.join(src_dir, file_rel_path)
         if not os.path.isfile(full_path):
             if not silent_missing:
@@ -124,59 +127,34 @@ def run_analysis(
             f" -> ({file_index}/{total_files}) Analyzing {file_rel_path}...", flush=True
         )
 
-        env = base_env.copy()
-
-        cmd = [
-            gemini_bin,
-            "--model",
-            model,
-            "--prompt",
-            prompt,
-        ]
-
         try:
             with open(full_path, "r") as input_f:
-                result = subprocess.run(
-                    cmd,
-                    stdin=input_f,
-                    capture_output=True,
-                    text=True,
-                    env=env,
-                    check=True,
-                    timeout=timeout_secs,
-                )
+                file_contents = input_f.read()
 
-                report_chunk = common.clean_toml_output(result.stdout)
-                return file_rel_path, report_chunk, False
-        except subprocess.TimeoutExpired:
-            print(
-                f"Error analyzing {file_rel_path}: Job hung and timed out after {timeout_secs}s."
+            # Instruct model to evaluate the contents of the file
+            file_prompt = f"Analyze this file:\n\nFilename: {file_rel_path}\n\nContent:\n{file_contents}"
+
+            response = client.models.generate_content(
+                model=model,
+                contents=file_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    response_mime_type="application/json",
+                    response_schema=SecurityReport,
+                ),
             )
-            report = common.generate_fallback_toml(
-                {
-                    "file": file_rel_path,
-                    "title": "Error during analysis: Timeout",
-                    "description": f"Job hung and timed out after {timeout_secs}s.",
-                }
-            )
-            return file_rel_path, report, False
-        except subprocess.CalledProcessError as e:
-            print(f"Error analyzing {file_rel_path}: {e.stderr}")
-            report = common.generate_fallback_toml(
-                {
-                    "file": file_rel_path,
-                    "title": "Error during analysis: Process Failure",
-                    "description": f"Subprocess failed with error:\n{e.stderr}",
-                }
-            )
-            return file_rel_path, report, False
+
+            # Enforced structured JSON is returned. Convert to expected TOML.
+            report_chunk = common.toml_from_structured_json(response.text)
+            return file_rel_path, report_chunk, False
+
         except Exception as e:
-            print(f"CRITICAL: Unexpected error for {file_rel_path}: {e}")
+            print(f"Error analyzing {file_rel_path}: {e}")
             report = common.generate_fallback_toml(
                 {
                     "file": file_rel_path,
-                    "title": "Error during analysis: Unexpected Failure",
-                    "description": f"Unexpected error occurred:\n{str(e)}",
+                    "title": "Error during analysis: SDK Failure",
+                    "description": f"Exception raised during SDK call:\n{str(e)}",
                 }
             )
             return file_rel_path, report, False
@@ -192,7 +170,9 @@ def run_analysis(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run Gemini analysis on files.")
+    parser = argparse.ArgumentParser(
+        description="Run Gemini analysis on files using GenAI Python SDK."
+    )
 
     # Mode Selection
     group = parser.add_mutually_exclusive_group(required=True)
@@ -204,8 +184,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--output", required=True, help="Output report path")
     parser.add_argument("--prompt", required=True, help="Path to system prompt file")
-    parser.add_argument("--model", required=True, help="Gemini model name")
-    parser.add_argument("--gemini-bin", required=True, help="Path to gemini-cli binary")
+    parser.add_argument("--model", required=True, help="Model name")
     parser.add_argument(
         "--silent-missing",
         action="store_true",
@@ -214,13 +193,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--parallel", type=int, default=1, help="Number of parallel workers"
     )
+
+    # Explicit credentials and routing flags passed down from Nix
+    parser.add_argument("--api-key", help="Gemini Developer API key")
     parser.add_argument("--project", help="Google Cloud Project ID")
-    parser.add_argument(
-        "--timeout",
-        type=int,
-        default=DEFAULT_TIMEOUT_SECS,
-        help="Analysis timeout in seconds",
-    )
+    parser.add_argument("--location", help="Google Cloud region/location")
 
     args = parser.parse_args()
 
@@ -236,9 +213,9 @@ if __name__ == "__main__":
             output_path=args.output,
             system_prompt_path=args.prompt,
             model=args.model,
-            gemini_bin=args.gemini_bin,
+            api_key=args.api_key,
             project=args.project,
-            timeout_secs=args.timeout,
+            location=args.location,
         )
     else:
         # Batch mode
@@ -251,9 +228,9 @@ if __name__ == "__main__":
             output_path=args.output,
             system_prompt_path=args.prompt,
             model=args.model,
-            gemini_bin=args.gemini_bin,
-            project=args.project,
             silent_missing=args.silent_missing,
             parallel=args.parallel,
-            timeout_secs=args.timeout,
+            api_key=args.api_key,
+            project=args.project,
+            location=args.location,
         )

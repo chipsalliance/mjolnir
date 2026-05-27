@@ -8,11 +8,54 @@ outputs.
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
 import os
 import sys
 import tomllib
+from pydantic import BaseModel, Field
+from typing import List
 
 DEFAULT_TIMEOUT_SECS = 600
+
+
+class Finding(BaseModel):
+    file: str = Field(
+        description="The path of the analyzed file containing the security vulnerability"
+    )
+    title: str = Field(description="A brief title summarizing the vulnerability")
+    severity: str = Field(
+        description="The severity level (Critical, High, Medium, Low, Informational)"
+    )
+    location: str = Field(
+        default="N/A",
+        description="The line number, line range, or function name where the vulnerability resides",
+    )
+    description: str = Field(
+        description="Detailed technical explanation of the vulnerability and threat vectors"
+    )
+    recommendation: str = Field(
+        default="No recommendation provided.",
+        description="Detailed, step-by-step recommendation and code example to remediate the vulnerability",
+    )
+    verdict: str = Field(
+        default="Informational",
+        description="The exploitability status: 'Exploitable', 'Not Exploitable', or 'False Positive'",
+    )
+    justification: str = Field(
+        default="Not explicitly reviewed.",
+        description="Detailed technical justification explaining the verdict",
+    )
+    attack_vector: str = Field(
+        default="",
+        description="Step-by-step description of how an attacker could exploit this vulnerability",
+    )
+
+
+class SecurityReport(BaseModel):
+    vulnerabilities: List[Finding] = Field(
+        description="List of detected security vulnerabilities"
+    )
+
 
 # The TOML output of the agent's report
 SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "vuln_report_schema.toml")
@@ -22,6 +65,49 @@ try:
 except Exception as e:
     print(f"CRITICAL ERROR: Failed to load {SCHEMA_PATH}: {e}")
     sys.exit(1)
+
+
+def escape_toml_multiline(text):
+    """Safely escapes triple-quotes inside a TOML multiline string."""
+    if not text:
+        return ""
+    val = str(text)
+    # Escape raw triple double-quotes
+    val = val.replace('"""', '\\"\\"\\"')
+    # Ensure string ending with double-quote is escaped so it doesn't merge with closing quotes
+    if val.endswith('"') and not val.endswith('\\"'):
+        val = val[:-1] + '\\"'
+    return val
+
+
+def toml_from_structured_json(json_text):
+    """Converts the structured JSON string response into Mjolnir's expected TOML format."""
+    try:
+        data = json.loads(json_text)
+        vulns = data.get("vulnerabilities", [])
+
+        toml_output = ""
+        for vuln in vulns:
+            toml_output += "[[vulnerabilities]]\n"
+            toml_output += f'file = "{vuln.get("file", "")}"\n'
+            toml_output += f'title = "{vuln.get("title", "")}"\n'
+            toml_output += f'severity = "{vuln.get("severity", "")}"\n'
+            toml_output += f'location = "{vuln.get("location", "")}"\n'
+            toml_output += f'description = """{escape_toml_multiline(vuln.get("description", ""))}"""\n'
+            toml_output += f'recommendation = """{escape_toml_multiline(vuln.get("recommendation", ""))}"""\n'
+            toml_output += f'verdict = "{vuln.get("verdict", "")}"\n'
+            toml_output += f'justification = """{escape_toml_multiline(vuln.get("justification", ""))}"""\n'
+            toml_output += f'attack_vector = """{escape_toml_multiline(vuln.get("attack_vector", ""))}"""\n\n'
+        return toml_output
+    except Exception as e:
+        print(f"Error translating structured JSON response to TOML: {e}")
+        return generate_fallback_toml(
+            {
+                "file": "unknown",
+                "title": "Structured Parsing Error",
+                "description": f"Failed to translate JSON response to TOML. Raw: {json_text}",
+            }
+        )
 
 
 def generate_prompt_schema():
@@ -56,7 +142,7 @@ def generate_fallback_toml(overrides):
         val = overrides.get(key, config["default"])
 
         if config["multiline"] or "\n" in str(val):
-            safe_val = str(val).replace('"""', "'''")
+            safe_val = escape_toml_multiline(val)
             lines.append(f'{key} = """\n{safe_val}\n"""')
         else:
             safe_val = str(val).replace('"', '\\"')

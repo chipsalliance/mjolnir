@@ -19,6 +19,8 @@ def extract_sloppy_toml_blocks(text):
     KEY_SYNONYMS = {
         "file_path": "file",
         "filename": "file",
+        "line": "location",
+        "function": "location",
         "name": "title",
         "headline": "title",
         "summary": "title",
@@ -29,6 +31,7 @@ def extract_sloppy_toml_blocks(text):
     # Official keys we want to extract
     OFFICIAL_KEYS = [
         "file",
+        "location",
         "title",
         "severity",
         "description",
@@ -162,14 +165,13 @@ def main():
                 if not v:
                     continue
 
-                # Safely escape multi-line or long text into triple quotes
                 if "\n" in str(v) or k in [
                     "description",
                     "justification",
                     "attack_vector",
                     "recommendation",
                 ]:
-                    safe_v = str(v).replace('"""', "'''")
+                    safe_v = common.escape_toml_multiline(v)
                     f.write(f'{k} = """\n{safe_v}\n"""\n')
                 else:
                     safe_v = escape_toml_string(v)
