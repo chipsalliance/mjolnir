@@ -6,6 +6,5 @@ import ./base.nix { inherit pkgs; } {
   workspaceDir = "/tmp/smoke-test-workspace";
   outputDir = "./test-output/smoke-test";
   backend = "mock";
-  enableGcsUpload = false;
-  numFiles = 1;
+  model = "mock";
 }

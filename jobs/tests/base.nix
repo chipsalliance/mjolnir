@@ -6,30 +6,73 @@
   workspaceDir,
   outputDir,
   backend ? null,
-  model ? "unused-testing-default",
+  model ? null,
   numFiles ? 10,
   enableGcsUpload ? false,
+  target ? null,
+  agentDir ? ../../agents/rust_auditor,
+  postExtract ? null,
 }:
-import ../default_job.nix { inherit pkgs; } {
-  inherit name workspaceDir outputDir backend enableGcsUpload model;
-  agentDir = ../../agents/rust_auditor;
-  parallel = 5;
-
-  target = {
+let
+  defaultTarget = {
     repoUrl = "https://github.com/chipsalliance/caliptra-sw.git";
     repoName = "caliptra-sw";
     commit = "latest";
+    fileCommand = "${pkgs.fd}/bin/fd -t f -e rs";
   };
 
-  postExtract = ''
+  defaultPostExtract = ''
     echo "${name}: Update file list to only include first ${toString numFiles} Rust files..."
-
-    # Find the first ${toString numFiles} Rust files from within CODE_DIR and update the list file
     cd "$CODE_DIR"
-    # Dump to tmp file first to avoid SIGPIPE/pipefail crashes if fd is piped directly to head
     ${pkgs.fd}/bin/fd -H -e rs . > "$ANALYSIS_FILES_FILE.tmp"
     head -n ${toString numFiles} "$ANALYSIS_FILES_FILE.tmp" > "$ANALYSIS_FILES_FILE"
     rm "$ANALYSIS_FILES_FILE.tmp"
     cd "$TOP_DIR"
   '';
+
+  # Resolve the clean Target module directly
+  resolvedTarget = import ../../target/git.nix ({ inherit pkgs; } // (if target != null then target else defaultTarget));
+
+  # Build simple local storage helper directly
+  localStore = import ../../storage/local.nix { inherit pkgs; path = outputDir; };
+  gcsStore = import ../../storage/gcs.nix { inherit pkgs; path = name; };
+
+  storage = {
+    name = if enableGcsUpload then "local+gcs" else "local";
+    upload = { runDir }: ''
+      ${localStore.upload { inherit runDir; }}
+      ${if enableGcsUpload then gcsStore.upload { inherit runDir; } else ""}
+    '';
+  };
+
+  # Resolved prompt (simple static wrapper using the raw backend name string)
+  prompt = import ../../agents/load.nix {
+    inherit pkgs;
+    inherit agentDir;
+    backendName = backend;
+  };
+
+  # Map all backends for the orchestrator so it can look up the matching execution templates
+  backendsList = {
+    mock = import ../../backends/mock.nix { inherit pkgs; };
+    gemini = import ../../backends/gemini/gemini.nix { inherit pkgs; };
+  };
+in
+{
+  config = {
+    inherit workspaceDir outputDir;
+  };
+  parallel = 5;
+
+  target = resolvedTarget;
+  backends = backendsList;
+  inherit backend;
+  inherit model;
+  inherit storage;
+  inherit prompt;
+
+  hooks = {
+    postExtract = if postExtract != null then postExtract else defaultPostExtract;
+  };
 }
+

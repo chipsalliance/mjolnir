@@ -6,6 +6,5 @@ import ./base.nix { inherit pkgs; } {
   workspaceDir = "/tmp/gemini-test-workspace";
   outputDir = "./test-output/gemini-test";
   backend = "gemini";
-  model = "gemini-2.5-pro";
-  enableGcsUpload = false;
+  model = "gemini-3.5-flash";
 }

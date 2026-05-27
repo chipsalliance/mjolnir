@@ -6,6 +6,6 @@ import ./base.nix { inherit pkgs; } {
   workspaceDir = "/tmp/gemini-gcs-test-workspace";
   outputDir = "./test-output/gemini-gcs-test";
   backend = "gemini";
-  model = "gemini-2.5-pro";
+  model = "gemini-3.5-flash";
   enableGcsUpload = true;
 }

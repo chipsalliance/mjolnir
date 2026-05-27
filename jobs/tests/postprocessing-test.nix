@@ -17,14 +17,12 @@ let
     git commit -m "init"
   '';
 in
-import ../default_job.nix { inherit pkgs; } {
+import ./base.nix { inherit pkgs; } {
   name = "Malformed Postprocessing Handling Test";
   workspaceDir = "/tmp/postprocessing-test-workspace";
   outputDir = "./test-output/postprocessing-test";
   backend = "gemini"; 
-  enableGcsUpload = false;
-
-  contextFile = null;
+  model = "gemini-3.5-flash";
   agentDir = ../../agents/postprocessing_test;
 
   target = {

@@ -12,37 +12,43 @@
       supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
       nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
+
+      # Function to create the orchestrator package based on a job file
+      makeOrchestrator = { pkgs, jobFile }: import ./orchestrator.nix {
+        inherit pkgs jobFile;
+        orchestratorCommit = self.rev or "dirty";
+      };
+
+      # Separate compiler helper for hermetic, validation-free test runs
+      makeTestOrchestrator = { pkgs, jobFile }: import ./orchestrator.nix {
+        inherit pkgs jobFile;
+        orchestratorCommit = self.rev or "dirty";
+        isTest = true;
+      };
     in
     {
       packages = forAllSystems (system:
         let
           pkgs = nixpkgsFor.${system};
-
-          # Function to create the orchestrator package based on a job file
-          makeOrchestrator = { jobFile }: import ./orchestrator.nix {
-            inherit pkgs jobFile;
-            orchestratorCommit = self.rev or "dirty";
-          };
-          # Function to create a group of jobs to run sequentially
           makeJobGroup = import ./job_group.nix { inherit pkgs; };
 
           # Individual (test) jobs
-          smoke-test = makeOrchestrator { jobFile = ./jobs/tests/smoke-test.nix; };
-          gcs-test = makeOrchestrator { jobFile = ./jobs/tests/gcs-test.nix; };
-          gemini-test = makeOrchestrator { jobFile = ./jobs/tests/gemini-test.nix; };
-          gemini-gcs-test = makeOrchestrator { jobFile = ./jobs/tests/gemini-gcs-test.nix; };
-          postprocessing-test = makeOrchestrator { jobFile = ./jobs/tests/postprocessing-test.nix; };
+          smoke-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/smoke-test.nix; };
+          gcs-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/gcs-test.nix; };
+          gemini-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/gemini-test.nix; };
+          gemini-gcs-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/gemini-gcs-test.nix; };
+          postprocessing-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/postprocessing-test.nix; };
 
           # Individual (real) jobs
-          caliptra-sw-2p1-latest = makeOrchestrator { jobFile = ./jobs/caliptra/sw-2p1-latest.nix; };
-          caliptra-mcu-sw-2p0-latest = makeOrchestrator { jobFile = ./jobs/caliptra/mcu-sw-2p0-latest.nix; };
-          caliptra-dpe-latest = makeOrchestrator { jobFile = ./jobs/caliptra/dpe-latest.nix; };
-          caliptra-dpe-1x = makeOrchestrator { jobFile = ./jobs/caliptra/dpe-1x.nix; };
-          opentitan-rom = makeOrchestrator { jobFile = ./jobs/opentitan/rom.nix; };
-          opentitan-rom-ext = makeOrchestrator { jobFile = ./jobs/opentitan/rom_ext.nix; };
-          opentitan-manuf = makeOrchestrator { jobFile = ./jobs/opentitan/manuf.nix; };
-          opentitan-lib = makeOrchestrator { jobFile = ./jobs/opentitan/lib.nix; };
-          opentitan-crypto = makeOrchestrator { jobFile = ./jobs/opentitan/crypto.nix; };
+          caliptra-sw-2p1-latest = makeOrchestrator { inherit pkgs; jobFile = ./jobs/caliptra/sw-2p1-latest.nix; };
+          caliptra-mcu-sw-2p0-latest = makeOrchestrator { inherit pkgs; jobFile = ./jobs/caliptra/mcu-sw-2p0-latest.nix; };
+          caliptra-dpe-latest = makeOrchestrator { inherit pkgs; jobFile = ./jobs/caliptra/dpe-latest.nix; };
+          caliptra-dpe-1x = makeOrchestrator { inherit pkgs; jobFile = ./jobs/caliptra/dpe-1x.nix; };
+          opentitan-rom = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/rom.nix; };
+          opentitan-rom-ext = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/rom_ext.nix; };
+          opentitan-manuf = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/manuf.nix; };
+          opentitan-lib = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/lib.nix; };
+          opentitan-crypto = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/crypto.nix; };
 
           # Group (test) jobs
           scan-all-test = makeJobGroup {
@@ -50,8 +56,10 @@
             description = "All Test/Smoke Vulnerability Scans";
             jobs = [
               { name = "smoke-test"; pkg = smoke-test; }
+              { name = "gcs-test"; pkg = gcs-test; }
               { name = "postprocessing-test"; pkg = postprocessing-test; }
               { name = "gemini-test"; pkg = gemini-test; }
+              { name = "gemini-gcs-test"; pkg = gemini-gcs-test; }
             ];
           };
 
@@ -62,6 +70,7 @@
             jobs = [
               { name = "caliptra-sw-2p1-latest"; pkg = caliptra-sw-2p1-latest; }
               { name = "caliptra-mcu-sw-2p0-latest"; pkg = caliptra-mcu-sw-2p0-latest; }
+              { name = "caliptra-dpe-latest"; pkg = caliptra-dpe-latest; }
               { name = "caliptra-dpe-1x"; pkg = caliptra-dpe-1x; }
               { name = "opentitan-rom"; pkg = opentitan-rom; }
               { name = "opentitan-rom-ext"; pkg = opentitan-rom-ext; }
