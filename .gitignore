@@ -16,3 +16,4 @@ output/
 # Environment
 .env
 .envrc
+!sample.env

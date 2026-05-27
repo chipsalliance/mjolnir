@@ -54,9 +54,10 @@ Backends are typically LLMs that perform the actual security analyses.
     - `systemPrompt`: Path to a file with the system instruction.
     - `src`: Path to the directory containing the source code.
     - `output`: Path where the agent should write its report.
-- **Runtime Environment Overrides** (for Gemini):
-  - `GOOGLE_CLOUD_PROJECT`: Overrides the default GCP Project ID used for Vertex AI API billing.
-  - `PARALLEL`: Overrides the default number of parallel threads used during batch file processing.
+- **Runtime Environment Overrides**:
+  - `MJOLNIR_BACKEND`: Overrides the active analysis backend engine (e.g., `gemini`, `claude`).
+  - `MJOLNIR_MODEL`: Overrides the active LLM model name (e.g., `gemini-3.5-flash`).
+  - `MJOLNIR_PARALLEL`: Overrides the maximum number of concurrent file workers.
 
 ### Prompts Component
 
@@ -74,8 +75,8 @@ The Storage component handles the outputs of the backend component, e.g. the vul
 - **Attributes**:
   - `name`: String, for logging purposes.
   - `upload { runDir }`: Returns a Bash snippet to handle the results in the provided directory.
-- **Runtime Environment Overrides** (for GCS):
-  - `GCSDEST`: Completely overrides the destination Google Cloud Storage URI (e.g., `gs://my-custom-bucket/path/`).
+- **Runtime Environment Overrides**:
+  - `MJOLNIR_GCS_BUCKET`: Defines the target Google Cloud Storage bucket where reports are uploaded.
 
 ---
 
@@ -332,6 +333,9 @@ EOF
 
 Mjolnir uses **Application Default Credentials (ADC)** to authenticate with Google Cloud Vertex AI. You can configure authentication in one of two ways:
 
+> [!WARNING]
+> **Ambiguous Configuration Safeguard:** If both `GEMINI_API_KEY` and Vertex AI parameters (`GOOGLE_CLOUD_PROJECT`, etc.) are simultaneously provided, the orchestrator will prioritize the API Key for execution. We recommend exporting only one set of credentials to avoid ambiguous runtime configurations.
+
 ### Option A: Using a Service Account Key (Recommended for automated environments)
 
 Export the `GOOGLE_APPLICATION_CREDENTIALS` environment variable pointing to your Service Account JSON key file:
@@ -356,7 +360,7 @@ Ensure your environment also specifies the correct billing GCP project and locat
 
 ```bash
 export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
-export GOOGLE_CLOUD_LOCATION="us-central1"
+export GOOGLE_CLOUD_LOCATION="global"
 ```
 
 ## Testing
@@ -386,9 +390,7 @@ export MJOLNIR_GCS_BUCKET="your-bucket"
 nix run .#gcs-test
 ```
 
-### 2. Verification of LLM Integration (Real Scans)
-
-To verify your `GEMINI_API_KEY` or GCP Vertex AI credentials against a real Gemini model (runs on the first 10 files of `caliptra-sw` to minimize quota usage):
+To verify your `GEMINI_API_KEY` or GCP Vertex AI credentials against a real Gemini model (runs on the first 10 files of `caliptra-sw` using `gemini-3.5-flash` to minimize quota usage):
 
 ```bash
 # Option A: Using API Key
@@ -397,7 +399,7 @@ nix run .#gemini-test
 
 # Option B: Using GCP Vertex AI
 export GOOGLE_CLOUD_PROJECT="your-project"
-export GOOGLE_CLOUD_LOCATION="us-central1"
+export GOOGLE_CLOUD_LOCATION="global"
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/application_default_credentials.json"
 nix run .#gemini-test
 ```
