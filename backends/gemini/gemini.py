@@ -17,7 +17,58 @@ from google.genai import types
 import common
 from common import SecurityReport
 import tools
+import json
+
 DEFAULT_TIMEOUT_SECS = 600
+
+
+def update_metadata_tokens(output_path, prompt_tokens, candidate_tokens):
+    """Accumulates and saves token usage into metadata.json in the run directory."""
+    run_dir = os.path.dirname(output_path)
+    metadata_path = os.path.join(run_dir, "metadata.json")
+
+    if not os.path.exists(metadata_path):
+        return
+
+    try:
+        with open(metadata_path, "r") as f:
+            data = json.load(f)
+
+        data["tokens_prompt"] = data.get("tokens_prompt", 0) + prompt_tokens
+        data["tokens_candidate"] = data.get("tokens_candidate", 0) + candidate_tokens
+        data["tokens_total"] = (
+            data.get("tokens_total", 0) + prompt_tokens + candidate_tokens
+        )
+
+        with open(metadata_path, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        print(f"Warning: Could not write token metadata: {e}")
+
+
+def print_grand_total_tokens(output_path):
+    """Reads metadata.json and prints the final total E2E token footprint of the job."""
+    run_dir = os.path.dirname(output_path)
+    metadata_path = os.path.join(run_dir, "metadata.json")
+
+    if not os.path.exists(metadata_path):
+        return
+
+    try:
+        with open(metadata_path, "r") as f:
+            data = json.load(f)
+
+        if "tokens_total" in data:
+            print("\n==================================================", flush=True)
+            print(f"   Mjolnir Job Complete: E2E Tokens Consumed", flush=True)
+            print(f"   - Prompt Tokens:    {data.get('tokens_prompt', 0)}", flush=True)
+            print(
+                f"   - Candidate Tokens: {data.get('tokens_candidate', 0)}", flush=True
+            )
+            print(f"   - GRAND TOTAL:      {data.get('tokens_total', 0)}", flush=True)
+            print("==================================================\n", flush=True)
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -85,11 +136,76 @@ def run_adversarial_reviewer(
             contents=full_prompt,
             config=types.GenerateContentConfig(
                 tools=[tools.read_file, tools.grep_search, tools.glob_files],
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    disable=False,
+                    maximum_remote_calls=30,
+                ),
             ),
         )
 
+        report_text = ""
+        has_text = False
+        if response.candidates and response.candidates[0].content:
+            parts = response.candidates[0].content.parts or []
+            text_parts = [p.text for p in parts if p.text is not None]
+            if text_parts:
+                report_text = "".join(text_parts)
+                has_text = True
+
+        if not has_text:
+            candidate = response.candidates[0] if response.candidates else None
+            parts = candidate.content.parts if candidate and candidate.content else []
+            if parts and parts[0].function_call:
+                print(
+                    f" [Warning] Adversarial Reviewer hit the maximum tool execution limit (30 turns) and was forced to terminate early.",
+                    flush=True,
+                )
+                report_text = """{
+  "vulnerabilities": [
+    {
+      "file": "Pipeline",
+      "title": "Adversarial Reviewer: Tool execution ceiling reached",
+      "severity": "Informational",
+      "description": "The Reviewer agent reached its maximum budget of 30 tool actions and was terminated early to prevent infinite looping.",
+      "recommendation": "Increase maximum_remote_calls or optimize the system prompt.",
+      "verdict": "Informational",
+      "justification": "Execution budget exhausted."
+    }
+  ]
+}"""
+            else:
+                print(
+                    f" [Error] Model returned an empty response or was blocked by safety settings.",
+                    flush=True,
+                )
+                report_text = """{
+  "vulnerabilities": [
+    {
+      "file": "Pipeline",
+      "title": "Adversarial Reviewer: Empty Response",
+      "severity": "Informational",
+      "description": "The model returned an empty text response. This can happen due to active safety filters or API issues.",
+      "recommendation": "Check GCP Vertex AI logs or adjust prompt guidelines.",
+      "verdict": "Informational",
+      "justification": "Empty API output."
+    }
+  ]
+}"""
+
+        prompt_tokens = (
+            response.usage_metadata.prompt_token_count if response.usage_metadata else 0
+        )
+        candidate_tokens = (
+            response.usage_metadata.candidates_token_count
+            if response.usage_metadata
+            else 0
+        )
+        update_metadata_tokens(output_path, prompt_tokens, candidate_tokens)
+
         with open(output_path, "w") as out_f:
-            out_f.write(response.text)
+            out_f.write(report_text)
+
+        print_grand_total_tokens(output_path)
 
     except Exception as e:
         print(f"Error running single query: {e}")
@@ -110,6 +226,11 @@ def run_batch_auditor(
 ):
     """Runs threat analysis on a list of files in parallel using the Gemini SDK."""
     client = get_sdk_client(api_key=api_key, project=project, location=location)
+
+    import threading
+
+    usage_tracker = {"prompt": 0, "candidate": 0}
+    tracker_lock = threading.Lock()
 
     def analyze_single_file(file_rel_path, file_index, total_files, system_prompt):
         full_path = os.path.join(src_dir, file_rel_path)
@@ -143,9 +264,47 @@ def run_batch_auditor(
                 ),
             )
 
+            if response.usage_metadata:
+                with tracker_lock:
+                    usage_tracker["prompt"] += (
+                        response.usage_metadata.prompt_token_count
+                    )
+                    usage_tracker["candidate"] += (
+                        response.usage_metadata.candidates_token_count
+                    )
+                print(
+                    f"    -> [{file_rel_path}] Tokens: {response.usage_metadata.total_token_count} (Prompt: {response.usage_metadata.prompt_token_count}, Output: {response.usage_metadata.candidates_token_count})",
+                    flush=True,
+                )
+
             # Gemini's structured output is guaranteed to be valid JSON conforming to SecurityReport.
             # Return the raw JSON chunk.
-            return file_rel_path, response.text, False
+            report_text = ""
+            has_text = False
+            if response.candidates and response.candidates[0].content:
+                parts = response.candidates[0].content.parts or []
+                text_parts = [p.text for p in parts if p.text is not None]
+                if text_parts:
+                    report_text = "".join(text_parts)
+                    has_text = True
+
+            if not has_text:
+                report_text = f"""{{
+  "vulnerabilities": [
+    {{
+      "file": "{file_rel_path}",
+      "title": "Error during analysis: Empty Response / Tool Ceiling",
+      "severity": "Informational",
+      "location": "N/A",
+      "description": "Model returned an empty response or terminated early on a tool call.",
+      "recommendation": "N/A",
+      "verdict": "Informational",
+      "justification": "API returned empty response text.",
+      "attack_vector": ""
+    }}
+  ]
+}}"""
+            return file_rel_path, report_text, False
 
         except Exception as e:
             print(f"Error analyzing {file_rel_path}: {e}")
@@ -174,6 +333,10 @@ def run_batch_auditor(
         system_prompt_path=system_prompt_path,
         parallel=parallel,
         analyze_file_fn=analyze_single_file,
+    )
+
+    update_metadata_tokens(
+        output_path, usage_tracker["prompt"], usage_tracker["candidate"]
     )
 
 

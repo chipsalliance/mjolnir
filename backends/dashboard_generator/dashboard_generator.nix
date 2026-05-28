@@ -11,6 +11,7 @@
       # Ensure output directory exists
       mkdir -p "$(dirname "${output}")"
 
+      PYTHONPATH="${../.}" \
       ${pkgs.python3}/bin/python3 ${./generate_dashboard.py} "${src}" "${output}" --template ${../../dashboards/vuln_report_dashboard.html.tpl} --css ${../../dashboards/dashboard.css}
 
       echo "Dashboard generated at: ${output}"
