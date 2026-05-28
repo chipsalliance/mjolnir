@@ -16,7 +16,7 @@ from google import genai
 from google.genai import types
 import common
 from common import SecurityReport
-
+import tools
 DEFAULT_TIMEOUT_SECS = 600
 
 
@@ -83,6 +83,9 @@ def run_adversarial_reviewer(
         response = client.models.generate_content(
             model=model,
             contents=full_prompt,
+            config=types.GenerateContentConfig(
+                tools=[tools.read_file, tools.grep_search, tools.glob_files],
+            ),
         )
 
         with open(output_path, "w") as out_f:
