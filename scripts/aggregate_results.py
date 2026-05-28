@@ -10,7 +10,6 @@ import os
 from pathlib import Path
 import shutil
 import sys
-import tomllib
 import dashboard_builder
 
 # Configure logging
@@ -20,12 +19,12 @@ logging.basicConfig(
 
 
 def resolve_default_components():
-    """Finds default components.toml in standard locations relative to CWD."""
+    """Finds default components.json in standard locations relative to CWD."""
     cwd = Path.cwd()
     possible_paths = [
-        cwd / "mjolnir" / "scripts" / "components.toml",
-        cwd / "scripts" / "components.toml",
-        cwd / "components.toml",
+        cwd / "mjolnir" / "scripts" / "components.json",
+        cwd / "scripts" / "components.json",
+        cwd / "components.json",
     ]
     for path in possible_paths:
         if path.exists():
@@ -115,7 +114,7 @@ def main():
         "--components",
         action="append",
         default=[str(default_components)] if default_components else [],
-        help="Path to TOML file containing component definitions. Can be specified multiple times.",
+        help="Path to JSON file containing component definitions. Can be specified multiple times.",
     )
     parser.add_argument(
         "--dashboards-dir",
@@ -136,7 +135,7 @@ def main():
 
     if not args.components:
         parser.error(
-            "No components file specified and default components.toml not found in standard locations."
+            "No components file specified and default components.json not found in standard locations."
         )
     components = dashboard_builder.load_components(args.components)
 
@@ -217,13 +216,13 @@ def main():
 
             # Dynamically determine which main report to copy
             main_report = None
-            if (latest_scan_path / "main_report.toml").exists():
-                main_report = "main_report.toml"
+            if (latest_scan_path / "main_report.json").exists():
+                main_report = "main_report.json"
             elif (latest_scan_path / "main_report.md").exists():
                 main_report = "main_report.md"
             else:
                 logging.info(
-                    f"No main report (TOML or MD) found in {latest_scan_path.name}"
+                    f"No main report (JSON or MD) found in {latest_scan_path.name}"
                 )
 
             # Build dynamic list of files to copy
@@ -267,7 +266,7 @@ def main():
                 links_html = ""
                 existing_files_count = 0
                 possible_files = list(FILES_TO_COPY) + [
-                    "main_report.toml",
+                    "main_report.json",
                     "main_report.md",
                 ]
                 for filename in possible_files:

@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 import logging
 from pathlib import Path
-import tomllib
+import json
 
 FILENAME_MAPPINGS = {
     "dashboard.html": ("Interactive Dashboard", "bg-html", "HTML"),
     "main_report.md": ("Main Vulnerability Report", "bg-md", "MD"),
-    "main_report.toml": ("Main Vulnerability Report", "bg-toml", "TOML"),
+    "main_report.json": ("Main Vulnerability Report", "bg-json", "JSON"),
     "reviewed_report.md": (
         "Agent Filtered Vulnerability Report",
         "bg-md",
@@ -29,7 +29,7 @@ CARD_TEMPLATE = """
 
 
 def load_components(config_paths):
-    """Loads and merges components from multiple TOML files."""
+    """Loads and merges components from multiple JSON files."""
     components = {}
     for path_str in config_paths:
         path = Path(path_str)
@@ -37,8 +37,8 @@ def load_components(config_paths):
             logging.error(f"Components config file not found: {path}")
             continue
         try:
-            with open(path, "rb") as f:
-                data = tomllib.load(f)
+            with open(path, "r") as f:
+                data = json.load(f)
                 components.update(data)
         except Exception as e:
             logging.error(f"Failed to parse components file {path}: {e}")

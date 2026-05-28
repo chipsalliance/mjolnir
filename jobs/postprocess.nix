@@ -22,8 +22,8 @@ in
   # Raw Agent Output
   RAW_REVIEW_TXT="$VULN_RUN_DIR/raw_ai_review.txt"
   
-  # Final merged TOML
-  REVIEWED_TOML="$VULN_RUN_DIR/reviewed_report.toml"
+  # Final merged JSON
+  REVIEWED_JSON="$VULN_RUN_DIR/reviewed_report.json"
   
   case "$MJOLNIR_BACKEND" in
     ${builtins.concatStringsSep "\n" (builtins.map (bName: ''
@@ -45,14 +45,14 @@ in
   ${pkgs.python3}/bin/python3 ${../backends}/sanitize_report.py \
       --original "$REPORT_FILE" \
       --review "$RAW_REVIEW_TXT" \
-      --output "$REVIEWED_TOML"
+      --output "$REVIEWED_JSON"
 
   echo "${name}: Generating Markdown report..."
-  ${pkgs.python3}/bin/python3 ${../backends/generate_markdown.py} --input "$REVIEWED_TOML" --output "$VULN_RUN_DIR/reviewed_report.md"
+  ${pkgs.python3}/bin/python3 ${../backends}/generate_markdown.py --input "$REVIEWED_JSON" --output "$VULN_RUN_DIR/reviewed_report.md"
 
   echo "${name}: Generating consolidated dashboard..."
   ${dashboardGenerator.run {
-    src = "$REVIEWED_TOML";
+    src = "$REVIEWED_JSON";
     output = "$VULN_RUN_DIR/dashboard.html";
   }}
 ''

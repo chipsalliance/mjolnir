@@ -3,7 +3,7 @@
 """Common threat analysis orchestrator utilities.
 
 This module provides shared logic for executing LLM clients to perform
-file-based security analyses, handling timeouts/failures, and cleaning TOML
+file-based security analyses, handling timeouts/failures, and cleaning JSON
 outputs.
 """
 
@@ -11,7 +11,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 import sys
-import tomllib
 from pydantic import BaseModel, Field
 from typing import List
 
@@ -20,34 +19,40 @@ DEFAULT_TIMEOUT_SECS = 600
 
 class Finding(BaseModel):
     file: str = Field(
-        description="The path of the analyzed file containing the security vulnerability"
+        default="Unknown",
+        description="relative/path/to/file.c",
     )
-    title: str = Field(description="A brief title summarizing the vulnerability")
+    title: str = Field(
+        default="Untitled Finding",
+        description="Vulnerability Title",
+    )
     severity: str = Field(
-        description="The severity level (Critical, High, Medium, Low, Informational)"
+        default="Informational",
+        description="Critical|High|Medium|Low|Informational",
     )
     location: str = Field(
         default="N/A",
-        description="The line number, line range, or function name where the vulnerability resides",
+        description="Line XX or function_name",
     )
     description: str = Field(
-        description="Detailed technical explanation of the vulnerability and threat vectors"
+        default="No description provided.",
+        description="Detailed technical description.",
     )
     recommendation: str = Field(
         default="No recommendation provided.",
-        description="Detailed, step-by-step recommendation and code example to remediate the vulnerability",
+        description="Recommended fix.",
     )
     verdict: str = Field(
         default="Informational",
-        description="The exploitability status: 'Exploitable', 'Not Exploitable', or 'False Positive'",
+        description="Exploitable|Not Exploitable|False Positive",
     )
     justification: str = Field(
         default="Not explicitly reviewed.",
-        description="Detailed technical justification explaining the verdict",
+        description="Detailed explanation.",
     )
     attack_vector: str = Field(
         default="",
-        description="Step-by-step description of how an attacker could exploit this vulnerability",
+        description="Step-by-step description of how to trigger.",
     )
 
 
@@ -55,162 +60,6 @@ class SecurityReport(BaseModel):
     vulnerabilities: List[Finding] = Field(
         description="List of detected security vulnerabilities"
     )
-
-
-# The TOML output of the agent's report
-SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "vuln_report_schema.toml")
-try:
-    with open(SCHEMA_PATH, "rb") as f:
-        VULN_SCHEMA = tomllib.load(f)
-except Exception as e:
-    print(f"CRITICAL ERROR: Failed to load {SCHEMA_PATH}: {e}")
-    sys.exit(1)
-
-
-def escape_toml_multiline(text):
-    """Safely escapes triple-quotes inside a TOML multiline string."""
-    if not text:
-        return ""
-    val = str(text)
-    # Escape raw triple double-quotes
-    val = val.replace('"""', '\\"\\"\\"')
-    # Ensure string ending with double-quote is escaped so it doesn't merge with closing quotes
-    if val.endswith('"') and not val.endswith('\\"'):
-        val = val[:-1] + '\\"'
-    return val
-
-
-def toml_from_structured_json(json_text):
-    """Converts the structured JSON string response into Mjolnir's expected TOML format."""
-    try:
-        data = json.loads(json_text)
-        vulns = data.get("vulnerabilities", [])
-
-        toml_output = ""
-        for vuln in vulns:
-            toml_output += "[[vulnerabilities]]\n"
-            toml_output += f'file = "{vuln.get("file", "")}"\n'
-            toml_output += f'title = "{vuln.get("title", "")}"\n'
-            toml_output += f'severity = "{vuln.get("severity", "")}"\n'
-            toml_output += f'location = "{vuln.get("location", "")}"\n'
-            toml_output += f'description = """{escape_toml_multiline(vuln.get("description", ""))}"""\n'
-            toml_output += f'recommendation = """{escape_toml_multiline(vuln.get("recommendation", ""))}"""\n'
-            toml_output += f'verdict = "{vuln.get("verdict", "")}"\n'
-            toml_output += f'justification = """{escape_toml_multiline(vuln.get("justification", ""))}"""\n'
-            toml_output += f'attack_vector = """{escape_toml_multiline(vuln.get("attack_vector", ""))}"""\n\n'
-        return toml_output
-    except Exception as e:
-        print(f"Error translating structured JSON response to TOML: {e}")
-        return generate_fallback_toml(
-            {
-                "file": "unknown",
-                "title": "Structured Parsing Error",
-                "description": f"Failed to translate JSON response to TOML. Raw: {json_text}",
-            }
-        )
-
-
-def generate_prompt_schema():
-    """Generates the TOML schema block to inject into prompts."""
-    lines = ["[[vulnerabilities]]"]
-    for key, config in VULN_SCHEMA.items():
-        hint = config["hint"]
-        if config["multiline"]:
-            lines.append(f'{key} = """\n{hint}\n"""')
-        else:
-            lines.append(f'{key} = "{hint}"')
-    return "\n".join(lines)
-
-
-def generate_reporting_requirements():
-    """Generates the strict TOML formatting rules alongside the schema."""
-    schema_block = generate_prompt_schema()
-
-    return f"""1. **Format:** All reports must be generated as valid TOML. Output ONLY the raw TOML content without any markdown fences (```) or conversational text.
-   - **CRITICAL:** You MUST use `[[vulnerabilities]]` as the root array for every finding.
-   - **CRITICAL:** DO NOT use nested tables (e.g., avoid `[vulnerability.description]`). Keep all keys perfectly FLAT.
-   - **CRITICAL:** Use the exact keys shown in the schema below (e.g., use `description`, not `details`).
-   - Use triple double-quotes (`\"\"\"`) for all multi-line strings.
-2. **Schema:**
-{schema_block}"""
-
-
-def generate_fallback_toml(overrides):
-    """Generates a schema-compliant TOML block using provided overrides."""
-    lines = ["[[vulnerabilities]]"]
-    for key, config in VULN_SCHEMA.items():
-        val = overrides.get(key, config["default"])
-
-        if config["multiline"] or "\n" in str(val):
-            safe_val = escape_toml_multiline(val)
-            lines.append(f'{key} = """\n{safe_val}\n"""')
-        else:
-            safe_val = str(val).replace('"', '\\"')
-            lines.append(f'{key} = "{safe_val}"')
-
-    return "\n".join(lines) + "\n\n"
-
-
-def clean_toml_output(stdout):
-    """Strips markdown formatting blocks (e.g. ```toml) from output.
-
-    Args:
-        stdout: Raw stdout string from the CLI subprocess.
-
-    Returns:
-        Cleaned string containing only the inner block, formatted with trailing spacing.
-    """
-    output_text = stdout.strip()
-    if output_text.startswith("```toml"):
-        output_text = output_text[7:]
-    elif output_text.startswith("```"):
-        output_text = output_text[3:]
-    if output_text.endswith("```"):
-        output_text = output_text[:-3]
-    return output_text.strip() + "\n\n"
-
-
-def format_timeout_error(file_rel_path, timeout_secs):
-    """Generates a standard vulnerability record for timeout failures.
-
-    Args:
-        file_rel_path: Relative path of the file that failed.
-        timeout_secs: Timeout limit in seconds.
-
-    Returns:
-        Standard TOML block describing the timeout error.
-    """
-    return f"""
-[[vulnerabilities]]
-file = "{file_rel_path}"
-title = "Error during analysis: Timeout"
-severity = "Informational"
-location = "N/A"
-description = "Job hung and timed out after {timeout_secs}s."
-recommendation = "N/A"
-\n"""
-
-
-def format_process_failure(file_rel_path, error_msg):
-    """Generates a standard vulnerability record for process exit failures.
-
-    Args:
-        file_rel_path: Relative path of the file that failed.
-        error_msg: Subprocess stderr output.
-
-    Returns:
-        Standard TOML block describing the process failure.
-    """
-    error_msg_escaped = error_msg.replace('"', '\\"')  # Escape quotes for TOML
-    return f"""
-[[vulnerabilities]]
-file = "{file_rel_path}"
-title = "Error during analysis: Process Failure"
-severity = "Informational"
-location = "N/A"
-description = "Subprocess failed with error: {error_msg_escaped}"
-recommendation = "N/A"
-\n"""
 
 
 def run_orchestrator(
@@ -235,10 +84,6 @@ def run_orchestrator(
     # Read model prompt
     with open(system_prompt_path, "r") as f:
         prompt = f.read().strip()
-
-    prompt = prompt.replace(
-        "{REPORTING_REQUIREMENTS}", generate_reporting_requirements()
-    )
 
     # Ensure output is clean
     with open(output_path, "w") as out_f:
@@ -269,11 +114,36 @@ def run_orchestrator(
                 print(report_chunk)
             results_map[file_rel_path] = (report_chunk, is_warning)
 
-    with open(output_path, "a") as out_f:
-        for file_rel_path in files_to_analyze:
-            if file_rel_path in results_map:
-                chunk, is_warning = results_map[file_rel_path]
-                if not is_warning and chunk:
-                    out_f.write(chunk)
+    # Collect all individual findings from each analyzed file's JSON chunk
+    all_findings = []
+    for file_rel_path in files_to_analyze:
+        if file_rel_path in results_map:
+            chunk, is_warning = results_map[file_rel_path]
+            if not is_warning and chunk:
+                try:
+                    # Parse each structured file report response
+                    data = json.loads(chunk)
+                    all_findings.extend(data.get("vulnerabilities", []))
+                except Exception as e:
+                    print(f"Error parsing JSON chunk for {file_rel_path}: {e}")
+                    # Push a fallback structured object
+                    all_findings.append(
+                        {
+                            "file": file_rel_path,
+                            "title": "Error parsing analysis output",
+                            "severity": "Informational",
+                            "location": "N/A",
+                            "description": f"Failed to load JSON chunk. Raw: {chunk}",
+                            "recommendation": "N/A",
+                            "verdict": "Informational",
+                            "justification": str(e),
+                            "attack_vector": "",
+                        }
+                    )
+
+    # Write unified final structured report
+    final_report = {"vulnerabilities": all_findings}
+    with open(output_path, "w") as out_f:
+        json.dump(final_report, out_f, indent=2)
 
     print(f"Analysis complete. Report saved to {output_path}")

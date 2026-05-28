@@ -1,94 +1,28 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 import argparse
-import re
 import common
-
-
-def extract_sloppy_toml_blocks(text):
-    """
-    Extracts TOML output from RAW agent output.
-    Uses a synonym mapper to catch LLM hallucinations and normalizes them.
-    """
-    # Split the text by the TOML array header
-    blocks = re.split(r"\[\[vulnerabilit(?:ies|y)\]\]", text, flags=re.IGNORECASE)
-
-    parsed_vulns = []
-
-    # Map hallucinated keys to our official schema keys
-    KEY_SYNONYMS = {
-        "file_path": "file",
-        "filename": "file",
-        "line": "location",
-        "function": "location",
-        "name": "title",
-        "headline": "title",
-        "summary": "title",
-        "details": "description",
-        "remediation": "recommendation",
-    }
-
-    # Official keys we want to extract
-    OFFICIAL_KEYS = [
-        "file",
-        "location",
-        "title",
-        "severity",
-        "description",
-        "recommendation",
-        "attack_vector",
-        "justification",
-        "verdict",
-    ]
-
-    # We search for ALL official keys AND their known synonyms
-    search_keys = OFFICIAL_KEYS + list(KEY_SYNONYMS.keys())
-
-    for block in blocks:
-        if not block.strip():
-            continue
-
-        vuln = {}
-        for search_key in search_keys:
-            # Try to match triple-quoted or single-quoted multi-line strings (""" or ''')
-            triple_match = re.search(
-                rf'^{search_key}\s*=\s*(?:"""|\'\'\')(.*?)(?:"""|\'\'\')',
-                block,
-                re.MULTILINE | re.DOTALL,
-            )
-            if triple_match:
-                val = triple_match.group(1).strip()
-                normalized_key = KEY_SYNONYMS.get(search_key, search_key)
-                vuln[normalized_key] = val
-                continue
-
-            # Try to match standard single-line strings ("...")
-            single_match = re.search(
-                rf'^{search_key}\s*=\s*"(.*?)"\s*$', block, re.MULTILINE
-            )
-            if single_match:
-                val = single_match.group(1).strip()
-                normalized_key = KEY_SYNONYMS.get(search_key, search_key)
-                vuln[normalized_key] = val
-
-        if vuln.get("title") and vuln.get("file"):
-            parsed_vulns.append(vuln)
-
-    return parsed_vulns
+import json
+from pydantic_core import PydanticUndefined
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--original", required=True, help="Original main_report.toml")
-    parser.add_argument("--review", required=True, help="Raw text output from agent")
-    parser.add_argument("--output", required=True, help="Path for reviewed_report.toml")
+    parser.add_argument("--original", required=True, help="Original main_report.json")
+    parser.add_argument(
+        "--review", required=True, help="Raw JSON text output from agent"
+    )
+    parser.add_argument("--output", required=True, help="Path for reviewed_report.json")
     args = parser.parse_args()
 
-    # Load Original TOML
-    with open(args.original, "r") as f:
-        original_text = f.read()
-
-    original_vulns = extract_sloppy_toml_blocks(original_text)
+    # Load Original JSON
+    try:
+        with open(args.original, "r") as f:
+            data = json.load(f)
+            original_vulns = data.get("vulnerabilities", [])
+    except Exception as e:
+        print(f"Error loading original JSON: {e}")
+        original_vulns = []
 
     if not original_vulns:
         print("WARNING: Original report contained no valid vulnerabilities.")
@@ -105,12 +39,20 @@ def main():
     # Read Raw Output
     try:
         with open(args.review, "r") as f:
-            review_text = f.read()
-    except Exception:
-        review_text = ""
+            review_text = f.read().strip()
+            # Strip markdown fences if LLM wrapped its JSON
+            if review_text.startswith("```json"):
+                review_text = review_text[7:]
+            elif review_text.startswith("```"):
+                review_text = review_text[3:]
+            if review_text.endswith("```"):
+                review_text = review_text[:-3]
 
-    # Extract the reviewed vulnerabilities using the same parser
-    reviewed_vulns_list = extract_sloppy_toml_blocks(review_text)
+            review_data = json.loads(review_text.strip())
+            reviewed_vulns_list = review_data.get("vulnerabilities", [])
+    except Exception as e:
+        print(f"Error parsing reviewed JSON: {e}")
+        reviewed_vulns_list = []
 
     # Map them by file::title for easy merging
     reviews_map = {f"{v.get('file')}::{v.get('title')}": v for v in reviewed_vulns_list}
@@ -120,11 +62,13 @@ def main():
     for vuln in original_vulns:
         key = f"{vuln.get('file')}::{vuln.get('title')}"
 
-        # Set our required baseline fallbacks
-        if "verdict" not in vuln:
-            vuln["verdict"] = "Informational"
-        if "justification" not in vuln:
-            vuln["justification"] = "Not explicitly reviewed by AI or failed to parse."
+        # Set baseline fallbacks dynamically from Pydantic model fields
+        for name, field in common.Finding.model_fields.items():
+            if name not in vuln:
+                default_val = field.default
+                if default_val is None or default_val is PydanticUndefined:
+                    default_val = "Unknown" if name == "file" else ""
+                vuln[name] = default_val
 
         # Try exact match first
         rev = reviews_map.get(key)
@@ -141,8 +85,8 @@ def main():
 
         # If the agent analyzed it, overwrite with their keys
         if rev:
-            for k in ["verdict", "severity", "justification", "attack_vector"]:
-                if rev.get(k):
+            for k in common.Finding.model_fields.keys():
+                if k not in ["file", "title"] and rev.get(k):
                     vuln[k] = rev[k]
 
         # Deletion logic: Skip adding false positives to the final list
@@ -153,30 +97,10 @@ def main():
 
         final_vulns.append(vuln)
 
-    def escape_toml_string(s):
-        # Escape backslashes first, then quotes
-        return str(s).replace("\\", "\\\\").replace('"', '\\"')
-
-    # Write out the final TOML
+    # Write out the final JSON
+    final_report = {"vulnerabilities": final_vulns}
     with open(args.output, "w") as f:
-        for vuln in final_vulns:
-            f.write("[[vulnerabilities]]\n")
-            for k, v in vuln.items():
-                if not v:
-                    continue
-
-                if "\n" in str(v) or k in [
-                    "description",
-                    "justification",
-                    "attack_vector",
-                    "recommendation",
-                ]:
-                    safe_v = common.escape_toml_multiline(v)
-                    f.write(f'{k} = """\n{safe_v}\n"""\n')
-                else:
-                    safe_v = escape_toml_string(v)
-                    f.write(f'{k} = "{safe_v}"\n')
-            f.write("\n")
+        json.dump(final_report, f, indent=2)
 
 
 if __name__ == "__main__":

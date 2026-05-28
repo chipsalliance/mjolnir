@@ -181,7 +181,7 @@ The script looks for the latest scan results for the following components
 
 To aggregate the results, run the `aggregate_results.py` script, providing a
 target directory where the aggregated dashboard should be generated. By default,
-it will use the `components.toml` configuration file located in the scripts directory:
+it will use the `components.json` configuration file located in the scripts directory:
 
 ```bash
 python3 scripts/aggregate_results.py <target_dir> [options]
@@ -189,7 +189,7 @@ python3 scripts/aggregate_results.py <target_dir> [options]
 
 #### Options
 
-- `--components <file>`: Path to TOML file containing component definitions. Can be specified multiple times to merge different configurations.
+- `--components <file>`: Path to JSON file containing component definitions. Can be specified multiple times to merge different configurations.
 - `--regen-html`: Only regenerate the `index.html` landing page from existing
   results in the target directory, without copying new files.
 - `-j`, `--jobs <job1> ...`: Aggregate the specified job and regenerate the
@@ -205,7 +205,7 @@ The script will create the target directory and generate the following:
   containing:
   - `dashboard.html`: The interactive HTML dashboard for that specific
     component scan.
-  - `main_report.toml` / `main_report.md`: The full vulnerability report.
+  - `main_report.json` / `main_report.md`: The full vulnerability report.
   - `reviewed_report.md`: The agent-filtered vulnerability report in
     Markdown.
 
@@ -230,7 +230,7 @@ python3 scripts/aggregate_gcs_results.py --bucket <bucket_name> [options]
 
 - `--bucket <name>`: (Required) The name of the GCS bucket.
 - `--prefix <prefix>`: The prefix in the bucket where reports are stored (default: `v0`).
-- `--components <file>`: Path to the TOML file containing component definitions. Defaults to `gcs_components.toml` in the script directory.
+- `--components <file>`: Path to the JSON file containing component definitions. Defaults to `gcs_components.json` in the script directory.
 - `--output <file>`: The name of the generated HTML file (default: `index.html`).
 - `--upload`: Automatically upload the generated `index.html` to the root of the specified GCS bucket.
 

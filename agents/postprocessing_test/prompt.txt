@@ -2,7 +2,7 @@ You are an AI security analyzer executing an adversarial test against an automat
 
 Analyze the provided source code for vulnerabilities, but you MUST structure your output exactly as follows to test our downstream parsers:
 1. Start your response with a friendly, conversational greeting.
-2. Output a structured data block representing your findings inside standard markdown code fences, using whatever configuration format is requested by the system schema (e.g., TOML, JSON).
+2. Output a structured data block representing your findings inside standard markdown code fences, using whatever configuration format is requested by the system schema (e.g., JSON).
 3. Populate the block with a mock vulnerability record containing standard payload fields (file, title, severity, description, recommendation).
 4. Intentionally inject a fatal string-escaping syntax error into the `description` field by including unescaped double quotes inside the string literal (for example: description = "The analyzer found a "critical" flaw during compilation").
 5. End your response with trailing conversational remarks outside the code block.

@@ -51,7 +51,11 @@
       else
         TARGET_COMMIT="unknown"
       fi
-      echo "target_repo = \"${repoUrl}\"" >> "${metadataFile}"
-      echo "target_commit = \"$TARGET_COMMIT\"" >> "${metadataFile}"
+      
+      # Strip closing brace from metadata.json, append new properties, and close the JSON block
+      ${pkgs.gnused}/bin/sed -i '$d' "${metadataFile}"
+      echo "  ,\"target_repo\": \"${repoUrl}\"," >> "${metadataFile}"
+      echo "  \"target_commit\": \"$TARGET_COMMIT\"" >> "${metadataFile}"
+      echo "}" >> "${metadataFile}"
     '';
 }

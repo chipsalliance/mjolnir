@@ -4,31 +4,37 @@ header {
     flex-direction: column;
     align-items: flex-start;
 }
+
 header p {
     margin: 5px 0 0 0;
     color: #8b949e;
 }
+
 .grid {
     grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     margin-top: 20px;
 }
+
 .card {
     display: flex;
     flex-direction: column;
     height: 100%;
 }
+
 .card-body {
     padding: 25px;
     display: flex;
     flex-direction: column;
     flex-grow: 1;
 }
+
 .card-title {
     color: var(--text-bright);
     font-size: 20px;
     font-weight: 600;
     margin: 0 0 10px 0;
 }
+
 .scan-info {
     font-size: 13px;
     color: #8b949e;
@@ -39,12 +45,14 @@ header p {
     border: 1px solid rgba(255, 255, 255, 0.05);
     word-break: break-all;
 }
+
 .list-group {
     display: flex;
     flex-direction: column;
     gap: 10px;
     margin-top: auto;
 }
+
 .list-group-item {
     display: flex;
     justify-content: space-between;
@@ -58,14 +66,30 @@ header p {
     transition: all 0.2s ease;
     font-weight: 500;
 }
+
 .list-group-item:hover {
     background: rgba(255, 255, 255, 0.08);
     border-color: var(--accent-color);
     color: var(--text-bright);
 }
-.bg-html { color: var(--accent-color); background-color: rgba(88, 166, 255, 0.15); border: 1px solid rgba(88, 166, 255, 0.3); }
-.bg-md { color: var(--info-color); background-color: var(--info-bg); border: 1px solid rgba(100, 210, 255, 0.3); }
-.bg-toml { color: #df7e62; background-color: rgba(223, 126, 98, 0.15); border: 1px solid rgba(223, 126, 98, 0.3); }
+
+.bg-html {
+    color: var(--accent-color);
+    background-color: rgba(88, 166, 255, 0.15);
+    border: 1px solid rgba(88, 166, 255, 0.3);
+}
+
+.bg-md {
+    color: var(--info-color);
+    background-color: var(--info-bg);
+    border: 1px solid rgba(100, 210, 255, 0.3);
+}
+
+.bg-json {
+    color: #df7e62;
+    background-color: rgba(223, 126, 98, 0.15);
+    border: 1px solid rgba(223, 126, 98, 0.3);
+}
 
 footer {
     color: #8b949e;

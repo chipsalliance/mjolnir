@@ -3,13 +3,21 @@
 {
   pkgs,
   mockResult ? ''
-    [[vulnerabilities]]
-    file = \"dummy.rs\"
-    title = \"Dummy Vulnerability\"
-    severity = \"Low\"
-    location = \"Line 1\"
-    description = \"Dummy description from mock backend.\"
-    recommendation = \"Dummy recommendation.\"
+    {
+      "vulnerabilities": [
+        {
+          "file": "dummy.rs",
+          "title": "Dummy Vulnerability",
+          "severity": "Low",
+          "location": "Line 1",
+          "description": "Dummy description from mock backend.",
+          "recommendation": "Dummy recommendation.",
+          "verdict": "Informational",
+          "justification": "Mock run.",
+          "attack_vector": ""
+        }
+      ]
+    }
   '',
 }:
 {
@@ -26,15 +34,11 @@
 
       # Ensure output is empty initially
       # Initialize output with metadata if available
-      METADATA_FILE="$(dirname "${output}")/metadata.toml"
+      METADATA_FILE="$(dirname "${output}")/metadata.json"
       > "${output}"
 
-      while IFS= read -r f; do
-        if [ -f "${src}/$f" ]; then
-          echo "Mocking analysis for $f..."
-          echo "${mockResult}" >> "${output}"
-        fi
-      done < "${files}"
+      # Write out mockResult directly as the raw JSON array to output
+      echo '${mockResult}' > "${output}"
     '';
 
   runSingle =

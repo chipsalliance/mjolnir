@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import tomllib
 import dashboard_builder
 
 # Configure logging
@@ -56,8 +55,8 @@ def main():
     )
     parser.add_argument(
         "--components",
-        default=str(Path(__file__).resolve().parent / "gcs_components.toml"),
-        help="Path to components.toml file (default: gcs_components.toml in script dir).",
+        default=str(Path(__file__).resolve().parent / "gcs_components.json"),
+        help="Path to components.json file (default: gcs_components.json in script dir).",
     )
     parser.add_argument("--output", default="index.html", help="Output HTML file path.")
     parser.add_argument(
@@ -115,7 +114,7 @@ def main():
         files_to_link = [
             "dashboard.html",
             "reviewed_report.md",
-            "main_report.toml",
+            "main_report.json",
             "main_report.md",
         ]
         linked_count = 0

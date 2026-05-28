@@ -1,12 +1,10 @@
-# Licensed under the Apache-2.0 license
-# SPDX-License-Identifier: Apache-2.0
 import sys
 import re
 import json
 import os
 import argparse
 
-import tomllib
+import common
 
 
 def generate_html(vulns, metadata, template_path, css_path):
@@ -40,7 +38,7 @@ if __name__ == "__main__":
         description="Generate vulnerability HTML dashboard."
     )
     parser.add_argument(
-        "input_file", help="Path to the vulnerability report TOML file."
+        "input_file", help="Path to the vulnerability report JSON file."
     )
     parser.add_argument("output_file", help="Path to the output HTML file.")
     parser.add_argument(
@@ -52,19 +50,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    with open(args.input_file, "r") as f:
-        content = f.read().strip()
-
-    # Strip markdown code blocks if present
-    if content.startswith("```toml"):
-        content = content[7:]
-    elif content.startswith("```"):
-        content = content[3:]
-    if content.endswith("```"):
-        content = content[:-3]
-    content = content.strip()
-
-    data = tomllib.loads(content)
+    try:
+        with open(args.input_file, "r") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"Error loading JSON file: {e}")
+        sys.exit(1)
 
     vulns_raw = data.get("vulnerabilities", [])
     vulns = []
@@ -74,14 +65,24 @@ if __name__ == "__main__":
         parent_dir = os.path.dirname(file_path)
         file_name = os.path.basename(file_path)
 
+        desc_parts = [v.get("description", "")]
+        for name, field in common.Finding.model_fields.items():
+            if name in ["file", "title", "severity", "description"]:
+                continue
+            val = v.get(name)
+            if val:
+                display_name = name.replace("_", " ").title()
+                desc_parts.append(f"**{display_name}:** {val}")
+
+        description = "\n\n".join(filter(None, desc_parts))
+
         vuln = {
             "file_path": file_path,
             "parent_dir": parent_dir if parent_dir else "/",
             "file_name": file_name,
             "title": v.get("title", "Untitled"),
             "severity": v.get("severity", "Unknown"),
-            "description": v.get("description", "")
-            + f"\n\n**Location:** {v.get('location', 'N/A')}\n\n**Recommendation:** {v.get('recommendation', 'N/A')}",
+            "description": description,
         }
 
         sev = vuln["severity"].lower()
@@ -105,12 +106,15 @@ if __name__ == "__main__":
 
     # Load metadata if available
     input_dir = os.path.dirname(args.input_file)
-    metadata_file = os.path.join(input_dir, "metadata.toml")
+    metadata_file = os.path.join(input_dir, "metadata.json")
     metadata = {}
     if os.path.exists(metadata_file):
         print(f"Found metadata file at {metadata_file}")
-        with open(metadata_file, "rb") as f:
-            metadata = tomllib.load(f)
+        try:
+            with open(metadata_file, "r") as f:
+                metadata = json.load(f)
+        except Exception as e:
+            print(f"Error reading metadata: {e}")
 
     html = generate_html(vulns, metadata, args.template, args.css)
 

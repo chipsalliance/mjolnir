@@ -100,7 +100,7 @@ let
     cd "$TOP_DIR"
 
     # Set main report file in the run dir
-    REPORT_FILE="$RUN_DIR/main_report.toml"
+    REPORT_FILE="$RUN_DIR/main_report.json"
 
     echo "Running threat analysis with backend: $MJOLNIR_BACKEND..."
 
@@ -269,11 +269,13 @@ let
     mkdir -p "$RUN_DIR"
     export VULN_RUN_DIR="$RUN_DIR"
 
-    # Initialize metadata.toml
-    METADATA_FILE="$RUN_DIR/metadata.toml"
+    # Initialize metadata.json
+    METADATA_FILE="$RUN_DIR/metadata.json"
     echo "Initializing metadata file at $METADATA_FILE..."
-    echo "timestamp = \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"" > "$METADATA_FILE"
-    echo "orchestrator_commit = \"${orchestratorCommit}\"" >> "$METADATA_FILE"
+    echo "{" > "$METADATA_FILE"
+    echo "  \"timestamp\": \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"," >> "$METADATA_FILE"
+    echo "  \"orchestrator_commit\": \"${orchestratorCommit}\"" >> "$METADATA_FILE"
+    echo "}" >> "$METADATA_FILE"
 
     LOG_FILE="$RUN_DIR/execution_log.txt"
 

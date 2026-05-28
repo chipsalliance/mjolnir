@@ -2,15 +2,16 @@
 # SPDX-License-Identifier: Apache-2.0
 import sys
 import argparse
-import tomllib
+import json
+import common
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate Markdown report from TOML findings."
+        description="Generate Markdown report from JSON findings."
     )
     parser.add_argument(
-        "--input", required=True, help="Path to the findings TOML file."
+        "--input", required=True, help="Path to the findings JSON file."
     )
     parser.add_argument(
         "--output", required=True, help="Path to the output Markdown file."
@@ -19,20 +20,9 @@ def main():
 
     try:
         with open(args.input, "r") as f:
-            content = f.read().strip()
-
-        # Strip markdown code blocks if present
-        if content.startswith("```toml"):
-            content = content[7:]
-        elif content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
-
-        data = tomllib.loads(content)
+            data = json.load(f)
     except Exception as e:
-        print(f"Error loading TOML file: {e}")
+        print(f"Error loading JSON file: {e}")
         sys.exit(1)
 
     vulns = data.get("vulnerabilities", [])
@@ -44,16 +34,34 @@ def main():
             file_path = vuln.get("file", "Unknown")
             title = vuln.get("title", "Untitled Vulnerability")
             severity = vuln.get("severity", "Unknown")
-            location = vuln.get("location", "Unknown")
-            description = vuln.get("description", "No description provided.")
-            recommendation = vuln.get("recommendation", "No recommendation provided.")
 
             f.write(f"## File: {file_path}\n\n")
             f.write(f"### {title}\n")
-            f.write(f"**Severity:** {severity}\n")
-            f.write(f"**Location:** {location}\n\n")
-            f.write(f"#### Description\n{description}\n\n")
-            f.write(f"#### Recommendation\n{recommendation}\n\n")
+            f.write(f"**Severity:** {severity}\n\n")
+
+            # Write all other fields dynamically from the Pydantic Finding model definition
+            multiline_fields = {
+                "description",
+                "recommendation",
+                "justification",
+                "attack_vector",
+            }
+            for name, field in common.Finding.model_fields.items():
+                if name in ["file", "title", "severity"]:
+                    continue
+
+                val = vuln.get(name)
+                if not val:
+                    continue
+
+                multiline = name in multiline_fields
+                display_name = name.replace("_", " ").title()
+
+                if multiline:
+                    f.write(f"#### {display_name}\n{val}\n\n")
+                else:
+                    f.write(f"**{display_name}:** {val}\n\n")
+
             f.write("---\n\n")
 
     print(f"Markdown report generated successfully: {args.output}")

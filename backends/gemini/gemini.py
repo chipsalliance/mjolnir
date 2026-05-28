@@ -6,7 +6,7 @@ This script uses the official Google GenAI SDK to analyze either:
 1. A list of files in parallel for security threats (Batch Mode).
 2. A single file with a custom query/prompt (Single-File Mode).
 
-It enforces a Pydantic structured response schema matching Mjolnir's TOML output.
+It enforces a Pydantic structured response schema matching Mjolnir's JSON output.
 All configurations and credentials are passed explicitly as CLI arguments.
 """
 
@@ -18,6 +18,7 @@ import common
 from common import SecurityReport
 
 DEFAULT_TIMEOUT_SECS = 600
+
 
 # ---------------------------------------------------------------------------
 
@@ -72,11 +73,6 @@ def run_single_query(
 
     with open(system_prompt_path, "r") as f:
         prompt = f.read().strip()
-
-    # Replace reporting requirements in the prompt template
-    prompt = prompt.replace(
-        "{REPORTING_REQUIREMENTS}", common.generate_reporting_requirements()
-    )
 
     with open(input_path, "r") as in_f:
         file_content = in_f.read()
@@ -144,19 +140,28 @@ def run_analysis(
                 ),
             )
 
-            # Enforced structured JSON is returned. Convert to expected TOML.
-            report_chunk = common.toml_from_structured_json(response.text)
-            return file_rel_path, report_chunk, False
+            # Gemini's structured output is guaranteed to be valid JSON conforming to SecurityReport.
+            # Return the raw JSON chunk.
+            return file_rel_path, response.text, False
 
         except Exception as e:
             print(f"Error analyzing {file_rel_path}: {e}")
-            report = common.generate_fallback_toml(
-                {
-                    "file": file_rel_path,
-                    "title": "Error during analysis: SDK Failure",
-                    "description": f"Exception raised during SDK call:\n{str(e)}",
-                }
-            )
+            # Return a structured JSON error record
+            report = f"""{{
+  "vulnerabilities": [
+    {{
+      "file": "{file_rel_path}",
+      "title": "Error during analysis: SDK Failure",
+      "severity": "Informational",
+      "location": "N/A",
+      "description": "Exception raised during SDK call: {str(e).replace('"', '\\"')}",
+      "recommendation": "N/A",
+      "verdict": "Informational",
+      "justification": "SDK failed to execute.",
+      "attack_vector": ""
+    }}
+  ]
+}}"""
             return file_rel_path, report, False
 
     common.run_orchestrator(
