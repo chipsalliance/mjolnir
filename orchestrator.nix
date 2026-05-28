@@ -37,7 +37,7 @@ let
   # Generate run scripts for all available backends
   backendScripts = builtins.mapAttrs (name: backendModule:
     let
-      runFunc = backendModule.run;
+      runFunc = backendModule.runBatchAuditor;
       expectedArgs = builtins.functionArgs runFunc;
       allArgs = job.prompt.backendArgs
         // {

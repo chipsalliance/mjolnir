@@ -22,7 +22,7 @@
 }:
 {
   name = "mock";
-  run =
+  runBatchAuditor =
     {
       systemPrompt,
       src,
@@ -41,7 +41,7 @@
       echo '${mockResult}' > "${output}"
     '';
 
-  runSingle =
+  runAdversarialReviewer =
     {
       systemPrompt,
       input,

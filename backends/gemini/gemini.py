@@ -54,7 +54,7 @@ def get_sdk_client(api_key=None, project=None, location=None):
 # ---------------------------------------------------------------------------
 
 
-def run_single_query(
+def run_adversarial_reviewer(
     input_path,
     output_path,
     system_prompt_path,
@@ -93,7 +93,7 @@ def run_single_query(
         raise e
 
 
-def run_analysis(
+def run_batch_auditor(
     src_dir,
     files_list_path,
     output_path,
@@ -213,7 +213,7 @@ if __name__ == "__main__":
                 "Arguments --files, --silent-missing, and --src are not compatible with --input mode."
             )
 
-        run_single_query(
+        run_adversarial_reviewer(
             input_path=args.input,
             output_path=args.output,
             system_prompt_path=args.prompt,
@@ -227,7 +227,7 @@ if __name__ == "__main__":
         if not args.files:
             parser.error("Argument --files is required for batch mode.")
 
-        run_analysis(
+        run_batch_auditor(
             src_dir=args.src,
             files_list_path=args.files,
             output_path=args.output,

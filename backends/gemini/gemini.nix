@@ -8,7 +8,7 @@
   name = "gemini";
 
   # Batch Mode: Analyzes multiple files in parallel
-  run =
+  runBatchAuditor =
     {
       systemPrompt,
       src,
@@ -37,7 +37,7 @@
     '';
 
   # Single-File Mode: Analyzes or processes a single file
-  runSingle =
+  runAdversarialReviewer =
     {
       systemPrompt,
       input,

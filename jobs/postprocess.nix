@@ -11,9 +11,9 @@ let
     backendName = backendName;
   };
 
-  # Filter backends that support runSingle
-  singleRunBackends = pkgs.lib.filterAttrs (name: backendModule:
-    backendModule ? runSingle
+  # Filter backends that support runAdversarialReviewer
+  adversarialReviewBackends = pkgs.lib.filterAttrs (name: backendModule:
+    backendModule ? runAdversarialReviewer
   ) backends;
 in
 ''
@@ -28,13 +28,13 @@ in
   case "$MJOLNIR_BACKEND" in
     ${builtins.concatStringsSep "\n" (builtins.map (bName: ''
       "${bName}")
-        ${singleRunBackends.${bName}.runSingle {
+        ${adversarialReviewBackends.${bName}.runAdversarialReviewer {
           systemPrompt = adversarialPrompt.backendArgs.systemPrompt;
           input = "$REPORT_FILE";
           output = "$RAW_REVIEW_TXT";
         }}
         ;;
-    '') (builtins.attrNames singleRunBackends))}
+    '') (builtins.attrNames adversarialReviewBackends))}
     *)
       echo "Error: Backend $MJOLNIR_BACKEND does not support adversarial review." >&2
       exit 1
