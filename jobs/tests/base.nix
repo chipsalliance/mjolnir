@@ -12,6 +12,7 @@
   target ? null,
   agentDir ? ../../agents/rust_auditor,
   postExtract ? null,
+  postTransform ? null,
 }:
 let
   defaultTarget = {
@@ -73,6 +74,6 @@ in
 
   hooks = {
     postExtract = if postExtract != null then postExtract else defaultPostExtract;
-  };
+  } // (if postTransform != null then { inherit postTransform; } else {});
 }
 

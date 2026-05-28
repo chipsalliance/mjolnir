@@ -36,4 +36,13 @@ import ./base.nix { inherit pkgs; } {
   postExtract = ''
     echo "Running AI with instructions to generate malformed output..."
   '';
+
+  postTransform = import ../postprocess.nix {
+    inherit pkgs;
+    name = "Malformed Postprocessing Handling Test";
+    backends = {
+      gemini = import ../../backends/gemini/gemini.nix { inherit pkgs; };
+    };
+    backendName = "gemini";
+  };
 }
