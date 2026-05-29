@@ -127,19 +127,18 @@ def run_orchestrator(
                 except Exception as e:
                     print(f"Error parsing JSON chunk for {file_rel_path}: {e}")
                     # Push a fallback structured object
-                    all_findings.append(
-                        {
-                            "file": file_rel_path,
-                            "title": "Error parsing analysis output",
-                            "severity": "Informational",
-                            "location": "N/A",
-                            "description": f"Failed to load JSON chunk. Raw: {chunk}",
-                            "recommendation": "N/A",
-                            "verdict": "Informational",
-                            "justification": str(e),
-                            "attack_vector": "",
-                        }
+                    finding = Finding(
+                        file=file_rel_path,
+                        title="Error parsing analysis output",
+                        severity="Informational",
+                        location="N/A",
+                        description=f"Failed to load JSON chunk. Raw: {chunk}",
+                        recommendation="N/A",
+                        verdict="Informational",
+                        justification=str(e),
+                        attack_vector="",
                     )
+                    all_findings.append(finding.model_dump())
 
     # Write unified final structured report
     final_report = {"vulnerabilities": all_findings}

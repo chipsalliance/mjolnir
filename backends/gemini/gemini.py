@@ -15,7 +15,7 @@ import os
 from google import genai
 from google.genai import types
 import common
-from common import SecurityReport
+from common import Finding, SecurityReport
 import tools
 import json
 
@@ -160,37 +160,37 @@ def run_adversarial_reviewer(
                     f" [Warning] Adversarial Reviewer hit the maximum tool execution limit (30 turns) and was forced to terminate early.",
                     flush=True,
                 )
-                report_text = """{
-  "vulnerabilities": [
-    {
-      "file": "Pipeline",
-      "title": "Adversarial Reviewer: Tool execution ceiling reached",
-      "severity": "Informational",
-      "description": "The Reviewer agent reached its maximum budget of 30 tool actions and was terminated early to prevent infinite looping.",
-      "recommendation": "Increase maximum_remote_calls or optimize the system prompt.",
-      "verdict": "Informational",
-      "justification": "Execution budget exhausted."
-    }
-  ]
-}"""
+                report_text = SecurityReport(
+                    vulnerabilities=[
+                        Finding(
+                            file="Pipeline",
+                            title="Adversarial Reviewer: Tool execution ceiling reached",
+                            severity="Informational",
+                            description="The Reviewer agent reached its maximum budget of 30 tool actions and was terminated early to prevent infinite looping.",
+                            recommendation="Increase maximum_remote_calls or optimize the system prompt.",
+                            verdict="Informational",
+                            justification="Execution budget exhausted.",
+                        )
+                    ]
+                ).model_dump_json()
             else:
                 print(
                     f" [Error] Model returned an empty response or was blocked by safety settings.",
                     flush=True,
                 )
-                report_text = """{
-  "vulnerabilities": [
-    {
-      "file": "Pipeline",
-      "title": "Adversarial Reviewer: Empty Response",
-      "severity": "Informational",
-      "description": "The model returned an empty text response. This can happen due to active safety filters or API issues.",
-      "recommendation": "Check GCP Vertex AI logs or adjust prompt guidelines.",
-      "verdict": "Informational",
-      "justification": "Empty API output."
-    }
-  ]
-}"""
+                report_text = SecurityReport(
+                    vulnerabilities=[
+                        Finding(
+                            file="Pipeline",
+                            title="Adversarial Reviewer: Empty Response",
+                            severity="Informational",
+                            description="The model returned an empty text response. This can happen due to active safety filters or API issues.",
+                            recommendation="Check GCP Vertex AI logs or adjust prompt guidelines.",
+                            verdict="Informational",
+                            justification="Empty API output.",
+                        )
+                    ]
+                ).model_dump_json()
 
         prompt_tokens = (
             response.usage_metadata.prompt_token_count if response.usage_metadata else 0
@@ -289,41 +289,41 @@ def run_batch_auditor(
                     has_text = True
 
             if not has_text:
-                report_text = f"""{{
-  "vulnerabilities": [
-    {{
-      "file": "{file_rel_path}",
-      "title": "Error during analysis: Empty Response / Tool Ceiling",
-      "severity": "Informational",
-      "location": "N/A",
-      "description": "Model returned an empty response or terminated early on a tool call.",
-      "recommendation": "N/A",
-      "verdict": "Informational",
-      "justification": "API returned empty response text.",
-      "attack_vector": ""
-    }}
-  ]
-}}"""
+                report_text = SecurityReport(
+                    vulnerabilities=[
+                        Finding(
+                            file=file_rel_path,
+                            title="Error during analysis: Empty Response / Tool Ceiling",
+                            severity="Informational",
+                            location="N/A",
+                            description="Model returned an empty response or terminated early on a tool call.",
+                            recommendation="N/A",
+                            verdict="Informational",
+                            justification="API returned empty response text.",
+                            attack_vector="",
+                        )
+                    ]
+                ).model_dump_json()
             return file_rel_path, report_text, False
 
         except Exception as e:
             print(f"Error analyzing {file_rel_path}: {e}")
             # Return a structured JSON error record
-            report = f"""{{
-  "vulnerabilities": [
-    {{
-      "file": "{file_rel_path}",
-      "title": "Error during analysis: SDK Failure",
-      "severity": "Informational",
-      "location": "N/A",
-      "description": "Exception raised during SDK call: {str(e).replace('"', '\\"')}",
-      "recommendation": "N/A",
-      "verdict": "Informational",
-      "justification": "SDK failed to execute.",
-      "attack_vector": ""
-    }}
-  ]
-}}"""
+            report = SecurityReport(
+                vulnerabilities=[
+                    Finding(
+                        file=file_rel_path,
+                        title="Error during analysis: SDK Failure",
+                        severity="Informational",
+                        location="N/A",
+                        description=f"Exception raised during SDK call: {e}",
+                        recommendation="N/A",
+                        verdict="Informational",
+                        justification="SDK failed to execute.",
+                        attack_vector="",
+                    )
+                ]
+            ).model_dump_json()
             return file_rel_path, report, False
 
     common.run_orchestrator(

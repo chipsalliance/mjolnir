@@ -27,13 +27,13 @@ def main():
     if not original_vulns:
         print("WARNING: Original report contained no valid vulnerabilities.")
         original_vulns = [
-            {
-                "file": "Pipeline",
-                "title": "Initial Audit Failed",
-                "severity": "Informational",
-                "description": "The initial security auditor produced unparsable output.",
-                "recommendation": "Check the raw execution logs.",
-            }
+            common.Finding(
+                file="Pipeline",
+                title="Initial Audit Failed",
+                severity="Informational",
+                description="The initial security auditor produced unparsable output.",
+                recommendation="Check the raw execution logs.",
+            ).model_dump()
         ]
 
     # Read Raw Output
