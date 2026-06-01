@@ -11,6 +11,7 @@ CODE_DIR = os.environ.get("CODE_DIR", ".")
 
 def read_file(path: str) -> str:
     """Reads the entire contents of a file from the checked-out codebase.
+    Limited to a maximum of 100,000 characters to avoid exhausting token context.
 
     Args:
         path: The relative path of the file under the workspace/code directory.
@@ -32,6 +33,7 @@ def read_file(path: str) -> str:
 
 def grep_search(query: str, path: str = ".") -> str:
     """Searches for a regex or string pattern across files in the workspace.
+    Limited to a maximum of 100 results to avoid exhausting token context.
 
     Args:
         query: The search term or regex pattern.
@@ -72,6 +74,7 @@ def grep_search(query: str, path: str = ".") -> str:
 
 def glob_files(pattern: str) -> list[str]:
     """Finds files matching a wildcard pattern in the workspace.
+    Limited to a maximum of 100 results to avoid exhausting token context.
 
     Args:
         pattern: A glob pattern, e.g., '**/*.rs' or 'src/*.c'.
