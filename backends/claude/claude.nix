@@ -4,10 +4,11 @@
 { pkgs }:
 {
   name = "claude";
-  run =
+  runBatchAuditor =
     {
       systemPrompt,
       src,
+      files,
       output,
     }:
     ''

@@ -8,7 +8,7 @@
   extensions ? [ "c" "h" "s" ],
   timeout ? 3600,
   backend ? null,
-  model ? null,
+  model ? "gemini-3.5-flash",
 }:
 let
   # Helper to build fd flags for extensions: [ "c" "h" "s" ] -> "-e c -e h -e s"

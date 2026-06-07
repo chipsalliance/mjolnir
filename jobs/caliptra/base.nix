@@ -12,7 +12,7 @@
   postExtractExtra ? "",
   contextFile ? null,
   backend ? null,
-  model ? null,
+  model ? "gemini-3.5-flash",
 }:
 import ../default_job.nix { inherit pkgs; } {
   inherit name workspaceDir outputDir backend model contextFile;
