@@ -84,19 +84,32 @@ def get_sdk_client(api_key=None, project=None, location=None):
     resolved_project = (project or "").strip()
     resolved_location = (location or "").strip()
 
+    # Configure robust retry options for both Gemini API and Vertex AI
+    # to handle transient errors and rate limits (429)
+    retry_options = types.HttpRetryOptions(
+        attempts=6,
+        initial_delay=2.0,
+        max_delay=60.0,
+        http_status_codes=[429, 500, 503],
+    )
+    http_options = types.HttpOptions(retry_options=retry_options)
+
     if resolved_api_key:
         print(
             " -> [API Mode] Public Gemini Developer API (using explicit API key)",
             flush=True,
         )
-        return genai.Client(api_key=resolved_api_key)
+        return genai.Client(api_key=resolved_api_key, http_options=http_options)
 
     print(
         f" -> [API Mode] Google Cloud Vertex AI (Project: {resolved_project}, Location: {resolved_location})",
         flush=True,
     )
     return genai.Client(
-        vertexai=True, project=resolved_project, location=resolved_location
+        vertexai=True,
+        project=resolved_project,
+        location=resolved_location,
+        http_options=http_options,
     )
 
 

@@ -7,9 +7,12 @@ import argparse
 import json
 import logging
 import os
-from pathlib import Path
-import shutil
 import sys
+
+# Add dashboard_generator to sys.path to import dashboard_builder
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parent.parent / "dashboard_generator"))
 import dashboard_builder
 
 # Configure logging
@@ -19,12 +22,12 @@ logging.basicConfig(
 
 
 def resolve_default_components():
-    """Finds default components.json in standard locations relative to CWD."""
+    """Finds default components.toml in standard locations relative to CWD."""
     cwd = Path.cwd()
     possible_paths = [
-        cwd / "mjolnir" / "scripts" / "components.json",
-        cwd / "scripts" / "components.json",
-        cwd / "components.json",
+        cwd / "mjolnir" / "app" / "aggregate_results" / "components.toml",
+        cwd / "app" / "aggregate_results" / "components.toml",
+        cwd / "components.toml",
     ]
     for path in possible_paths:
         if path.exists():
@@ -43,8 +46,8 @@ def resolve_dashboards_dir(cli_path):
 
     cwd = Path.cwd()
     possible_paths = [
-        cwd / "mjolnir" / "dashboards",
-        cwd / "dashboards",
+        cwd / "mjolnir" / "app" / "dashboard_generator" / "dashboards",
+        cwd / "app" / "dashboard_generator" / "dashboards",
     ]
     for path in possible_paths:
         if path.exists():
@@ -135,7 +138,7 @@ def main():
 
     if not args.components:
         parser.error(
-            "No components file specified and default components.json not found in standard locations."
+            "No components file specified and default components.toml not found in standard locations."
         )
     components = dashboard_builder.load_components(args.components)
 

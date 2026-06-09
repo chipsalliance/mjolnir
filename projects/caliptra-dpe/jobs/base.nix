@@ -14,9 +14,9 @@
   backend ? null,
   model ? "gemini-3.5-flash",
 }:
-import ../default_job.nix { inherit pkgs; } {
+import ../../../nix/orchestration/default_job.nix { inherit pkgs; } {
   inherit name workspaceDir outputDir backend model contextFile;
-  agentDir = ../../agents/rust_auditor;
+  agentDir = ../../../agents/rust_auditor;
 
   target = {
     inherit repoName repoUrl commit fileCommand;

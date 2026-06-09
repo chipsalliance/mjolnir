@@ -7,6 +7,9 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+
+# Add dashboard_generator to sys.path to import dashboard_builder
+sys.path.append(str(Path(__file__).resolve().parent.parent / "dashboard_generator"))
 import dashboard_builder
 
 # Configure logging
@@ -55,8 +58,8 @@ def main():
     )
     parser.add_argument(
         "--components",
-        default=str(Path(__file__).resolve().parent / "gcs_components.json"),
-        help="Path to components.json file (default: gcs_components.json in script dir).",
+        default=str(Path(__file__).resolve().parent / "gcs_components.toml"),
+        help="Path to components.toml file (default: gcs_components.toml in script dir).",
     )
     parser.add_argument("--output", default="index.html", help="Output HTML file path.")
     parser.add_argument(
@@ -76,7 +79,9 @@ def main():
     dashboards_dir = (
         Path(args.dashboards_dir)
         if args.dashboards_dir
-        else Path(__file__).resolve().parent.parent / "dashboards"
+        else Path(__file__).resolve().parent.parent
+        / "dashboard_generator"
+        / "dashboards"
     )
 
     shared_css, mjolnir_css, html_template = dashboard_builder.get_assets(

@@ -25,11 +25,11 @@ Mjolnir performs its analyses in phases, described below.
 
 The Mjolnir infrastructure consists of the follow components:
 
-- **Job Files (`jobs/*.nix`)**: Pure Nix files that assemble a specific run by plugging in Target, Backend, Prompt, Storage, and Hooks.
-- **Targets (`target/*.nix`)**: Modules that define how to retrieve source code (e.g., `git.nix`).
-- **Backends (`backends/*.nix`)**: Modules that describe how to run a specific AI model or analysis tool. (Note: `claude.nix` is currently a placeholder and not yet working).
-- **Prompts (`prompts/*.nix`)**: Modules that handle the resolution and preparation of instructions and context to feed the backend model.
-- **Storage Backends (`storage/*.nix`)**: Modules that define how to persist or upload the final run artifacts.
+- **Job Files (`projects/**/\*.nix`)\*\*: Pure Nix files that assemble a specific run by plugging in Target, Backend, Prompt, Storage, and Hooks.
+- **Targets (`nix/git/*.nix`)**: Modules that define how to retrieve source code (e.g., `git.nix`).
+- **Backends (`nix/*.nix`)**: Modules that describe how to run a specific AI model or analysis tool (e.g., `main.nix` for Gemini, `mock.nix`).
+- **Agents/Prompts (`agents/`, loaded via `nix/orchestration/load.nix`)**: Definitions of agents and their system prompts.
+- **Storage (`nix/storage/*.nix`)**: Modules that define where to upload or save results (e.g., `local.nix`, `gcs.nix`).
 - **Hooks**: Bash script snippets that can be injected at various stages (e.g., `preExtract`, `postTransform`) to customize behavior (e.g., deleting files, running linters).
 
 Below we elaborate on the interfaces to some of the key components described above.
@@ -246,11 +246,11 @@ There are two ways to assemble a new auditing job:
 
 ### A. Using the Shared Job Builder (Recommended for Standard Audits)
 
-For standard threat analysis audits that use the default agents and backends, you can use the shared job builder in `jobs/default_job.nix` to create a concise job definition:
+For standard threat analysis audits that use the default agents and backends, you can use the shared job builder in `nix/orchestration/default_job.nix` to create a concise job definition (typically placed under `projects/<project_name>/jobs/`):
 
 ```nix
 { pkgs }:
-import ./default_job.nix { inherit pkgs; } {
+import ../../../nix/orchestration/default_job.nix { inherit pkgs; } {
   name = "My Custom Job";
   workspaceDir = "/tmp/my-workspace";
   outputDir = "./my-results";
@@ -271,28 +271,28 @@ import ./default_job.nix { inherit pkgs; } {
 
 ### B. Manual Component Assembly (For Advanced Use Cases)
 
-If you need a custom workflow, different backend, or multiple custom hooks, create a file in `jobs/my-audit.nix`:
+If you need a custom workflow, different backend, or multiple custom hooks, create a file in `projects/my-project/jobs/my-audit.nix`:
 
 ```nix
 { pkgs }:
 let
   # 1. Initialize Components
-  gitTarget = import ../target/git.nix {
+  gitTarget = import ../../../nix/git/git.nix {
     inherit pkgs;
     repoUrl = "https://github.com/example/repo.git";
     repoName = "my-project";
     commit = "latest";
   };
 
-  prompt = import ../agents/load.nix {
+  prompt = import ../../../nix/orchestration/load.nix {
     inherit pkgs;
-    agentDir = ../agents/rust_auditor;
+    agentDir = ../../../agents/rust_auditor;
     backendName = geminiBackend.name;
   };
 
-  geminiBackend = import ../backends/gemini.nix { inherit pkgs; };
+  geminiBackend = import ../../../nix/main.nix { inherit pkgs; };
 
-  localStorage = import ../storage/local.nix {
+  localStorage = import ../../../nix/storage/local.nix {
     inherit pkgs;
     path = "../audits";
   };

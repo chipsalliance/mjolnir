@@ -14,13 +14,13 @@
       nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
 
       # Function to create the orchestrator package based on a job file
-      makeOrchestrator = { pkgs, jobFile }: import ./orchestrator.nix {
+      makeOrchestrator = { pkgs, jobFile }: import ./nix/orchestration/orchestrator.nix {
         inherit pkgs jobFile;
         orchestratorCommit = self.rev or "dirty";
       };
 
       # Separate compiler helper for hermetic, validation-free test runs
-      makeTestOrchestrator = { pkgs, jobFile }: import ./orchestrator.nix {
+      makeTestOrchestrator = { pkgs, jobFile }: import ./nix/orchestration/orchestrator.nix {
         inherit pkgs jobFile;
         orchestratorCommit = self.rev or "dirty";
         isTest = true;
@@ -30,25 +30,25 @@
       packages = forAllSystems (system:
         let
           pkgs = nixpkgsFor.${system};
-          makeJobGroup = import ./job_group.nix { inherit pkgs; };
+          makeJobGroup = import ./nix/orchestration/job_group.nix { inherit pkgs; };
 
           # Individual (test) jobs
-          smoke-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/smoke-test.nix; };
-          gcs-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/gcs-test.nix; };
-          gemini-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/gemini-test.nix; };
-          gemini-gcs-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/gemini-gcs-test.nix; };
-          postprocessing-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/postprocessing-test.nix; };
+          smoke-test = makeTestOrchestrator { inherit pkgs; jobFile = ./projects/tests/smoke-test.nix; };
+          gcs-test = makeTestOrchestrator { inherit pkgs; jobFile = ./projects/tests/gcs-test.nix; };
+          gemini-test = makeTestOrchestrator { inherit pkgs; jobFile = ./projects/tests/gemini-test.nix; };
+          gemini-gcs-test = makeTestOrchestrator { inherit pkgs; jobFile = ./projects/tests/gemini-gcs-test.nix; };
+          postprocessing-test = makeTestOrchestrator { inherit pkgs; jobFile = ./projects/tests/postprocessing-test.nix; };
 
           # Individual (real) jobs
-          caliptra-sw-2p1-latest = makeOrchestrator { inherit pkgs; jobFile = ./jobs/caliptra/sw-2p1-latest.nix; };
-          caliptra-mcu-sw-2p0-latest = makeOrchestrator { inherit pkgs; jobFile = ./jobs/caliptra/mcu-sw-2p0-latest.nix; };
-          caliptra-dpe-latest = makeOrchestrator { inherit pkgs; jobFile = ./jobs/caliptra/dpe-latest.nix; };
-          caliptra-dpe-1x = makeOrchestrator { inherit pkgs; jobFile = ./jobs/caliptra/dpe-1x.nix; };
-          opentitan-rom = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/rom.nix; };
-          opentitan-rom-ext = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/rom_ext.nix; };
-          opentitan-manuf = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/manuf.nix; };
-          opentitan-lib = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/lib.nix; };
-          opentitan-crypto = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/crypto.nix; };
+          caliptra-sw-2p1-latest = makeOrchestrator { inherit pkgs; jobFile = ./projects/caliptra-sw/jobs/sw-2p1-latest.nix; };
+          caliptra-mcu-sw-2p0-latest = makeOrchestrator { inherit pkgs; jobFile = ./projects/caliptra-mcu-sw/jobs/mcu-sw-2p0-latest.nix; };
+          caliptra-dpe-latest = makeOrchestrator { inherit pkgs; jobFile = ./projects/caliptra-dpe/jobs/dpe-latest.nix; };
+          caliptra-dpe-1x = makeOrchestrator { inherit pkgs; jobFile = ./projects/caliptra-dpe/jobs/dpe-1x.nix; };
+          opentitan-rom = makeOrchestrator { inherit pkgs; jobFile = ./projects/opentitan/jobs/rom.nix; };
+          opentitan-rom-ext = makeOrchestrator { inherit pkgs; jobFile = ./projects/opentitan/jobs/rom_ext.nix; };
+          opentitan-manuf = makeOrchestrator { inherit pkgs; jobFile = ./projects/opentitan/jobs/manuf.nix; };
+          opentitan-lib = makeOrchestrator { inherit pkgs; jobFile = ./projects/opentitan/jobs/lib.nix; };
+          opentitan-crypto = makeOrchestrator { inherit pkgs; jobFile = ./projects/opentitan/jobs/crypto.nix; };
 
           # Group (test) jobs
           scan-all-test = makeJobGroup {

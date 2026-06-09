@@ -3,6 +3,7 @@
 import logging
 from pathlib import Path
 import json
+import tomllib
 
 FILENAME_MAPPINGS = {
     "dashboard.html": ("Interactive Dashboard", "bg-html", "HTML"),
@@ -29,7 +30,7 @@ CARD_TEMPLATE = """
 
 
 def load_components(config_paths):
-    """Loads and merges components from multiple JSON files."""
+    """Loads and merges components from multiple JSON or TOML files."""
     components = {}
     for path_str in config_paths:
         path = Path(path_str)
@@ -37,9 +38,13 @@ def load_components(config_paths):
             logging.error(f"Components config file not found: {path}")
             continue
         try:
-            with open(path, "r") as f:
-                data = json.load(f)
-                components.update(data)
+            if path.suffix == ".toml":
+                with open(path, "rb") as f:
+                    data = tomllib.load(f)
+            else:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            components.update(data)
         except Exception as e:
             logging.error(f"Failed to parse components file {path}: {e}")
     return components

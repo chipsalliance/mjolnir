@@ -37,11 +37,11 @@ import ./base.nix { inherit pkgs; } {
     echo "Running AI with instructions to generate malformed output..."
   '';
 
-  postTransform = import ../postprocess.nix {
+  postTransform = import ../../nix/orchestration/postprocess.nix {
     inherit pkgs;
     name = "Malformed Postprocessing Handling Test";
     backends = {
-      gemini = import ../../backends/gemini/gemini.nix { inherit pkgs; };
+      gemini = import ../../nix/main.nix { inherit pkgs; };
     };
     backendName = "gemini";
   };

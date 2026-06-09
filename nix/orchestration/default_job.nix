@@ -17,7 +17,7 @@
 }:
 let
   # Dynamic Backend Loading
-  localBackendsDir = ../backends;
+  localBackendsDir = ../.;
 
   safeReadDir = path:
     if builtins.pathExists path
@@ -28,10 +28,7 @@ let
 
   # Helper to identify valid backends and their paths from the directory listing
   getBackendPath = name: type:
-    if type == "directory" then
-      let path = localBackendsDir + "/${name}/${name}.nix";
-      in if builtins.pathExists path then { inherit name path; } else null
-    else if type == "regular" && pkgs.lib.hasSuffix ".nix" name then
+    if type == "regular" && pkgs.lib.hasSuffix ".nix" name then
       let
         backendName = pkgs.lib.removeSuffix ".nix" name;
         path = localBackendsDir + "/${name}";
@@ -63,6 +60,15 @@ let
 
   loadedBackends = builtins.mapAttrs evaluateBackend allBackendFuncs;
 
+  # Re-key backends by their internal name attribute to handle cases where
+  # the filename (e.g. main.nix) doesn't match the backend name (e.g. gemini)
+  backendsByInternalName = builtins.listToAttrs (
+    builtins.map (backendName: {
+      name = loadedBackends.${backendName}.name;
+      value = loadedBackends.${backendName};
+    }) (builtins.attrNames loadedBackends)
+  );
+
   # Select backend
   resolvedBackend = if backend != null then backend else "mock";
 
@@ -73,10 +79,10 @@ in
   };
   inherit parallel;
 
-  target = import ../target/git.nix ({ inherit pkgs; } // target);
+  target = import ../git/git.nix ({ inherit pkgs; } // target);
 
   # Load prompt
-  prompt = import ../agents/load.nix {
+  prompt = import ./load.nix {
     inherit pkgs;
     inherit agentDir;
     backendName = resolvedBackend;
@@ -96,7 +102,7 @@ in
   };
 
   # Backend Configuration
-  backends = loadedBackends;
+  backends = backendsByInternalName;
   backend = resolvedBackend;
   inherit model;
 
@@ -108,7 +114,7 @@ in
     inherit postExtract;
     postTransform = import ./postprocess.nix {
       inherit pkgs name;
-      backends = loadedBackends;
+      backends = backendsByInternalName;
       backendName = resolvedBackend;
     };
   };

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 {
   pkgs ? import <nixpkgs> { },
-  jobFile ? ./jobs/test-job.nix,
+  jobFile ? ../../projects/tests/smoke-test.nix,
   orchestratorCommit ? "unknown",
   isTest ? false,
 }:

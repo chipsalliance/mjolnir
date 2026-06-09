@@ -17,13 +17,13 @@ let
   fdExcludeFlags = pkgs.lib.concatMapStringsSep " " (ext: "-E '*.${ext}'") extensions;
   fdSearchFlags = pkgs.lib.concatMapStringsSep " " (path: "--search-path ${path}") searchPaths;
 in
-import ../default_job.nix { inherit pkgs; } {
+import ../../../nix/orchestration/default_job.nix { inherit pkgs; } {
   name = "OpenTitan Earlgrey A2 SW Scan - ${subjobName}";
   workspaceDir = "/tmp/opentitan-workspace/${subdir}";
   outputDir = "./output/opentitan/${subdir}";
-  agentDir = ../../agents/c_auditor;
+  agentDir = ../../../agents/c_auditor;
   inherit timeout backend model;
-  contextFile = ../../threat-models/opentitan/THREAT_MODEL_FIRMWARE_SMALL.md;
+  contextFile = ../threat-models/THREAT_MODEL_FIRMWARE_SMALL.md;
 
   target = {
     repoUrl = "https://github.com/lowrisc/opentitan";

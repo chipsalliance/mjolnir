@@ -9,5 +9,5 @@ import ./base.nix { inherit pkgs; } {
   repoUrl = "https://github.com/chipsalliance/caliptra-sw.git";
   commit = "latest";
   fileCommand = "${pkgs.fd}/bin/fd -t f -e rs --search-path rom/dev/src";
-  contextFile = ../../threat-models/caliptra/THREAT_MODEL_FIRMWARE_SMALL.md;
+  contextFile = ../threat-models/THREAT_MODEL_FIRMWARE_SMALL.md;
 }

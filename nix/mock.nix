@@ -38,7 +38,9 @@
       > "${output}"
 
       # Write out mockResult directly as the raw JSON array to output
-      echo '${mockResult}' > "${output}"
+      cat << 'EOF' > "${output}"
+${mockResult}
+EOF
     '';
 
   runAdversarialReviewer =
@@ -49,6 +51,8 @@
     }:
     ''
       echo "Running Mock backend in Single-File Mode..."
-      echo "${mockResult}" > "${output}"
+      cat << 'EOF' > "${output}"
+${mockResult}
+EOF
     '';
 }

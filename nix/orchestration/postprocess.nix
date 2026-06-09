@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 { pkgs, name, backends, backendName }:
 let
-  dashboardGenerator = import ../backends/dashboard_generator/dashboard_generator.nix { inherit pkgs; };
+  dashboardGenerator = import ../dashboards/dashboard_generator.nix { inherit pkgs; };
 
   # Load adversarial review prompt
-  adversarialPrompt = import ../agents/load.nix {
+  adversarialPrompt = import ./load.nix {
     inherit pkgs;
-    agentDir = ../agents/adversarial_reviewer;
+    agentDir = ../../agents/adversarial_reviewer;
     backendName = backendName;
   };
 
@@ -42,13 +42,13 @@ in
   esac
 
   echo "${name}: Merging review with original findings..."
-  ${pkgs.python3}/bin/python3 ${../backends}/sanitize_report.py \
+  ${pkgs.python3}/bin/python3 ${../../app/tools}/sanitize_report.py \
       --original "$REPORT_FILE" \
       --review "$RAW_REVIEW_TXT" \
       --output "$REVIEWED_JSON"
 
   echo "${name}: Generating Markdown report..."
-  ${pkgs.python3}/bin/python3 ${../backends}/generate_markdown.py --input "$REVIEWED_JSON" --output "$VULN_RUN_DIR/reviewed_report.md"
+  ${pkgs.python3}/bin/python3 ${../../app/tools}/generate_markdown.py --input "$REVIEWED_JSON" --output "$VULN_RUN_DIR/reviewed_report.md"
 
   echo "${name}: Generating consolidated dashboard..."
   ${dashboardGenerator.run {

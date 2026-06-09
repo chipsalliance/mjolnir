@@ -18,12 +18,12 @@
     ''
       echo "Running Gemini backend ($MJOLNIR_MODEL) in Batch Mode..."
 
-      # Set PYTHONPATH to backends/ directory so that gemini/gemini.py
+      # Set PYTHONPATH to app/tools/ directory so that main.py
       # can import the shared common.py module.
       # Still export GOOGLE_APPLICATION_CREDENTIALS so Google Auth library
       # can locate the ADC JSON file.
-      PYTHONPATH="${../.}" \
-      ${pkgs.python3}/bin/python3 ${./gemini.py} \
+      PYTHONPATH="${../app/tools}" \
+      ${pkgs.python3}/bin/python3 ${../app/main.py} \
         --src "${src}" \
         --files "${files}" \
         --output "${output}" \
@@ -46,8 +46,8 @@
     ''
       echo "Running Gemini backend ($MJOLNIR_MODEL) in Single-File Mode..."
 
-      PYTHONPATH="${../.}" \
-      ${pkgs.python3}/bin/python3 ${./gemini.py} \
+      PYTHONPATH="${../app/tools}" \
+      ${pkgs.python3}/bin/python3 ${../app/main.py} \
         --input "${input}" \
         --output "${output}" \
         --prompt "${systemPrompt}" \

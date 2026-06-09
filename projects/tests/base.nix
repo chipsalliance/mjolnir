@@ -32,11 +32,11 @@ let
   '';
 
   # Resolve the clean Target module directly
-  resolvedTarget = import ../../target/git.nix ({ inherit pkgs; } // (if target != null then target else defaultTarget));
+  resolvedTarget = import ../../nix/git/git.nix ({ inherit pkgs; } // (if target != null then target else defaultTarget));
 
   # Build simple local storage helper directly
-  localStore = import ../../storage/local.nix { inherit pkgs; path = outputDir; };
-  gcsStore = import ../../storage/gcs.nix { inherit pkgs; path = name; };
+  localStore = import ../../nix/storage/local.nix { inherit pkgs; path = outputDir; };
+  gcsStore = import ../../nix/storage/gcs.nix { inherit pkgs; path = name; };
 
   storage = {
     name = if enableGcsUpload then "local+gcs" else "local";
@@ -47,7 +47,7 @@ let
   };
 
   # Resolved prompt (simple static wrapper using the raw backend name string)
-  prompt = import ../../agents/load.nix {
+  prompt = import ../../nix/orchestration/load.nix {
     inherit pkgs;
     inherit agentDir;
     backendName = backend;
@@ -55,8 +55,14 @@ let
 
   # Map all backends for the orchestrator so it can look up the matching execution templates
   backendsList = {
-    mock = import ../../backends/mock.nix { inherit pkgs; };
-    gemini = import ../../backends/gemini/gemini.nix { inherit pkgs; };
+    mock = import ../../nix/mock.nix { inherit pkgs; };
+    gemini = import ../../nix/main.nix { inherit pkgs; };
+  };
+
+  defaultPostTransform = import ../../nix/orchestration/postprocess.nix {
+    inherit pkgs name;
+    backends = backendsList;
+    backendName = backend;
   };
 in
 {
@@ -74,6 +80,7 @@ in
 
   hooks = {
     postExtract = if postExtract != null then postExtract else defaultPostExtract;
-  } // (if postTransform != null then { inherit postTransform; } else {});
+    postTransform = if postTransform != null then postTransform else defaultPostTransform;
+  };
 }
 
