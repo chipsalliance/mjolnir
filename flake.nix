@@ -1,117 +1,172 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 {
-  description = "AI Security Analysis Orchestration Tool";
+  description = "Mjolnir: AI Security Analysis Tool";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+
+    # Local Project Flakes (providing hermetic compiler environments)
+    opentitan-env.url = "path:./projects/opentitan/nix";
+    caliptra-sw-env.url = "path:./projects/caliptra-sw/nix";
+    caliptra-mcu-sw-env.url = "path:./projects/caliptra-mcu-sw/nix";
+    caliptra-dpe-env.url = "path:./projects/caliptra-dpe/nix";
+    tests-env.url = "path:./projects/tests/nix";
   };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, opentitan-env, caliptra-sw-env, caliptra-mcu-sw-env, caliptra-dpe-env, tests-env }:
     let
       supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
       nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
 
-      # Function to create the orchestrator package based on a job file
-      makeOrchestrator = { pkgs, jobFile }: import ./orchestrator.nix {
-        inherit pkgs jobFile;
-        orchestratorCommit = self.rev or "dirty";
-      };
-
-      # Separate compiler helper for hermetic, validation-free test runs
-      makeTestOrchestrator = { pkgs, jobFile }: import ./orchestrator.nix {
-        inherit pkgs jobFile;
-        orchestratorCommit = self.rev or "dirty";
-        isTest = true;
-      };
+      autodiscoverJobs = import ./nix/discovery.nix;
     in
     {
       packages = forAllSystems (system:
         let
           pkgs = nixpkgsFor.${system};
-          makeJobGroup = import ./job_group.nix { inherit pkgs; };
 
-          # Individual (test) jobs
-          smoke-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/smoke-test.nix; };
-          gcs-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/gcs-test.nix; };
-          gemini-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/gemini-test.nix; };
-          gemini-gcs-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/gemini-gcs-test.nix; };
-          postprocessing-test = makeTestOrchestrator { inherit pkgs; jobFile = ./jobs/tests/postprocessing-test.nix; };
-
-          # Individual (real) jobs
-          caliptra-sw-2p1-latest = makeOrchestrator { inherit pkgs; jobFile = ./jobs/caliptra/sw-2p1-latest.nix; };
-          caliptra-mcu-sw-2p0-latest = makeOrchestrator { inherit pkgs; jobFile = ./jobs/caliptra/mcu-sw-2p0-latest.nix; };
-          caliptra-dpe-latest = makeOrchestrator { inherit pkgs; jobFile = ./jobs/caliptra/dpe-latest.nix; };
-          caliptra-dpe-1x = makeOrchestrator { inherit pkgs; jobFile = ./jobs/caliptra/dpe-1x.nix; };
-          opentitan-rom = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/rom.nix; };
-          opentitan-rom-ext = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/rom_ext.nix; };
-          opentitan-manuf = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/manuf.nix; };
-          opentitan-lib = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/lib.nix; };
-          opentitan-crypto = makeOrchestrator { inherit pkgs; jobFile = ./jobs/opentitan/crypto.nix; };
-
-          # Group (test) jobs
-          scan-all-test = makeJobGroup {
-            name = "scan-all-test";
-            description = "All Test/Smoke Vulnerability Scans";
-            jobs = [
-              { name = "smoke-test"; pkg = smoke-test; }
-              { name = "gcs-test"; pkg = gcs-test; }
-              { name = "postprocessing-test"; pkg = postprocessing-test; }
-              { name = "gemini-test"; pkg = gemini-test; }
-              { name = "gemini-gcs-test"; pkg = gemini-gcs-test; }
-            ];
+          runners = {
+            caliptra-sw = caliptra-sw-env.packages.${system}.default;
+            opentitan = opentitan-env.packages.${system}.default;
+            caliptra-mcu-sw = caliptra-mcu-sw-env.packages.${system}.default;
+            caliptra-dpe = caliptra-dpe-env.packages.${system}.default;
+            tests = tests-env.packages.${system}.default;
           };
 
-          # Group (real) jobs
-          scan-all = makeJobGroup {
-            name = "scan-all";
-            description = "All Vulnerability Scans";
-            jobs = [
-              { name = "caliptra-sw-2p1-latest"; pkg = caliptra-sw-2p1-latest; }
-              { name = "caliptra-mcu-sw-2p0-latest"; pkg = caliptra-mcu-sw-2p0-latest; }
-              { name = "caliptra-dpe-latest"; pkg = caliptra-dpe-latest; }
-              { name = "caliptra-dpe-1x"; pkg = caliptra-dpe-1x; }
-              { name = "opentitan-rom"; pkg = opentitan-rom; }
-              { name = "opentitan-rom-ext"; pkg = opentitan-rom-ext; }
-              { name = "opentitan-manuf"; pkg = opentitan-manuf; }
-              { name = "opentitan-lib"; pkg = opentitan-lib; }
-              { name = "opentitan-crypto"; pkg = opentitan-crypto; }
-            ];
+          pythonEnv = pkgs.python3.withPackages (ps: [
+            ps.pydantic
+            ps.google-genai
+            ps.google-cloud-storage
+            ps.pyopenssl
+            ps.tqdm
+          ]);
+
+          mjolnir-app = pkgs.stdenv.mkDerivation {
+            name = "mjolnir-app";
+            src = ./app/mjolnir;
+            
+            nativeBuildInputs = [ pkgs.makeWrapper ];
+            
+            installPhase = ''
+              mkdir -p $out/bin $out/lib
+              cp -r * $out/lib/
+              
+              makeWrapper ${pythonEnv}/bin/python3 $out/bin/mjolnir-run \
+                --add-flags "$out/lib/main.py" \
+                --prefix PYTHONPATH : "$out/lib" \
+                --prefix PATH : "${pkgs.lib.makeBinPath [ pkgs.git pkgs.ripgrep ]}" \
+                --set GOOGLE_API_USE_CLIENT_CERTIFICATE false
+            '';
           };
 
-          opentitan-all = makeJobGroup {
-            name = "opentitan-all";
-            description = "All OpenTitan Vulnerability Scans";
-            jobs = [
-              { name = "opentitan-rom"; pkg = opentitan-rom; }
-              { name = "opentitan-rom-ext"; pkg = opentitan-rom-ext; }
-              { name = "opentitan-manuf"; pkg = opentitan-manuf; }
-              { name = "opentitan-lib"; pkg = opentitan-lib; }
-              { name = "opentitan-crypto"; pkg = opentitan-crypto; }
-            ];
+          makeJob = { project, job, runner ? null }: 
+            import ./nix/orchestrator.nix {
+              inherit pkgs project job runner mjolnir-app;
+            };
+
+          makeGroup = { name, description, jobs }:
+            import ./nix/group.nix { inherit pkgs; } {
+              inherit name description jobs;
+            };
+
+          discovered = autodiscoverJobs { inherit pkgs makeJob runners; };
+
+          caliptra-sw-runner-test = makeJob {
+            project = import ./projects/caliptra-sw/project.nix;
+            job = import ./projects/caliptra-sw/nix/runner-test.nix;
+            runner = runners.caliptra-sw;
           };
 
-          caliptra-all = makeJobGroup {
-            name = "caliptra-all";
-            description = "All Caliptra Vulnerability Scans";
-            jobs = [
-              { name = "caliptra-sw-2p1-latest"; pkg = caliptra-sw-2p1-latest; }
-              { name = "caliptra-mcu-sw-2p0-latest"; pkg = caliptra-mcu-sw-2p0-latest; }
-              { name = "caliptra-dpe-latest"; pkg = caliptra-dpe-latest; }
-              { name = "caliptra-dpe-1x"; pkg = caliptra-dpe-1x; }
-            ];
+          caliptra-mcu-sw-runner-test = makeJob {
+            project = import ./projects/caliptra-mcu-sw/project.nix;
+            job = import ./projects/caliptra-mcu-sw/nix/runner-test.nix;
+            runner = runners.caliptra-mcu-sw;
+          };
+
+          caliptra-dpe-runner-test = makeJob {
+            project = import ./projects/caliptra-dpe/project.nix;
+            job = import ./projects/caliptra-dpe/nix/runner-test.nix;
+            runner = runners.caliptra-dpe;
+          };
+
+          opentitan-runner-host-test = makeJob {
+            project = import ./projects/opentitan/project.nix;
+            job = import ./projects/opentitan/nix/runner-host-test.nix;
+            runner = runners.opentitan;
+          };
+
+          opentitan-runner-verilator-test = makeJob {
+            project = import ./projects/opentitan/project.nix;
+            job = import ./projects/opentitan/nix/runner-verilator-test.nix;
+            runner = runners.opentitan;
+          };
+
+          gen-dashboard = pkgs.writeShellApplication {
+            name = "mjolnir-gen-dashboard";
+            runtimeInputs = [ mjolnir-app ];
+            text = ''
+              mjolnir-run --gen-dashboard "$@"
+            '';
           };
         in
-        {
-          inherit smoke-test gcs-test gemini-test gemini-gcs-test postprocessing-test
-                  caliptra-sw-2p1-latest caliptra-mcu-sw-2p0-latest
-                  opentitan-rom opentitan-rom-ext opentitan-manuf opentitan-lib opentitan-crypto
-                  opentitan-all caliptra-all
-                  caliptra-dpe-latest
-                  caliptra-dpe-1x
-                  scan-all scan-all-test;
-        }
+          discovered // {
+            inherit
+              mjolnir-app
+              gen-dashboard
+              caliptra-sw-runner-test
+              caliptra-mcu-sw-runner-test
+              caliptra-dpe-runner-test
+              opentitan-runner-host-test
+              opentitan-runner-verilator-test;
+
+            test-all = makeGroup {
+              name = "test-all";
+              description = "All tests";
+              jobs = [
+                discovered.gcs-test
+                discovered.gemini-gcs-test
+                discovered.gemini-test
+                discovered.smoke-test
+              ];
+            };
+
+            test-all-runners = makeGroup {
+              name = "test-all-runners";
+              description = "All runner tests";
+              jobs = [
+                caliptra-sw-runner-test
+                caliptra-mcu-sw-runner-test
+                caliptra-dpe-runner-test
+                opentitan-runner-host-test
+                opentitan-runner-verilator-test
+              ];
+            };
+
+            caliptra-all = makeGroup {
+              name = "caliptra-all";
+              description = "All Caliptra jobs";
+              jobs = [
+                discovered.caliptra-sw-rom-main
+                discovered.caliptra-mcu-sw-main
+                discovered.caliptra-dpe-main
+                discovered.caliptra-dpe-runtime-v1
+              ];
+            };
+
+            opentitan-all = makeGroup {
+              name = "opentitan-all";
+              description = "All OpenTitan jobs";
+              jobs = [
+                discovered.opentitan-crypto
+                discovered.opentitan-lib
+                discovered.opentitan-manuf
+                discovered.opentitan-rom
+                discovered.opentitan-rom_ext
+              ];
+            };
+          }
       );
     };
 }
