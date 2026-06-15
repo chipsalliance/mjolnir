@@ -6,7 +6,10 @@ import re
 from pathlib import Path
 from utilities.logger import logger
 
-def format_findings(findings: list, run_id_key: str = None, timestamp: str = None) -> list:
+
+def format_findings(
+    findings: list, run_id_key: str = None, timestamp: str = None
+) -> list:
     """Formats raw findings for visual dashboard rendering."""
     formatted = []
     for f in findings:
@@ -25,7 +28,7 @@ def format_findings(findings: list, run_id_key: str = None, timestamp: str = Non
                 "id",
                 "status",
                 "history",
-                "location"
+                "location",
             ]:
                 continue
             if val:
@@ -51,7 +54,14 @@ def format_findings(findings: list, run_id_key: str = None, timestamp: str = Non
     return formatted
 
 
-def format_scan_data(project_name: str, job_name: str, run_name: str, report_data: dict, metadata: dict, flow_records: list) -> dict:
+def format_scan_data(
+    project_name: str,
+    job_name: str,
+    run_name: str,
+    report_data: dict,
+    metadata: dict,
+    flow_records: list,
+) -> dict:
     """Formats findings and returns a structured dictionary for the template renderer."""
     findings = report_data.get("vulnerabilities") or []
     return {
@@ -77,13 +87,19 @@ def compute_project_stats(runs_data: dict) -> dict:
             projects[proj] = {
                 "totalRuns": 0,
                 "totalVulns": 0,
-                "bySeverity": {"Critical": 0, "High": 0, "Medium": 0, "Low": 0, "Informational": 0}
+                "bySeverity": {
+                    "Critical": 0,
+                    "High": 0,
+                    "Medium": 0,
+                    "Low": 0,
+                    "Informational": 0,
+                },
             }
-        
+
         p = projects[proj]
         p["totalRuns"] += 1
         p["totalVulns"] += len(run["findings"])
-        
+
         for f in run["findings"]:
             sev = f.get("severity", "Informational")
             if "critical" in sev.lower():
@@ -134,11 +150,11 @@ def get_sankey_rows(filtered_runs: list) -> list:
             snap = next((h for h in history if str(h.get("phase_id")) == p_key), None)
             if not snap:
                 continue
-            
+
             phase_name = phase_map[p_key]
             severity = snap.get("severity") or "Unknown"
             verdict = snap.get("verdict")
-            
+
             if verdict == "False Positive":
                 node_name = f"Phase {p_key}: {phase_name} - Closed"
             elif severity == "Skipped":
@@ -149,10 +165,10 @@ def get_sankey_rows(filtered_runs: list) -> list:
 
         for i in range(len(phase_keys) - 1):
             p_key1 = phase_keys[i]
-            p_key2 = phase_keys[i+1]
+            p_key2 = phase_keys[i + 1]
             base1 = phase_node_names.get(p_key1)
             base2 = phase_node_names.get(p_key2)
-            
+
             if base1 and base2:
                 node_counts[base1] = node_counts.get(base1, 0) + 1
                 node_counts[base2] = node_counts.get(base2, 0) + 1
@@ -172,16 +188,16 @@ def get_sankey_rows(filtered_runs: list) -> list:
                 nodes_by_phase[phase_num].add(node)
 
     severity_order = {
-        'Informational': 1,
-        'Low': 2,
-        'Medium': 3,
-        'High': 4,
-        'Critical': 5,
-        'Closed': 6,
-        'Skipped': 6,
-        'Excluded': 6
+        "Informational": 1,
+        "Low": 2,
+        "Medium": 3,
+        "High": 4,
+        "Critical": 5,
+        "Closed": 6,
+        "Skipped": 6,
+        "Excluded": 6,
     }
-    
+
     def get_priority(node_name):
         for sev, priority in severity_order.items():
             if sev in node_name:
@@ -192,11 +208,11 @@ def get_sankey_rows(filtered_runs: list) -> list:
     dummy_rows = []
     for i in range(len(phase_nums) - 1):
         p1 = phase_nums[i]
-        p2 = phase_nums[i+1]
-        
+        p2 = phase_nums[i + 1]
+
         sorted_srcs = sorted(list(nodes_by_phase[p1]), key=get_priority)
         sorted_dsts = sorted(list(nodes_by_phase[p2]), key=get_priority)
-        
+
         max_len = max(len(sorted_srcs), len(sorted_dsts))
         for j in range(max_len):
             src = sorted_srcs[min(j, len(sorted_srcs) - 1)]
@@ -212,14 +228,14 @@ def get_sankey_rows(filtered_runs: list) -> list:
 
     real_rows = []
     for key, weight in transitions.items():
-        src, dst = key.split('::')
+        src, dst = key.split("::")
         real_rows.append([src, dst, weight])
 
     def sort_key(row):
         return (get_priority(row[0]), get_priority(row[1]))
-    
+
     sorted_real_rows = sorted(real_rows, key=sort_key)
-    
+
     final_dummy_rows = []
     for src_base, dst_base in dummy_rows:
         src_name = f"{src_base} (count: {node_counts[src_base]})"
@@ -249,36 +265,36 @@ def render_sidebar(projects_list: list, runs_list: list) -> str:
         <div class="menu-label">Projects</div>
         <div id="job-menu-list">
     """
-    
+
     for proj_name, stat in projects_list:
-        is_test = proj_name == 'tests'
+        is_test = proj_name == "tests"
         test_class = " is-test-item" if is_test else ""
-        prefix = '🧪 ' if is_test else '📁 '
+        prefix = "🧪 " if is_test else "📁 "
         html += f"""
             <a href="project_{proj_name}.html" class="menu-item{test_class}" id="menu-project-{proj_name}">
-                <span>{prefix}{proj_name}</span> <span class="menu-badge">{stat['totalVulns']}</span>
+                <span>{prefix}{proj_name}</span> <span class="menu-badge">{stat["totalVulns"]}</span>
             </a>
         """
-        
+
     html += """
         </div>
         <div class="menu-label">Recent Runs</div>
         <div id="recent-runs-menu-list" style="display: flex; flex-direction: column; gap: 4px;">
     """
-    
+
     for r in runs_list:
         run_id = f"{r['project']}-{r['job_folder']}-{r['run_folder']}"
-        is_test = r['project'] == 'tests'
+        is_test = r["project"] == "tests"
         test_class = " is-test-item" if is_test else ""
-        short_time = r['timestamp'][5:16]
-        
+        short_time = r["timestamp"][5:16]
+
         html += f"""
             <a href="run_{run_id}.html" class="menu-item{test_class}" id="menu-run-{run_id}" style="font-size: 12px; padding: 6px 10px;">
-                <span>⏱️ {r['name']}</span> 
+                <span>⏱️ {r["name"]}</span> 
                 <span style="font-size: 10px; color: var(--text-muted); margin-left: auto; padding-left: 8px;">{short_time}</span>
             </a>
         """
-        
+
     html += """
         </div>
     </nav>
@@ -291,19 +307,19 @@ def render_projects_summary_table(projects_list: list) -> str:
     """Pre-renders overview projects summary table rows."""
     html = ""
     for proj_name, stat in projects_list:
-        is_test = proj_name == 'tests'
-        test_class = ' class="is-test-item"' if is_test else ''
+        is_test = proj_name == "tests"
+        test_class = ' class="is-test-item"' if is_test else ""
         name_display = f"🧪 {proj_name}" if is_test else f"📁 {proj_name}"
-        
+
         html += f"""
         <tr{test_class}>
             <td><a href="project_{proj_name}.html" class="job-link">{name_display}</a></td>
-            <td>{stat['totalRuns']}</td>
-            <td><strong>{stat['totalVulns']}</strong></td>
-            <td style="font-weight: 600; color: var(--critical-color)">{stat['bySeverity'].get('Critical', 0)}</td>
-            <td style="font-weight: 600; color: var(--high-color)">{stat['bySeverity'].get('High', 0)}</td>
-            <td style="font-weight: 600; color: var(--medium-color)">{stat['bySeverity'].get('Medium', 0)}</td>
-            <td style="font-weight: 600; color: var(--low-color)">{stat['bySeverity'].get('Low', 0)}</td>
+            <td>{stat["totalRuns"]}</td>
+            <td><strong>{stat["totalVulns"]}</strong></td>
+            <td style="font-weight: 600; color: var(--critical-color)">{stat["bySeverity"].get("Critical", 0)}</td>
+            <td style="font-weight: 600; color: var(--high-color)">{stat["bySeverity"].get("High", 0)}</td>
+            <td style="font-weight: 600; color: var(--medium-color)">{stat["bySeverity"].get("Medium", 0)}</td>
+            <td style="font-weight: 600; color: var(--low-color)">{stat["bySeverity"].get("Low", 0)}</td>
         </tr>
         """
     return html
@@ -314,7 +330,7 @@ def compile_page(
     content_html: str,
     page_data: dict,
     active_menu_id: str,
-    templates_dir: Path
+    templates_dir: Path,
 ) -> str:
     """Compiles page shell with pageData script block and highlights sidebar menu item."""
     template_path = templates_dir / "dashboard.html.tpl"
@@ -325,7 +341,7 @@ def compile_page(
     html = html.replace("{{page_data_json}}", page_data_json)
     html = html.replace("{{sidebar}}", sidebar_html)
     html = html.replace("{{content}}", content_html)
-    
+
     active_script = ""
     if active_menu_id:
         active_script = f"""
@@ -337,7 +353,7 @@ def compile_page(
         </script>
         """
     html = html.replace("</body>", f"{active_script}</body>")
-    
+
     return html
 
 
@@ -357,7 +373,9 @@ def generate_dashboard(output_dir: str):
                 break
 
     if not runs_path or not runs_path.exists():
-        logger.write(f"Error: Could not locate 'runs' directory starting from {output_dir}")
+        logger.write(
+            f"Error: Could not locate 'runs' directory starting from {output_dir}"
+        )
         return
 
     output_root = runs_path.parent
@@ -370,7 +388,7 @@ def generate_dashboard(output_dir: str):
     for project_dir in sorted(runs_path.iterdir()):
         if not project_dir.is_dir():
             continue
-        
+
         proj_name = project_dir.name
         project_vulns[proj_name] = []
 
@@ -395,19 +413,30 @@ def generate_dashboard(output_dir: str):
                         with open(metadata_json, "r") as f:
                             metadata = json.load(f)
 
-                    open_findings = [v for v in history_data if v.get("status") == "Open"]
+                    open_findings = [
+                        v for v in history_data if v.get("status") == "Open"
+                    ]
                     report_data = {"vulnerabilities": open_findings}
 
                     run_id_key = f"{project_dir.name}-{job_dir.name}-{run_dir.name}"
                     runs_data[run_id_key] = format_scan_data(
-                        project_dir.name, job_dir.name, run_dir.name, report_data, metadata, history_data
+                        project_dir.name,
+                        job_dir.name,
+                        run_dir.name,
+                        report_data,
+                        metadata,
+                        history_data,
                     )
-                    
+
                     timestamp = metadata.get("timestamp")
-                    formatted_for_project = format_findings(open_findings, run_id_key, timestamp)
+                    formatted_for_project = format_findings(
+                        open_findings, run_id_key, timestamp
+                    )
                     project_vulns[proj_name].extend(formatted_for_project)
                 except Exception as e:
-                    logger.write(f"Warning: Failed to load findings for run {run_dir.name}: {e}")
+                    logger.write(
+                        f"Warning: Failed to load findings for run {run_dir.name}: {e}"
+                    )
 
     if not runs_data:
         logger.write("No scan reports found. Local dashboard not compiled.")
@@ -419,7 +448,7 @@ def generate_dashboard(output_dir: str):
     with open(templates_dir / "dashboard.css", "r", encoding="utf-8") as f:
         with open(output_root / "dashboard.css", "w", encoding="utf-8") as out:
             out.write(f.read())
-            
+
     with open(templates_dir / "dashboard.js", "r", encoding="utf-8") as f:
         with open(output_root / "dashboard.js", "w", encoding="utf-8") as out:
             out.write(f.read())
@@ -427,47 +456,61 @@ def generate_dashboard(output_dir: str):
     # Pre-compute sidebar listings
     project_stats = compute_project_stats(runs_data)
     projects_list = sorted(list(project_stats.items()))
-    runs_list = sorted(list(runs_data.values()), key=lambda x: x["timestamp"], reverse=True)
+    runs_list = sorted(
+        list(runs_data.values()), key=lambda x: x["timestamp"], reverse=True
+    )
     sidebar_html = render_sidebar(projects_list, runs_list)
 
     # 1. COMPILE GLOBAL OVERVIEW (dashboard.html)
     with open(templates_dir / "view_global.html.tpl", "r", encoding="utf-8") as f:
         global_content = f.read()
-    
+
     summary_rows = render_projects_summary_table(projects_list)
     global_content = global_content.replace("{{projects_summary_rows}}", summary_rows)
-    
+
     sankey_all = get_sankey_rows(list(runs_data.values()))
-    sankey_no_tests = get_sankey_rows([r for r in runs_data.values() if r["project"] != "tests"])
-    
+    sankey_no_tests = get_sankey_rows(
+        [r for r in runs_data.values() if r["project"] != "tests"]
+    )
+
     global_page_data = {
         "type": "global",
         "sankeyRowsAll": sankey_all,
-        "sankeyRowsNoTests": sankey_no_tests
+        "sankeyRowsNoTests": sankey_no_tests,
     }
-    
-    html = compile_page(sidebar_html, global_content, global_page_data, "menu-overview", templates_dir)
+
+    html = compile_page(
+        sidebar_html, global_content, global_page_data, "menu-overview", templates_dir
+    )
     with open(output_root / "dashboard.html", "w", encoding="utf-8") as f:
         f.write(html)
 
     # 2. COMPILE PROJECTS PAGES (project_[name].html)
     with open(templates_dir / "view_project.html.tpl", "r", encoding="utf-8") as f:
         project_tpl = f.read()
-        
+
     for proj_name, findings in project_vulns.items():
         proj_content = project_tpl.replace("{{project_name}}", proj_name)
-        
+
         proj_runs = [r for r in runs_data.values() if r["project"] == proj_name]
         proj_sankey = get_sankey_rows(proj_runs)
-        
+
         proj_page_data = {
             "type": "project",
             "sankeyRows": proj_sankey,
-            "findings": findings
+            "findings": findings,
         }
-        
-        html = compile_page(sidebar_html, proj_content, proj_page_data, f"menu-project-{proj_name}", templates_dir)
-        with open(output_root / f"project_{proj_name}.html", "w", encoding="utf-8") as f:
+
+        html = compile_page(
+            sidebar_html,
+            proj_content,
+            proj_page_data,
+            f"menu-project-{proj_name}",
+            templates_dir,
+        )
+        with open(
+            output_root / f"project_{proj_name}.html", "w", encoding="utf-8"
+        ) as f:
             f.write(html)
 
     # 3. COMPILE RUNS PAGES (run_[id].html)
@@ -482,16 +525,22 @@ def generate_dashboard(output_dir: str):
         run_content = run_content.replace("{{commit_hash_short}}", r["commit"][:8])
         run_content = run_content.replace("{{run_folder}}", r["run_folder"])
         run_content = run_content.replace("{{timestamp}}", r["timestamp"])
-        
+
         run_sankey = get_sankey_rows([r])
-        
+
         run_page_data = {
             "type": "run",
             "sankeyRows": run_sankey,
-            "findings": r["findings"]
+            "findings": r["findings"],
         }
-        
-        html = compile_page(sidebar_html, run_content, run_page_data, f"menu-run-{run_id}", templates_dir)
+
+        html = compile_page(
+            sidebar_html,
+            run_content,
+            run_page_data,
+            f"menu-run-{run_id}",
+            templates_dir,
+        )
         with open(output_root / f"run_{run_id}.html", "w", encoding="utf-8") as f:
             f.write(html)
 

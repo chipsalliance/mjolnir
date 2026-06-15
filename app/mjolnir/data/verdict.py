@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 from enum import Enum
 
+
 class Verdict(str, Enum):
     EXPLOITABLE = "Exploitable"
     NOT_EXPLOITABLE = "Not Exploitable"

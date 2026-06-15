@@ -4,6 +4,7 @@ import os
 
 from utilities.logger import logger
 
+
 def load_threat_model(threat_model_path: str) -> str:
     """Reads project threat model context if defined, returning a formatting prompt section."""
     if not threat_model_path or not os.path.exists(threat_model_path):

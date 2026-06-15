@@ -67,7 +67,7 @@ def run_command(args, cwd=None, env=None):
         logger.success("Execution succeeded")
     else:
         logger.error(f"Execution failed with exit code: {rc}")
-        
+
         for line in output_lines:
             sys.__stderr__.write(line)
         sys.__stderr__.flush()

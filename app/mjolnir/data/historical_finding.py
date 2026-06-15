@@ -11,7 +11,7 @@ class HistoricalFinding(BaseModel):
     phase_id: str
     phase_name: str
     status: Status = Status.OPEN
-    
+
     title: str
     severity: Severity
     location: str

@@ -25,6 +25,7 @@ def run_analysis(
     all_vulnerabilities = []
 
     from tqdm import tqdm
+
     pbar = tqdm(files, desc="\tScanning files", unit="file")
     for idx, f_path in enumerate(pbar):
         pbar.set_description(f"\tScanning {f_path} (Mock)")
@@ -35,14 +36,14 @@ def run_analysis(
         logger.write(f"Loaded prompt for .{ext} from: {prompt_name}", stdout=False)
 
         fid = str(uuid.uuid4())
-        
+
         # 1. Auditor Finding (Phase 1)
         audit_finding = AuditFinding(
             title="Mock Vulnerability",
             severity=Severity.MEDIUM,
             location="Line 42",
             description=f"Mock vulnerability flagged for file '{f_path}' by model '{model}'.",
-            recommendation="Replace mock config with production backend."
+            recommendation="Replace mock config with production backend.",
         )
 
         vuln = Vulnerability(
@@ -52,14 +53,16 @@ def run_analysis(
             severity=audit_finding.severity,
             location=audit_finding.location,
             description=audit_finding.description,
-            recommendation=audit_finding.recommendation
+            recommendation=audit_finding.recommendation,
         )
-        vuln.add(phase_id="1", phase_name="Source File Exploration", finding=audit_finding)
+        vuln.add(
+            phase_id="1", phase_name="Source File Exploration", finding=audit_finding
+        )
 
         # 2. Simulate Reviewer (Phase 2)
         # We vary status to test all flow branches (kept, downgraded, FP/discarded, skipped/kept)
         case = idx % 4
-        
+
         if case == 0:
             # Finding survives intact
             review = ReviewFinding(
@@ -70,7 +73,7 @@ def run_analysis(
                 recommendation=audit_finding.recommendation,
                 verdict=Verdict.EXPLOITABLE,
                 justification="Testing intact path.",
-                attack_vector="Trigger exploit directly."
+                attack_vector="Trigger exploit directly.",
             )
             vuln.add(phase_id="2", phase_name="Initial Review", finding=review)
         elif case == 1:
@@ -83,7 +86,7 @@ def run_analysis(
                 recommendation=audit_finding.recommendation,
                 verdict=Verdict.NOT_EXPLOITABLE,
                 justification="Testing downgrade path.",
-                attack_vector=""
+                attack_vector="",
             )
             vuln.add(phase_id="2", phase_name="Initial Review", finding=review)
         elif case == 2:
@@ -96,12 +99,16 @@ def run_analysis(
                 recommendation=audit_finding.recommendation,
                 verdict=Verdict.FALSE_POSITIVE,
                 justification="Testing false positive path.",
-                attack_vector=""
+                attack_vector="",
             )
             vuln.add(phase_id="2", phase_name="Initial Review", finding=review)
         else:
             # Finding is skipped (Omitted by reviewer -> Kept via fail-open)
-            vuln.add_skipped(phase_id="2", phase_name="Initial Review", justification="Omitted during mock review simulation.")
+            vuln.add_skipped(
+                phase_id="2",
+                phase_name="Initial Review",
+                justification="Omitted during mock review simulation.",
+            )
 
         all_vulnerabilities.append(vuln)
 

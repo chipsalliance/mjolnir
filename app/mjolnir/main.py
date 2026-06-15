@@ -32,8 +32,16 @@ def main():
 def _run_orchestrator():
     parser = argparse.ArgumentParser()
     parser.add_argument("--spec", required=False, help="Path to job spec JSON")
-    parser.add_argument("--gen-dashboard", action="store_true", help="Only regenerate dashboard from existing runs without scanning")
-    parser.add_argument("--output-dir", default="./output/runs", help="Default runs directory to compile if spec is missing")
+    parser.add_argument(
+        "--gen-dashboard",
+        action="store_true",
+        help="Only regenerate dashboard from existing runs without scanning",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="./output/runs",
+        help="Default runs directory to compile if spec is missing",
+    )
     args, unknown_args = parser.parse_known_args()
 
     if args.gen_dashboard:
@@ -57,7 +65,10 @@ def _run_orchestrator():
         return
 
     if not args.spec:
-        print("Error: The --spec argument is required when not in --gen-dashboard mode.", file=sys.stderr)
+        print(
+            "Error: The --spec argument is required when not in --gen-dashboard mode.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     if not os.path.exists(args.spec):
@@ -147,7 +158,9 @@ def _run_orchestrator():
 
     provider_name = job.get("provider")
 
-    logger.write(f"Executing analysis using {provider_name} provider (model={model_name}).")
+    logger.write(
+        f"Executing analysis using {provider_name} provider (model={model_name})."
+    )
 
     batch_size = job.get("batchSize")
 
@@ -179,23 +192,23 @@ def _run_orchestrator():
     with open(vulnerabilities_path, "w") as f:
         json.dump([v.model_dump() for v in vulnerabilities], f, indent=2)
 
-
     # Filter to open vulnerabilities and strip history for a clean minimal view
 
-    vulnerabilities_minimal = [
-        v for v in vulnerabilities 
-        if v.status == Status.OPEN
-    ]
-    
+    vulnerabilities_minimal = [v for v in vulnerabilities if v.status == Status.OPEN]
+
     # Write vulnerabilities (minimal) to disk
     vulnerabilities_minimal_path = os.path.join(run_dir, "vulnerabilities_minimal.json")
     with open(vulnerabilities_minimal_path, "w") as f:
-        json.dump([v.model_dump(exclude={"history"}) for v in vulnerabilities_minimal], f, indent=2)
-    
+        json.dump(
+            [v.model_dump(exclude={"history"}) for v in vulnerabilities_minimal],
+            f,
+            indent=2,
+        )
+
     # Dashboard generation
 
     logger.write(f"Generating dashboards.")
-    
+
     generate_dashboard(output_dir)
 
     # Upload results to Google Cloud Storage
@@ -204,9 +217,7 @@ def _run_orchestrator():
 
     if require_gcs:
         logger.write(f"Uploading results to GCS.")
-        upload.upload_run_to_gcs(
-            run_dir, repo_name, job.get("name"), timestamp_dir
-        )
+        upload.upload_run_to_gcs(run_dir, repo_name, job.get("name"), timestamp_dir)
         upload.upload_dashboard_to_gcs()
 
     logger.header("Exiting Mjolnir!")

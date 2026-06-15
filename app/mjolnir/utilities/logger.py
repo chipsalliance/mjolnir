@@ -12,6 +12,7 @@ COLORS = {
     "reset": "\033[0m",
 }
 
+
 class Logger:
     _instance = None
 
@@ -52,6 +53,7 @@ class Logger:
     def header(self, msg, stdout=True):
         """Helper to write header/welcome logs (gold bold, indent=0)."""
         self.write(msg, stdout=stdout, indent=0, color="gold")
+
 
 # Single shared instance
 logger = Logger()

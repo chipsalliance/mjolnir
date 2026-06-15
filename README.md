@@ -6,11 +6,10 @@ It leverages AI foundation models and adversarial review pipelines to provide co
 
 ## Directory Structure
 
-*   **[app/mjolnir/](./app/mjolnir/)**: Core Python application engine, including agent tools, data models, and providers (mock, genai). See [Application README](./app/mjolnir/README.md).
-*   **[nix/](./nix/)**: Nix infrastructure for job packaging, auto-discovery, and orchestration. See [Nix README](./nix/README.md).
-*   **[projects/](./projects/)**: Supported project definitions and job configurations. See [Projects README](./projects/README.md).
-*   **`output/`**: Generated analysis reports, run logs, and HTML dashboards.
-
+- **[app/mjolnir/](./app/mjolnir/)**: Core Python application engine, including agent tools, data models, and providers (mock, genai). See [Application README](./app/mjolnir/README.md).
+- **[nix/](./nix/)**: Nix infrastructure for job packaging, auto-discovery, and orchestration. See [Nix README](./nix/README.md).
+- **[projects/](./projects/)**: Supported project definitions and job configurations. See [Projects README](./projects/README.md).
+- **`output/`**: Generated analysis reports, run logs, and HTML dashboards.
 
 ## Supported Projects
 

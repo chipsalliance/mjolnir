@@ -6,6 +6,7 @@ from google.genai import types
 
 from utilities.logger import logger
 
+
 def get_client():
     """Initializes and returns the unified google-genai Client with auto-retries."""
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -25,7 +26,11 @@ def get_client():
         return genai.Client(api_key=api_key, http_options=http_options)
 
     if project and location:
-        logger.success(f"Using Vertex AI (project={project}, location={location}, with auto-retries)")
-        return genai.Client(vertexai=True, project=project, location=location, http_options=http_options)
+        logger.success(
+            f"Using Vertex AI (project={project}, location={location}, with auto-retries)"
+        )
+        return genai.Client(
+            vertexai=True, project=project, location=location, http_options=http_options
+        )
 
     return None

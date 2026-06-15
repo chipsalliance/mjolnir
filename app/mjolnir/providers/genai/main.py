@@ -39,6 +39,7 @@ def phase_1_source_file_exploration(
                 logger.error(f"Could not read {f_path}: {e}.")
 
         from tqdm import tqdm
+
         pbar = tqdm(
             as_completed(futures),
             total=len(futures),
@@ -59,9 +60,13 @@ def phase_1_source_file_exploration(
                         severity=audit_finding.severity,
                         location=audit_finding.location,
                         description=audit_finding.description,
-                        recommendation=audit_finding.recommendation
+                        recommendation=audit_finding.recommendation,
                     )
-                    vuln.add(phase_id="1", phase_name="Source File Exploration", finding=audit_finding)
+                    vuln.add(
+                        phase_id="1",
+                        phase_name="Source File Exploration",
+                        finding=audit_finding,
+                    )
                     all_vulnerabilities.append(vuln)
             except Exception as e:
                 logger.error(f"Scanning {f_path} failed: {e}.")
@@ -97,12 +102,15 @@ def phase_2_initial_review(
                 severity=vuln.severity,
                 location=vuln.location,
                 description=vuln.description,
-                recommendation=vuln.recommendation
+                recommendation=vuln.recommendation,
             )
             vuln_json_str = json.dumps(audit_view.model_dump())
-            reviewer_futures[reviewer_executor.submit(reviewer.run, vuln_json_str)] = vuln
+            reviewer_futures[reviewer_executor.submit(reviewer.run, vuln_json_str)] = (
+                vuln
+            )
 
         from tqdm import tqdm
+
         reviewer_pbar = tqdm(
             as_completed(reviewer_futures),
             total=len(reviewer_futures),
@@ -117,16 +125,26 @@ def phase_2_initial_review(
             reviewer_pbar.set_description(f"Reviewing {orig_vuln.title[:30]}")
             try:
                 review_finding = future.result()
-                orig_vuln.add(phase_id="2", phase_name="Initial Review", finding=review_finding)
+                orig_vuln.add(
+                    phase_id="2", phase_name="Initial Review", finding=review_finding
+                )
                 reviewed_ids.add(orig_vuln.id)
             except Exception as e:
                 logger.error(f"Adversarial review failed for {orig_vuln.title}: {e}.")
-                orig_vuln.add_skipped(phase_id="2", phase_name="Initial Review", justification=f"Review failed: {e}")
+                orig_vuln.add_skipped(
+                    phase_id="2",
+                    phase_name="Initial Review",
+                    justification=f"Review failed: {e}",
+                )
 
         # Mark skipped findings (only among the ones we attempted to review)
         for vuln in open_vulns:
             if vuln.id not in reviewed_ids:
-                vuln.add_skipped(phase_id="2", phase_name="Initial Review", justification="Omitted by reviewer.")
+                vuln.add_skipped(
+                    phase_id="2",
+                    phase_name="Initial Review",
+                    justification="Omitted by reviewer.",
+                )
     finally:
         reviewer_executor.shutdown(wait=True)
 
@@ -159,10 +177,14 @@ def run_analysis(
     reviewer = ReviewerAgent(client, model, adv_instruction)
 
     # PHASE 1: Source File Exploration (Audit)
-    all_vulnerabilities = phase_1_source_file_exploration(auditor, files, code_dir, batch_size)
+    all_vulnerabilities = phase_1_source_file_exploration(
+        auditor, files, code_dir, batch_size
+    )
 
     # PHASE 2: Initial Review (Adversarial Review)
-    all_vulnerabilities = phase_2_initial_review(reviewer, all_vulnerabilities, batch_size)
-    
+    all_vulnerabilities = phase_2_initial_review(
+        reviewer, all_vulnerabilities, batch_size
+    )
+
     logger.success("Analysis pipeline completed.")
     return all_vulnerabilities
