@@ -7,10 +7,10 @@
 __pycache__/
 *.pyc
 
-# Generated test vulnerability reports
-test-output/
+# Linting
+.ruff_cache
 
-# Generated vulnerability reports
+# Generated reports
 output/
 
 # Environment
