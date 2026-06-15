@@ -1,6 +1,7 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 import json
+from pathlib import Path
 import os
 import sys
 from google.cloud import storage
