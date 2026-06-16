@@ -293,6 +293,12 @@ select:focus {
     border: 1px solid transparent;
 }
 
+.badge-critical { background-color: var(--critical-color) !important; color: #ffffff !important; }
+.badge-high { background-color: var(--high-color) !important; color: #ffffff !important; }
+.badge-medium { background-color: var(--medium-color) !important; color: #ffffff !important; }
+.badge-low { background-color: var(--low-color) !important; color: #ffffff !important; }
+.badge-informational { background-color: var(--info-color) !important; color: #ffffff !important; }
+
 .sev-Critical { color: var(--critical-color); background-color: var(--critical-bg); border-color: rgba(255, 69, 58, 0.4); }
 .sev-High { color: var(--high-color); background-color: var(--high-bg); border-color: rgba(255, 159, 10, 0.4); }
 .sev-Medium { color: var(--medium-color); background-color: var(--medium-bg); border-color: rgba(255, 214, 10, 0.4); }

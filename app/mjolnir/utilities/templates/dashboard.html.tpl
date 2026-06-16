@@ -11,9 +11,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         (function() {
-            const theme = localStorage.getItem('mjolnir-theme') || 'dark';
+            let theme = 'dark';
+            try {
+                theme = localStorage.getItem('mjolnir-theme') || 'dark';
+            } catch (e) {
+                console.warn('localStorage not accessible, defaulting to dark theme', e);
+            }
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>

@@ -32,6 +32,18 @@
                 </select>
             </div>
             <div class="control-group" style="width: 200px;">
+                <label for="project-model-filter">Model Filter</label>
+                <select id="project-model-filter" onchange="onProjectSearch()" style="padding: 10px 15px; border: 1px solid var(--surface-border); border-radius: 8px; background: var(--input-bg); color: var(--text-color); font-size: 14px; outline: none; width: 100%; cursor: pointer;">
+                    <option value="all">All Models</option>
+                </select>
+            </div>
+            <div class="control-group" style="width: 200px;">
+                <label for="project-run-filter">Run Filter</label>
+                <select id="project-run-filter" onchange="onProjectSearch()" style="padding: 10px 15px; border: 1px solid var(--surface-border); border-radius: 8px; background: var(--input-bg); color: var(--text-color); font-size: 14px; outline: none; width: 100%; cursor: pointer;">
+                    <option value="all">All Runs</option>
+                </select>
+            </div>
+            <div class="control-group" style="width: 200px;">
                 <label for="project-sort-order">Sort Order</label>
                 <select id="project-sort-order" onchange="onProjectSearch()" style="padding: 10px 15px; border: 1px solid var(--surface-border); border-radius: 8px; background: var(--input-bg); color: var(--text-color); font-size: 14px; outline: none; width: 100%; cursor: pointer;">
                     <option value="sev-desc">Severity (High to Low)</option>

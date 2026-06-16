@@ -8,13 +8,17 @@ from utilities.logger import logger
 
 
 def format_findings(
-    findings: list, run_id_key: str = None, timestamp: str = None
+    findings: list,
+    run_id_key: str = None,
+    timestamp: str = None,
+    model: str = None,
+    run_folder: str = None,
 ) -> list:
     """Formats raw findings for visual dashboard rendering."""
     formatted = []
     for f in findings:
-        file_path = f.get("file", "Unknown")
-        desc_parts = [f.get("description", "")]
+        file_path = f["file"]
+        desc_parts = [f["description"]]
         for key, val in f.items():
             if key in [
                 "file",
@@ -36,20 +40,25 @@ def format_findings(
                 desc_parts.append(f"**{display_key}:** {val}")
 
         item = {
+            "id": f["id"],
             "file": file_path,
-            "location": f.get("location", "N/A"),
-            "title": f.get("title", "Untitled"),
-            "severity": f.get("severity") or "Unknown",
+            "location": f["location"],
+            "title": f["title"],
+            "severity": f["severity"],
             "description": "\n\n".join(filter(None, desc_parts)),
-            "verdict": f.get("verdict") or "Unknown",
-            "justification": f.get("justification", "No justification."),
-            "attack_vector": f.get("attack_vector", ""),
-            "recommendation": f.get("recommendation", "No recommendation."),
+            "verdict": f.get("verdict"),
+            "justification": f.get("justification"),
+            "attack_vector": f.get("attack_vector"),
+            "recommendation": f["recommendation"],
         }
         if run_id_key:
             item["run_id_key"] = run_id_key
         if timestamp:
             item["timestamp"] = timestamp
+        if model:
+            item["model"] = model
+        if run_folder:
+            item["run_folder"] = run_folder
         formatted.append(item)
     return formatted
 
@@ -64,6 +73,7 @@ def format_scan_data(
 ) -> dict:
     """Formats findings and returns a structured dictionary for the template renderer."""
     findings = report_data.get("vulnerabilities") or []
+    run_id_key = f"{project_name}-{job_name}-{run_name}"
     return {
         "name": job_name.replace("_", " "),
         "project": project_name,
@@ -73,7 +83,13 @@ def format_scan_data(
         "timestamp": metadata.get("timestamp", "unknown"),
         "model": metadata.get("model", "mock"),
         "commit": metadata.get("target_commit", "unknown"),
-        "findings": format_findings(findings),
+        "findings": format_findings(
+            findings,
+            run_id_key=run_id_key,
+            timestamp=metadata.get("timestamp"),
+            model=metadata.get("model"),
+            run_folder=run_name,
+        ),
         "flow": flow_records,
     }
 
@@ -188,14 +204,14 @@ def get_sankey_rows(filtered_runs: list) -> list:
                 nodes_by_phase[phase_num].add(node)
 
     severity_order = {
+        "Closed": 0,
+        "Skipped": 0,
+        "Excluded": 0,
         "Informational": 1,
         "Low": 2,
         "Medium": 3,
         "High": 4,
         "Critical": 5,
-        "Closed": 6,
-        "Skipped": 6,
-        "Excluded": 6,
     }
 
     def get_priority(node_name):
@@ -430,7 +446,11 @@ def generate_dashboard(output_dir: str):
 
                     timestamp = metadata.get("timestamp")
                     formatted_for_project = format_findings(
-                        open_findings, run_id_key, timestamp
+                        open_findings,
+                        run_id_key=run_id_key,
+                        timestamp=timestamp,
+                        model=metadata.get("model"),
+                        run_folder=run_dir.name,
                     )
                     project_vulns[proj_name].extend(formatted_for_project)
                 except Exception as e:
@@ -499,6 +519,7 @@ def generate_dashboard(output_dir: str):
             "type": "project",
             "sankeyRows": proj_sankey,
             "findings": findings,
+            "runs": proj_runs,
         }
 
         html = compile_page(
