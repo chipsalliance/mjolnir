@@ -24,7 +24,7 @@ let
     };
 
     config = {
-      workspaceDir = "~/mjolnir-workspace/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
+      workspaceDir = "./workspace/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
       outputDir = "./output/runs/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
       projectOutputDir = "./output/runs/${project.repoName}";
     };
