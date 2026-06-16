@@ -90,7 +90,7 @@ class MjolnirAgent:
 
         if not has_text and has_calls:
             logger.write(
-                " [API Warning] Model session ended with a tool call request but no text parts. The maximum tool execution calls limit (30) was likely reached!",
+                " [API Warning] Model session ended with a tool call request but no text parts. The maximum tool execution calls limit (10) was likely reached!",
                 stdout=True,
             )
 

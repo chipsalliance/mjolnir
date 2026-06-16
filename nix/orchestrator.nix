@@ -10,7 +10,7 @@ let
 
     job = {
       inherit (job) name;
-      model = job.model or "gemini-3.5-flash";
+      model = job.model or project.model or "gemini-2.5-flash";
       provider = job.provider or project.provider or "genai";
       batchSize = job.batchSize or 20;
       branch = job.branch or null;
@@ -19,7 +19,7 @@ let
       srcDirs = job.srcDirs or [ "." ];
       extensions = job.extensions or [ "c" "h" "cpp" "cc" "rs" "go" "py" ];
       maxFiles = job.maxFiles or null;
-      requireGcsUpload = job.requireGcsUpload or false;
+      requireGcsUpload = job.requireGcsUpload or project.requireGcsUpload or false;
       cmd = job.cmd or null;
     };
 

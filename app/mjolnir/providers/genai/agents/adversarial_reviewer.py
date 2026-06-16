@@ -24,7 +24,7 @@ class ReviewerAgent(MjolnirAgent):
                 tools=[read_file, grep_search, glob_files],
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(
                     disable=False,
-                    maximum_remote_calls=30,
+                    maximum_remote_calls=10,
                 ),
                 safety_settings=self.safety_settings,
             ),
