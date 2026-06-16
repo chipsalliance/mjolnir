@@ -5,7 +5,6 @@ import sys
 import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 from providers.genai.client import get_client
 from providers.genai.agents.auditor import AuditorAgent
 from providers.genai.agents.adversarial_reviewer import ReviewerAgent
