@@ -30,10 +30,3 @@ Perform the following verification steps:
 ## 4. Severity Re-assessment
 - Based on your adversarial analysis, re-evaluate the severity (Critical, High, Medium, Low, Informational).
 - High severity should be reserved for findings with a clear, reliable exploit path and significant impact.
-
-## **CRITICAL LICENSE & RECITATION GUARDRAILS**
-To prevent triggering automated code recitation and licensing blocks on the serving API, you MUST NOT include long verbatim copies of source code lines in your generated 'description', 'recommendation', or 'justification' fields. Instead:
-- Describe code vulnerabilities and logic conceptually in prose.
-- Reference function names, variable names, and line numbers.
-- If demonstrating a code flaw or fix, write mock code, pseudo-code, or alter identifiers/formatting to ensure it does not match the source file verbatim.
-

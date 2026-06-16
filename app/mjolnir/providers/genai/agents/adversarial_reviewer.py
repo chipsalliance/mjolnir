@@ -3,11 +3,9 @@
 from google.genai import types
 from data.review_finding import ReviewFinding
 from providers.genai.agents.base import MjolnirAgent
-
-# Local tool imports
 from agent_tools.read_file import read_file
 from agent_tools.grep_search import grep_search
-from agent_tools.glob_files import glob_files
+from agent_tools.glob import glob
 
 
 class ReviewerAgent(MjolnirAgent):
@@ -21,7 +19,7 @@ class ReviewerAgent(MjolnirAgent):
                 system_instruction=self.system_instruction,
                 response_mime_type="application/json",
                 response_schema=ReviewFinding,
-                tools=[read_file, grep_search, glob_files],
+                tools=[read_file, grep_search, glob],
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(
                     disable=False,
                     maximum_remote_calls=10,

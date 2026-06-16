@@ -5,7 +5,7 @@ This directory contains the core Python application for Mjolnir. It handles the 
 ## Directory Structure
 
 - `main.py`: The entry point of the application. It parses the job spec, sets up the repository, runs the analysis, and generates the output.
-- `agent_tools/`: Python tools that the AI agents can use to inspect the codebase (e.g., `read_file`, `grep_search`, `glob_files`).
+- `agent_tools/`: Python tools that the AI agents can use to inspect the codebase (e.g., `read_file`, `grep_search`, `glob`).
 - `data/`: Pydantic data models defining the schema for vulnerabilities, findings, verdicts, and status.
 - `providers/`: Implementations of different analysis backends.
   - `mock/`: A mock provider that returns pre-defined findings quickly, useful for testing the orchestrator and dashboard generation.
