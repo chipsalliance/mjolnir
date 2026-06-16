@@ -14,11 +14,14 @@ def setup_repository(repo_url: str, code_dir: str, ref: str, workspace_dir: str)
     if not os.path.exists(git_dir):
         if os.path.exists(code_dir):
             shutil.rmtree(code_dir)
-        run_command(["git", "clone", repo_url, code_dir])
+        run_command(["git", "clone", "--recurse-submodules", repo_url, code_dir])
     else:
         run_command(["git", "reset", "--hard"], cwd=code_dir)
         run_command(["git", "clean", "-fdx"], cwd=code_dir)
+        run_command(["git", "submodule", "foreach", "--recursive", "git", "reset", "--hard"], cwd=code_dir)
+        run_command(["git", "submodule", "foreach", "--recursive", "git", "clean", "-fdx"], cwd=code_dir)
 
     # Perform Git Checkout
     if ref:
         run_command(["git", "checkout", ref], cwd=code_dir)
+        run_command(["git", "submodule", "update", "--init", "--recursive"], cwd=code_dir)
