@@ -1,10 +1,10 @@
 # Mjolnir Application Engine
 
-This directory contains the core Python application for Mjolnir. It handles the orchestration of the security analysis, interacting with AI providers, and generating reports/dashboards.
+This directory contains the core Python application engine for Mjolnir. It handles the orchestration of the security analysis, interacting with AI providers, and generating reports/dashboards.
 
 ## Directory Structure
 
-- `main.py`: The entry point of the application. It parses the job spec, sets up the repository, runs the analysis, and generates the output.
+- `main.py`: The entry point of the application engine. It parses the job spec, sets up the repository, runs the analysis, and generates the output.
 - `agent_tools/`: Python tools that the AI agents can use to inspect the codebase (e.g., `read_file`, `grep_search`, `glob`).
 - `data/`: Pydantic data models defining the schema for vulnerabilities, findings, verdicts, and status.
 - `providers/`: Implementations of different analysis backends.
@@ -23,3 +23,37 @@ This directory contains the core Python application for Mjolnir. It handles the 
 5.  It writes the findings to `vulnerabilities.json` and a filtered version to `vulnerabilities_minimal.json` in the run directory.
 6.  It regenerates the HTML dashboard.
 7.  Optionally uploads results to Google Cloud Storage.
+
+## Analysis Providers
+
+Providers execute the core vulnerability analysis. They are loaded dynamically based on the job configuration.
+
+To add a new provider:
+
+1. Create a subdirectory under `providers/` (e.g., `providers/my_provider/`).
+2. Implement a `main.py` containing a `run_analysis` function:
+
+```python
+from data.vulnerability import Vulnerability
+
+def run_analysis(
+    model: str,
+    code_dir: str,
+    files: list[str],
+    threat_model_context: str,
+    run_dir: str,
+    batch_size: int,
+) -> list[Vulnerability]:
+    """
+    Executes the analysis on the given list of files.
+
+    - model: Name of the Gemini/LLM model to use.
+    - code_dir: Absolute path to local target repository.
+    - files: List of file paths relative to code_dir.
+    - threat_model_context: Threat model context string.
+    - run_dir: Absolute path to the output directory of this run.
+    - batch_size: Number of concurrent tasks.
+    """
+    # ... analysis logic ...
+    return vulnerabilities
+```
