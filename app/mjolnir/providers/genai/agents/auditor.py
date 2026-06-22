@@ -6,6 +6,15 @@ from utilities.logger import logger
 from data.security_report import SecurityReport
 from providers.genai.agents.base import MjolnirAgent
 
+EXTENSION_TO_PROMPT = {
+    "c": "c_auditor.txt",
+    "h": "c_auditor.txt",
+    "cpp": "c_auditor.txt",
+    "cc": "c_auditor.txt",
+    "rs": "rust_auditor.txt",
+}
+DEFAULT_PROMPT = "c_auditor.txt"
+
 
 class AuditorAgent(MjolnirAgent):
     """Dynamic auditor agent that resolves language prompts and audits code files."""
@@ -19,12 +28,14 @@ class AuditorAgent(MjolnirAgent):
         prompts_dir = os.path.join(current_dir, "..", "prompts")
 
         ext = os.path.splitext(file_path)[1].lstrip(".").lower()
-        if ext in ["c", "h", "cpp", "cc"]:
-            prompt_name = "c_auditor.txt"
-        elif ext in ["rs"]:
-            prompt_name = "rust_auditor.txt"
+        if ext not in EXTENSION_TO_PROMPT:
+            logger.write(
+                f" [API Warning] Unsupported file extension: .{ext}. Defaulting to C auditor.",
+                stdout=True,
+            )
+            prompt_name = DEFAULT_PROMPT
         else:
-            prompt_name = "c_auditor.txt"
+            prompt_name = EXTENSION_TO_PROMPT[ext]
 
         p_path = os.path.join(prompts_dir, prompt_name)
         if os.path.exists(p_path):

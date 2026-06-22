@@ -2,6 +2,18 @@
 # SPDX-License-Identifier: Apache-2.0
 from google.genai import types
 
+IGNORED_BLOCK_REASONS = {
+    "None",
+    "0",
+    "BlockReason.BLOCKED_REASON_UNSPECIFIED",
+}
+
+IGNORED_FINISH_REASONS = {
+    "STOP",
+    "FinishReason.STOP",
+    "1",
+}
+
 
 class MjolnirAgent:
     """Base Mjolnir Agent wrapping model context parameters."""
@@ -28,11 +40,7 @@ class MjolnirAgent:
         prompt_feedback = getattr(response, "prompt_feedback", None)
         if prompt_feedback:
             block_reason = getattr(prompt_feedback, "block_reason", None)
-            if block_reason and str(block_reason) not in [
-                "None",
-                "0",
-                "BlockReason.BLOCKED_REASON_UNSPECIFIED",
-            ]:
+            if block_reason and str(block_reason) not in IGNORED_BLOCK_REASONS:
                 logger.write(
                     f" [API Warning] Prompt BLOCKED by safety filter. Reason: {block_reason}",
                     stdout=True,
@@ -60,11 +68,7 @@ class MjolnirAgent:
         finish_reason = getattr(candidate, "finish_reason", None)
 
         # If finish reason is not normal completion, log details
-        if finish_reason and str(finish_reason) not in [
-            "STOP",
-            "FinishReason.STOP",
-            "1",
-        ]:
+        if finish_reason and str(finish_reason) not in IGNORED_FINISH_REASONS:
             logger.write(
                 f" [API Warning] Model execution unfinished. Reason: {finish_reason}",
                 stdout=True,
