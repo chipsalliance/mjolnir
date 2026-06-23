@@ -16925,3 +16925,15 @@ Identify specific threats categorized by:
 - **AXI `aruser` and `arid` Filtering:** The actual RTL implementation of `fuse_ctrl` MUST be reviewed to verify that `aruser` and `arid` signals are strictly validated against a known-good configuration. Access control to sensitive fuses must not rely solely on software configuration if hardware bounds can be enforced.
 - **AXI State Machine Robustness:** Deep scrutiny of the `fuse_ctrl` AXI slave RTL is needed to ensure that illegal bursts (`arburst`), out-of-bounds addresses (`araddr`), or locked accesses (`arlock`) fail securely without wedging the bus or the internal fuse read state machine.
 - **Fuse Access Control Lists (ACLs):** We need to locate and analyze the specific RTL module within `fuse_ctrl` that enforces read permissions (e.g., mapping AXI transactions to the internal fuse memory wrapper).
+
+## Special Caliptra Silicon Execution Quirks & Hardware Hazards
+
+1. **Variable-Time Hardware Divider (`css_mcu0_el2_exu_div_ctl`)**:
+   - **Hardware Flaw**: The core hardware divider is explicitly non-constant-time.
+   - **Firmware Impact**: Firmware **must not** use standard division (`/`) or remainder (`%`) operators on secret keys, nonces, or private cryptographic scalars. All secret math must be implemented in constant-time software routines or dedicated crypto accelerators.
+2. **DMA Bus Master MPU Bypass**:
+   - **Hardware Flaw**: Certain DMA hardware paths bypass standard Physical Memory Protection (PMP) or Memory Protection Unit (MPU) checks.
+   - **Firmware Impact**: Firmware cannot assume PMP protects memory from external DMA engines. It must explicitly configure and verify all bus master access control registers.
+3. **Hardcoded Bus Privilege (`AxPROT`)**:
+   - **Hardware Flaw**: Several bus buffers hardcode transactions as "Privileged".
+   - **Firmware Impact**: User-mode code executing on the core might be able to access Machine-mode bus resources if hardware bus privileges are hardcoded. Firmware must verify bus user tags (`a_user`) directly.

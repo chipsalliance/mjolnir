@@ -6,5 +6,4 @@
   repoUrl = "https://github.com/chipsalliance/caliptra-dpe.git";
   requireGcsUpload = true;
   srcExtensions = [ "rs" "go" ];
-  threatModel = ../../app/mjolnir/providers/genai/threat-models/caliptra/THREAT_MODEL.md;
 }
