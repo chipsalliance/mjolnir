@@ -14,6 +14,7 @@ from data.review_finding import ReviewFinding
 from data.verdict import Verdict
 from data.status import Status
 from utilities.logger import logger
+from tqdm import tqdm
 
 
 def phase_1_source_file_exploration(
@@ -36,9 +37,6 @@ def phase_1_source_file_exploration(
                 futures[executor.submit(auditor.run, f_path, contents)] = f_path
             except Exception as e:
                 logger.error(f"Could not read {f_path}: {e}.")
-
-        from tqdm import tqdm
-
         pbar = tqdm(
             as_completed(futures),
             total=len(futures),
@@ -107,9 +105,6 @@ def phase_2_initial_review(
             reviewer_futures[reviewer_executor.submit(reviewer.run, vuln_json_str)] = (
                 vuln
             )
-
-        from tqdm import tqdm
-
         reviewer_pbar = tqdm(
             as_completed(reviewer_futures),
             total=len(reviewer_futures),

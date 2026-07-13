@@ -1,6 +1,7 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 from google.genai import types
+from utilities.logger import logger
 
 IGNORED_BLOCK_REASONS = {
     "None",
@@ -34,8 +35,6 @@ class MjolnirAgent:
 
     def get_response_text(self, response) -> str:
         """Safely extracts text parts from response candidates to bypass SDK non-text warnings."""
-        from utilities.logger import logger
-
         # Check if prompt was blocked
         prompt_feedback = getattr(response, "prompt_feedback", None)
         if prompt_feedback:
