@@ -6,6 +6,7 @@ COLORS = {
     "red": "\033[91m",
     "green": "\033[92m",
     "yellow": "\033[93m",
+    "orange": "\033[38;5;214m",
     "blue": "\033[94m",
     "gold": "\033[1;38;5;220m",
     "bold": "\033[1m",
@@ -49,6 +50,14 @@ class Logger:
     def error(self, msg, stdout=True, indent=1):
         """Helper to write error logs (red, default indent=1)."""
         self.write(msg, stdout=stdout, indent=indent, color="red")
+
+    def warning(self, msg, stdout=True, indent=1):
+        """Helper to write warning logs (orange, default indent=1)."""
+        self.write(msg, stdout=stdout, indent=indent, color="orange")
+
+    def info(self, msg, stdout=True, indent=1):
+        """Helper to write info logs (blue, default indent=1)."""
+        self.write(msg, stdout=stdout, indent=indent, color="blue")
 
     def header(self, msg, stdout=True):
         """Helper to write header/welcome logs (gold bold, indent=0)."""

@@ -103,6 +103,8 @@ function initPage() {
         drawSankeyChart(pageData.sankeyRows, 'job-sankey-chart');
         activeFindings = pageData.findings;
         applyFilters();
+    } else if (pageData.type === 'usage') {
+        drawUsageChart(pageData.runs);
     }
 }
 
@@ -615,7 +617,156 @@ function drawSankeyChart(rows, containerId) {
     chart.draw(data, options);
 }
 
+// Usage Chart logic
+window.onUsageIntervalChange = function() {
+    if (typeof pageData !== 'undefined' && pageData && pageData.runs) {
+        drawUsageChart(pageData.runs);
+    }
+};
+
+function drawUsageChart(runs) {
+    const container = document.getElementById('usage-chart-container');
+    const breakdownContainer = document.getElementById('usage-breakdown-container');
+    if (!container) return;
+
+    if (typeof google === 'undefined' || !google.visualization || !google.visualization.ColumnChart) {
+        setTimeout(() => drawUsageChart(runs), 100);
+        return;
+    }
+
+    if (!runs || runs.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted); text-align:center;">No run data available.</div>';
+        if (breakdownContainer) breakdownContainer.innerHTML = '';
+        return;
+    }
+
+    const intervalSelect = document.getElementById('usage-interval-select');
+    const interval = intervalSelect ? intervalSelect.value : 'day';
+
+    // Aggregate tokens
+    const usageData = {};
+    const modelBreakdown = {};
+    
+    runs.forEach(r => {
+        if (!r.timestamp || !r.model || !r.usage || !r.usage.total) return;
+        
+        let timeKey = '';
+        if (interval === 'hour') {
+            timeKey = r.timestamp.substring(0, 13).replace('T', ' ') + ':00';
+        } else if (interval === 'week') {
+            const d = new Date(r.timestamp.replace(' ', 'T'));
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(d.setDate(diff));
+            const y = monday.getFullYear();
+            const m = String(monday.getMonth() + 1).padStart(2, '0');
+            const dt = String(monday.getDate()).padStart(2, '0');
+            timeKey = `Week ${y}-${m}-${dt}`;
+        } else {
+            timeKey = r.timestamp.substring(0, 10);
+        }
+        
+        const model = r.model;
+        const key = `${timeKey} | ${model}`;
+        
+        const inTokens = r.usage.total.total_input_tokens || 0;
+        const outTokens = r.usage.total.total_output_tokens || 0;
+
+        if (!usageData[key]) {
+            usageData[key] = { timeKey, model, input: 0, output: 0 };
+        }
+        
+        usageData[key].input += inTokens;
+        usageData[key].output += outTokens;
+
+        if (!modelBreakdown[model]) {
+            modelBreakdown[model] = { input: 0, output: 0, total: 0 };
+        }
+        modelBreakdown[model].input += inTokens;
+        modelBreakdown[model].output += outTokens;
+        modelBreakdown[model].total += (inTokens + outTokens);
+    });
+
+    const keys = Object.keys(usageData).sort();
+    if (keys.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted); text-align:center;">No token usage data available across runs.</div>';
+        if (breakdownContainer) breakdownContainer.innerHTML = '';
+        return;
+    }
+
+    const data = new google.visualization.DataTable();
+    data.addColumn('string', `${interval.charAt(0).toUpperCase() + interval.slice(1)} - Model`);
+    data.addColumn('number', 'Input Tokens');
+    data.addColumn('number', 'Output Tokens');
+
+    const rows = keys.map(k => {
+        const item = usageData[k];
+        return [k, item.input, item.output];
+    });
+    
+    data.addRows(rows);
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#8b949e' : '#3c4043';
+    const bgColor = isDark ? 'transparent' : 'transparent';
+
+    const options = {
+        isStacked: true,
+        backgroundColor: bgColor,
+        chartArea: { width: '80%', height: '70%' },
+        legend: { textStyle: { color: textColor } },
+        hAxis: { 
+            textStyle: { color: textColor, fontSize: 11 },
+            slantedText: true,
+            slantedTextAngle: 45
+        },
+        vAxis: { 
+            title: 'Tokens',
+            titleTextStyle: { color: textColor },
+            textStyle: { color: textColor },
+            gridlines: { color: isDark ? '#333' : '#e0e0e0' }
+        },
+        colors: ['#4285F4', '#34A853'] // Input=Blue, Output=Green
+    };
+
+    const chart = new google.visualization.ColumnChart(container);
+    chart.draw(data, options);
+
+    // Draw Breakdown Table
+    if (breakdownContainer) {
+        let tableHTML = `
+            <table style="width: 100%; border-collapse: collapse; text-align: left; color: var(--text-bright);">
+                <thead>
+                    <tr>
+                        <th style="padding: 12px; border-bottom: 2px solid var(--surface-border);">Model</th>
+                        <th style="padding: 12px; border-bottom: 2px solid var(--surface-border);">Input Tokens</th>
+                        <th style="padding: 12px; border-bottom: 2px solid var(--surface-border);">Output Tokens</th>
+                        <th style="padding: 12px; border-bottom: 2px solid var(--surface-border);">Total Tokens</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        const modelKeys = Object.keys(modelBreakdown).sort();
+        modelKeys.forEach(m => {
+            const stat = modelBreakdown[m];
+            tableHTML += `
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--surface-border);">${m}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--surface-border);">${stat.input.toLocaleString()}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--surface-border);">${stat.output.toLocaleString()}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--surface-border);">${stat.total.toLocaleString()}</td>
+                    </tr>
+            `;
+        });
+        tableHTML += `
+                </tbody>
+            </table>
+        `;
+        breakdownContainer.innerHTML = tableHTML;
+    }
+}
+
 // Initialize Google Charts loader
 if (typeof google !== 'undefined') {
-    google.charts.load('current', {'packages':['sankey']});
+    google.charts.load('current', {'packages':['sankey', 'corechart']});
 }
