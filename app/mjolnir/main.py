@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import datetime
+import providers.adk.main as adk
 import providers.genai.main as genai
 import providers.mock.main as mock
 from utilities import upload
@@ -39,6 +40,10 @@ def _run_orchestrator():
         "--output-dir",
         default="./output/runs",
         help="Default runs directory to compile if spec is missing",
+    )
+    parser.add_argument(
+        "--ingest",
+        help="Path to report file to ingest. Implicitly triggers report ingestion mode.",
     )
     args, unknown_args = parser.parse_known_args()
 
@@ -123,8 +128,13 @@ def _run_orchestrator():
     logger.write(f"Setting up repository for {repo_name}.")
     setup_repository(repo_url, code_dir, repo_ref, workspace_dir)
 
+    # File discovery & Ingestion routing
+    ingest_path = args.ingest or job.get("ingestionReport")
+
     logger.write(f"Writing project metadata.")
-    write_metadata(run_dir, repo_url, model_name, repo_ref, code_dir, timestamp_pretty)
+    write_metadata(
+        run_dir, repo_url, model_name, repo_ref, code_dir, timestamp_pretty, ingest_path
+    )
 
     # Execute command, if one is provided
 
@@ -140,17 +150,20 @@ def _run_orchestrator():
             env=run_env,
         )
 
-    # File discovery
+    # Ingestion check and File discovery
 
-    logger.write(f"Looking for files to analyze.")
-
-    files_to_scan = discover_source_files(code_dir, job)
-
-    if files_to_scan:
-        logger.write(f"Discovered {len(files_to_scan)} files to analyze.")
+    if ingest_path:
+        logger.write(f"Ingestion Mode enabled. Ingesting report path: {ingest_path}")
+        files_to_scan = []
     else:
-        logger.write(f"Discovered no files to analyze. Exiting.")
-        sys.exit(1)
+        logger.write(f"Discovery Mode enabled. Looking for files to analyze.")
+        files_to_scan = discover_source_files(code_dir, job)
+
+        if files_to_scan:
+            logger.write(f"Discovered {len(files_to_scan)} files to analyze.")
+        else:
+            logger.write(f"Discovered no files to analyze. Exiting.")
+            sys.exit(1)
 
     # Execute analyis via selected provider
 
@@ -163,26 +176,48 @@ def _run_orchestrator():
     batch_size = job.get("batchSize")
 
     if provider_name == "mock":
-        vulnerabilities = mock.run_analysis(
+        vulnerabilities, status = mock.run_analysis(
             model_name,
             code_dir,
             files_to_scan,
             threat_model_context,
             run_dir,
             batch_size,
+            ingest_path=ingest_path,
         )
     elif provider_name == "genai":
-        vulnerabilities = genai.run_analysis(
+        vulnerabilities, status = genai.run_analysis(
             model_name,
             code_dir,
             files_to_scan,
             threat_model_context,
             run_dir,
             batch_size,
+            ingest_path=ingest_path,
+        )
+    elif provider_name == "adk":
+        vulnerabilities, status = adk.run_analysis(
+            model_name,
+            code_dir,
+            files_to_scan,
+            threat_model_context,
+            run_dir,
+            batch_size,
+            ingest_path=ingest_path,
         )
     else:
         logger.error(f"Unknown provider: {provider_name}")
         sys.exit(1)
+
+    # Update metadata with status
+    metadata_path = os.path.join(run_dir, "metadata.json")
+    if os.path.exists(metadata_path):
+        with open(metadata_path, "r") as f:
+            metadata = json.load(f)
+        metadata["status"] = status
+        metadata["mode"] = "Ingestion" if ingest_path else "Discovery"
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=2)
 
     # Write vulnerabilities (all) to disk
 
@@ -219,6 +254,8 @@ def _run_orchestrator():
         upload.upload_dashboard_to_gcs()
 
     logger.header("Exiting Mjolnir!")
+    if status == "Failed":
+        sys.exit(1)
 
 
 if __name__ == "__main__":
