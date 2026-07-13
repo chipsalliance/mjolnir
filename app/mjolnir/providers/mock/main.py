@@ -19,6 +19,7 @@ def run_analysis(
     threat_model_context: str,
     run_dir: str,
     batch_size: int,
+    ingest_path: str = None,
 ) -> list:
     """Instantly returns hardcoded mock findings and compiles a mock flow history for testing."""
 
@@ -112,4 +113,4 @@ def run_analysis(
 
         all_vulnerabilities.append(vuln)
 
-    return all_vulnerabilities
+    return all_vulnerabilities, "Success"
