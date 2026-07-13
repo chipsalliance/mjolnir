@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
 import subprocess
+from utilities.agent_context import CURRENT_RUN_ID
 from utilities.decorators import limit_tool_output
 
 
@@ -59,8 +60,8 @@ def grep_search(
 
     Args:
         pattern: The regular expression (regex) to search for.
-        dir_path: The path to the directory to search within. Defaults to ".".
-        include_pattern: A glob pattern to filter which files are searched.
+        dir_path: The path to the directory or file to search within. Defaults to ".".
+        include_pattern: A glob pattern to filter which files are searched (when dir_path is a directory).
         exclude_pattern: A glob pattern to exclude files from the search.
         case_sensitive: Whether the search should be case-sensitive. Defaults to True.
     """
@@ -69,42 +70,54 @@ def grep_search(
     if not search_path.startswith(os.path.abspath(code_dir)):
         return "Error: Access denied. Path traversal detected."
 
+    if not os.path.exists(search_path):
+        return f"Error: Path '{dir_path}' does not exist."
+
+    run_id = CURRENT_RUN_ID.get()
+    prefix = f"[{run_id}] " if run_id else ""
     print(
-        f" [Tool Execution] grep_search: pattern='{pattern}', dir_path='{dir_path}', "
+        f"{prefix}[Tool Execution] grep_search: pattern='{pattern}', dir_path='{dir_path}', "
         f"include={include_pattern}, exclude={exclude_pattern}, case_sensitive={case_sensitive}",
         flush=True,
     )
 
+    if os.path.isfile(search_path):
+        cwd_path = os.path.dirname(search_path)
+        target_path = os.path.basename(search_path)
+    else:
+        cwd_path = search_path
+        target_path = "."
+
     try:
         # Try ripgrep first
-        cmd = ["rg", "--line-number", "--no-heading"]
+        cmd = ["rg", "--line-number", "--no-heading", "--with-filename"]
         if not case_sensitive:
             cmd.append("-i")
-        if include_pattern:
+        if include_pattern and not os.path.isfile(search_path):
             cmd.extend(["-g", include_pattern])
         if exclude_pattern:
             cmd.extend(["-g", f"!{exclude_pattern}"])
-        cmd.extend([pattern, "."])
+        cmd.extend([pattern, target_path])
 
         res = subprocess.run(
             cmd,
-            cwd=search_path,
+            cwd=cwd_path,
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=5.0,
         )
         stdout_content = res.stdout if res.stdout else "No matches found."
         lines = stdout_content.splitlines()
         truncated = False
-        if len(lines) > 500:
-            stdout_content = "\n".join(lines[:500])
+        if len(lines) > 50:
+            stdout_content = "\n".join(lines[:50])
             truncated = True
 
         formatted = format_grep_output(
             stdout_content, pattern, dir_path, include_pattern
         )
         if truncated:
-            formatted += f"\n\n... [Warning: Output truncated. Found {len(lines)} matches. Please refine your query.]"
+            formatted += f"\n\n... [Warning: Output truncated. Showing first 50 matches out of {len(lines)} total. Please refine your query.]"
         return formatted
 
     except FileNotFoundError:
@@ -115,7 +128,9 @@ def grep_search(
         cmd.append(pattern)
 
         pathspecs = []
-        if include_pattern:
+        if os.path.isfile(search_path):
+            pathspecs.append(target_path)
+        elif include_pattern:
             pathspecs.append(include_pattern)
         else:
             pathspecs.append(".")
@@ -128,20 +143,23 @@ def grep_search(
 
         res = subprocess.run(
             cmd,
-            cwd=search_path,
+            cwd=cwd_path,
             capture_output=True,
             text=True,
+            timeout=5.0,
         )
         stdout_content = res.stdout if res.stdout else "No matches found."
         lines = stdout_content.splitlines()
         truncated = False
-        if len(lines) > 500:
-            stdout_content = "\n".join(lines[:500])
+        if len(lines) > 50:
+            stdout_content = "\n".join(lines[:50])
             truncated = True
 
         formatted = format_grep_output(
             stdout_content, pattern, dir_path, include_pattern
         )
         if truncated:
-            formatted += f"\n\n... [Warning: Output truncated. Found {len(lines)} matches. Please refine your query.]"
+            formatted += f"\n\n... [Warning: Output truncated. Showing first 50 matches out of {len(lines)} total. Please refine your query.]"
         return formatted
+    except Exception as e:
+        return f"Error executing grep_search: {str(e)}"
