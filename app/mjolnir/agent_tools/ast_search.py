@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
 import subprocess
-from utilities.agent_context import CURRENT_RUN_ID
 from utilities.decorators import limit_tool_output
 
 
@@ -11,6 +10,7 @@ def ast_search(
     pattern: str,
     lang: str,
     dir_path: str = ".",
+    tool_context=None,
 ) -> str:
     """Uses tree-sitter (via ast-grep / sg) to perform a structural syntax search (n-hop).
 
@@ -22,8 +22,9 @@ def ast_search(
         pattern: The ast-grep structural pattern to search for. ($$$ matches multiline/args, $A matches a variable).
         lang: The programming language (e.g., 'c', 'rust', 'python').
         dir_path: The directory to search in. Defaults to ".".
+        tool_context: ADK ToolContext injected automatically by framework.
     """
-    code_dir = os.environ.get("CODE_DIR", ".")
+    code_dir = tool_context.state.get("code_dir", ".")
     search_path = os.path.abspath(os.path.join(code_dir, dir_path))
     if not search_path.startswith(os.path.abspath(code_dir)):
         return "Error: Access denied. Path traversal detected."
@@ -31,10 +32,8 @@ def ast_search(
     if not os.path.exists(search_path):
         return f"Error: Path '{dir_path}' does not exist."
 
-    run_id = CURRENT_RUN_ID.get()
-    prefix = f"[{run_id}] " if run_id else ""
     print(
-        f"{prefix}[Tool Execution] ast_search: pattern='{pattern}', lang='{lang}', dir_path='{dir_path}'",
+        f"[Tool Execution] ast_search: pattern='{pattern}', lang='{lang}', dir_path='{dir_path}'",
         flush=True,
     )
 
@@ -58,7 +57,6 @@ def ast_search(
         if not output.strip():
             return f"No structural matches found for pattern '{pattern}' in {lang}."
 
-        # Truncate if necessary (limit_tool_output will catch it, but graceful trim is nice)
         lines = output.splitlines()
         max_lines = 100
         if len(lines) > max_lines:

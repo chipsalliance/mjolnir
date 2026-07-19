@@ -12,7 +12,7 @@ from google.genai import types
 
 from data.vulnerability import Vulnerability
 from utilities.logger import logger
-from providers.adk.utilities.usage_tracker import LIVE_TRACKER
+from providers.adk.utilities.usage_tracker import UsageTracker
 from providers.adk.phases import (
     initialize,
     audit_phase,
@@ -63,6 +63,17 @@ def run_analysis(
         )
     )
 
+    usage_tracker = UsageTracker(run_dir=run_dir)
+    initial_state = {
+        "model": model,
+        "code_dir": code_dir,
+        "threat_model_context": threat_model_context,
+        "batch_size": batch_size,
+        "ingest_path": ingest_path,
+        "run_dir": run_dir,
+        "usage_tracker": usage_tracker,
+    }
+
     workflow_input = {
         "model": model,
         "code_dir": code_dir,
@@ -78,9 +89,6 @@ def run_analysis(
         parts=[types.Part.from_text(text=json.dumps(workflow_input))],
     )
 
-    LIVE_TRACKER.__init__()
-    LIVE_TRACKER.run_dir = run_dir
-
     # Run the graph
     status = "Success"
     vulnerabilities: list[Vulnerability] = []
@@ -90,7 +98,7 @@ def run_analysis(
             session_id=session.id,
             new_message=user_msg,
         ):
-            LIVE_TRACKER.add(ev)
+            usage_tracker.add(ev)
             if ev.node_name == "review_phase" and ev.output is not None:
                 vulnerabilities = ev.output
     except (Exception, KeyboardInterrupt) as e:
@@ -98,7 +106,7 @@ def run_analysis(
         status = "Failed"
 
     # Write usage report
-    LIVE_TRACKER.write_to_disk(run_dir)
+    usage_tracker.write_to_disk(run_dir)
 
     if not vulnerabilities:
         audit_path = os.path.join(run_dir, "audit_findings.json")

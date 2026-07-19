@@ -3,7 +3,6 @@
 import os
 import re
 import subprocess
-from utilities.agent_context import CURRENT_RUN_ID
 from utilities.decorators import limit_tool_output
 
 
@@ -11,14 +10,16 @@ from utilities.decorators import limit_tool_output
 def ctags_search(
     symbol: str,
     dir_path: str = ".",
+    tool_context=None,
 ) -> str:
     """Finds the definition of a symbol across the codebase using Universal Ctags.
 
     Args:
         symbol: The exact name of the function, struct, macro, or variable to find.
         dir_path: The directory to search in. Defaults to ".".
+        tool_context: ADK ToolContext injected automatically by framework.
     """
-    code_dir = os.environ.get("CODE_DIR", ".")
+    code_dir = tool_context.state.get("code_dir", ".")
     search_path = os.path.abspath(os.path.join(code_dir, dir_path))
     if not search_path.startswith(os.path.abspath(code_dir)):
         return "Error: Access denied. Path traversal detected."
@@ -26,10 +27,8 @@ def ctags_search(
     if not os.path.exists(search_path):
         return f"Error: Path '{dir_path}' does not exist."
 
-    run_id = CURRENT_RUN_ID.get()
-    prefix = f"[{run_id}] " if run_id else ""
     print(
-        f"{prefix}[Tool Execution] ctags_search: symbol='{symbol}', dir_path='{dir_path}'",
+        f"[Tool Execution] ctags_search: symbol='{symbol}', dir_path='{dir_path}'",
         flush=True,
     )
 

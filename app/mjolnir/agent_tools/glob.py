@@ -1,9 +1,8 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
-import os
 import fnmatch
+import os
 import subprocess
-from utilities.agent_context import CURRENT_RUN_ID
 from utilities.decorators import limit_tool_output
 
 
@@ -14,6 +13,7 @@ def glob(
     case_sensitive: bool = False,
     respect_git_ignore: bool = True,
     respect_gemini_ignore: bool = True,
+    tool_context=None,
 ) -> str:
     """Finds files matching specific glob patterns across the workspace.
 
@@ -23,8 +23,9 @@ def glob(
         case_sensitive: Whether the search should be case-sensitive. Defaults to False.
         respect_git_ignore: Whether to respect .gitignore patterns. Defaults to True.
         respect_gemini_ignore: Whether to respect .geminiignore patterns. Defaults to True (currently stubbed).
+        tool_context: ADK ToolContext injected automatically by framework.
     """
-    code_dir = os.environ.get("CODE_DIR", ".")
+    code_dir = tool_context.state.get("code_dir", ".")
     search_path = os.path.abspath(os.path.join(code_dir, dir_path))
     if not search_path.startswith(os.path.abspath(code_dir)):
         return "Error: Access denied. Path traversal detected."
@@ -32,10 +33,8 @@ def glob(
     if not os.path.exists(search_path):
         return f"Error: Path '{dir_path}' does not exist."
 
-    run_id = CURRENT_RUN_ID.get()
-    prefix = f"[{run_id}] " if run_id else ""
     print(
-        f"{prefix}[Tool Execution] glob: pattern='{pattern}', dir_path='{dir_path}', "
+        f"[Tool Execution] glob: pattern='{pattern}', dir_path='{dir_path}', "
         f"case_sensitive={case_sensitive}, respect_git_ignore={respect_git_ignore}",
         flush=True,
     )
@@ -128,7 +127,6 @@ def glob(
         if not matches:
             return f"No files matching '{pattern}' found within '{dir_path}'."
 
-        # Convert to absolute paths as per Gemini CLI spec
         if os.path.isfile(search_path):
             absolute_matches = [search_path]
         else:

@@ -11,8 +11,8 @@ from utilities.logger import logger
 class UsageTracker:
     """Tracks token usage and transient errors across ADK agents, generating breakdown reports."""
 
-    def __init__(self):
-        self.run_dir = None
+    def __init__(self, run_dir: str = None):
+        self.run_dir = run_dir
         self.usage_by_agent = {}
         self.error_counts = {}
         self.total_usage = {
@@ -298,6 +298,3 @@ class UsageTracker:
             with open(usage_path, "w") as f:
                 json.dump(usage_data, f, indent=2)
             logger.write(f"Token and error usage breakdown saved to {usage_path}")
-
-
-LIVE_TRACKER = UsageTracker()

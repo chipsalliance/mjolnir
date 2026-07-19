@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
 import subprocess
-from utilities.agent_context import CURRENT_RUN_ID
 from utilities.decorators import limit_tool_output
 
 
@@ -55,6 +54,7 @@ def grep_search(
     include_pattern: str = None,
     exclude_pattern: str = None,
     case_sensitive: bool = True,
+    tool_context=None,
 ) -> str:
     """Searches for a regular expression pattern within file contents.
 
@@ -64,8 +64,9 @@ def grep_search(
         include_pattern: A glob pattern to filter which files are searched (when dir_path is a directory).
         exclude_pattern: A glob pattern to exclude files from the search.
         case_sensitive: Whether the search should be case-sensitive. Defaults to True.
+        tool_context: ADK ToolContext injected automatically by framework.
     """
-    code_dir = os.environ.get("CODE_DIR", ".")
+    code_dir = tool_context.state.get("code_dir", ".")
     search_path = os.path.abspath(os.path.join(code_dir, dir_path))
     if not search_path.startswith(os.path.abspath(code_dir)):
         return "Error: Access denied. Path traversal detected."
@@ -73,10 +74,8 @@ def grep_search(
     if not os.path.exists(search_path):
         return f"Error: Path '{dir_path}' does not exist."
 
-    run_id = CURRENT_RUN_ID.get()
-    prefix = f"[{run_id}] " if run_id else ""
     print(
-        f"{prefix}[Tool Execution] grep_search: pattern='{pattern}', dir_path='{dir_path}', "
+        f"[Tool Execution] grep_search: pattern='{pattern}', dir_path='{dir_path}', "
         f"include={include_pattern}, exclude={exclude_pattern}, case_sensitive={case_sensitive}",
         flush=True,
     )

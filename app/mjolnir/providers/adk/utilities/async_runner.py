@@ -1,11 +1,9 @@
 import asyncio
 import time
 import random
-from typing import Any
+from typing import Any, Optional
 from tqdm import tqdm
 from utilities.logger import logger
-from utilities.agent_context import CURRENT_RUN_ID
-from providers.adk.utilities.usage_tracker import LIVE_TRACKER
 
 # ----------------- AIMD CONCURRENCY CONTROLLER -----------------
 # Additive Increase / Multiplicative Decrease (TCP Congestion Control)
@@ -119,26 +117,22 @@ async def run_agent_with_backoff(
         await _acquire_concurrency_slot()
 
         try:
-            token = CURRENT_RUN_ID.set(run_id)
-            try:
-                res = await ctx.run_node(
-                    agent,
-                    node_input=node_input,
-                    run_id=run_id,
-                    use_sub_branch=True,
-                    override_isolation_scope=run_id,
-                )
-                # Successful execution Additively Increases concurrency limit
-                await _release_concurrency_slot(is_quota_hit=False)
-                return (
-                    extract_agent_output(res, expected_schema)
-                    if expected_schema
-                    else res
-                )
-            finally:
-                CURRENT_RUN_ID.reset(token)
+            res = await ctx.run_node(
+                agent,
+                node_input=node_input,
+                run_id=run_id,
+                use_sub_branch=True,
+                override_isolation_scope=run_id,
+            )
+            # Successful execution Additively Increases concurrency limit
+            await _release_concurrency_slot(is_quota_hit=False)
+            return (
+                extract_agent_output(res, expected_schema) if expected_schema else res
+            )
         except Exception as e:
-            LIVE_TRACKER.track_error(e, getattr(agent, "name", "unknown_agent"))
+            tracker = ctx.state.get("usage_tracker")
+            if tracker:
+                tracker.track_error(e, agent.name)
 
             # Natively traverse to the root base exception
             root_e = e
@@ -218,6 +212,7 @@ async def run_batch_with_concurrency(
     concurrency_limit: int,
     desc: str,
     unit: str,
+    usage_tracker: Optional[Any] = None,
 ) -> tuple[list[Any], list[Exception]]:
     """Runs an async worker function across items with bounded concurrency and progress tracking."""
     sem = asyncio.Semaphore(concurrency_limit)
@@ -237,8 +232,8 @@ async def run_batch_with_concurrency(
                 return e
             finally:
                 pbar.set_postfix(
-                    In=LIVE_TRACKER.total_usage.get("total_input_tokens", 0),
-                    Out=LIVE_TRACKER.total_usage.get("total_output_tokens", 0),
+                    In=usage_tracker.total_usage.get("total_input_tokens", 0),
+                    Out=usage_tracker.total_usage.get("total_output_tokens", 0),
                 )
                 pbar.update(1)
 

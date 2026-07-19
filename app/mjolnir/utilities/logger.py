@@ -1,6 +1,10 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
+"""Standard logging module with ANSI color formatting for Mjolnir."""
+
+import logging
 import sys
+from typing import Optional
 
 COLORS = {
     "red": "\033[91m",
@@ -14,55 +18,71 @@ COLORS = {
 }
 
 
-class Logger:
-    _instance = None
+class ColoredFormatter(logging.Formatter):
+    """Formats log records with ANSI colors based on log level or custom color attribute."""
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(Logger, cls).__new__(cls)
-            cls._instance.log_file = None
-        return cls._instance
+    LEVEL_COLORS = {
+        logging.DEBUG: COLORS["blue"],
+        logging.INFO: COLORS["reset"],
+        logging.WARNING: COLORS["orange"],
+        logging.ERROR: COLORS["red"],
+        logging.CRITICAL: COLORS["bold"] + COLORS["red"],
+    }
 
-    def init(self, log_path):
-        self.log_file = open(log_path, "a")
-
-    def write(self, msg, stdout=True, indent=0, color=None):
-        if self.log_file:
-            self.log_file.write(msg + "\n")
-            self.log_file.flush()
-
-        if stdout:
-            if color and color in COLORS:
-                msg_stdout = f"{COLORS[color]}{msg}{COLORS['reset']}"
-            else:
-                msg_stdout = msg
-
-            prefix_indent = "\t" * indent
-            lines = msg_stdout.split("\n")
-            stdout_msg = "\n".join(prefix_indent + line for line in lines)
-            sys.stdout.write(stdout_msg + "\n")
-            sys.stdout.flush()
-
-    def success(self, msg, stdout=True, indent=1):
-        """Helper to write success logs (green, default indent=1)."""
-        self.write(msg, stdout=stdout, indent=indent, color="green")
-
-    def error(self, msg, stdout=True, indent=1):
-        """Helper to write error logs (red, default indent=1)."""
-        self.write(msg, stdout=stdout, indent=indent, color="red")
-
-    def warning(self, msg, stdout=True, indent=1):
-        """Helper to write warning logs (orange, default indent=1)."""
-        self.write(msg, stdout=stdout, indent=indent, color="orange")
-
-    def info(self, msg, stdout=True, indent=1):
-        """Helper to write info logs (blue, default indent=1)."""
-        self.write(msg, stdout=stdout, indent=indent, color="blue")
-
-    def header(self, msg, stdout=True):
-        """Helper to write header/welcome logs (gold bold, indent=0)."""
-        self.write(msg, stdout=stdout, indent=0, color="gold")
+    def format(self, record: logging.LogRecord) -> str:
+        color = getattr(
+            record, "color", self.LEVEL_COLORS.get(record.levelno, COLORS["reset"])
+        )
+        prefix = COLORS.get(color, color) if color else ""
+        suffix = COLORS["reset"] if color else ""
+        msg = super().format(record)
+        return f"{prefix}{msg}{suffix}"
 
 
-# Single shared instance
-logger = Logger()
+class MjolnirLogger(logging.Logger):
+    """Standard logging.Logger with convenience formatting methods."""
+
+    def write(
+        self,
+        msg: str,
+        stdout: bool = True,
+        indent: int = 0,
+        color: Optional[str] = None,
+    ):
+        prefix_indent = "\t" * indent
+        indented_msg = "\n".join(prefix_indent + line for line in msg.split("\n"))
+        self.info(indented_msg, extra={"color": color})
+
+    def header(self, msg: str):
+        self.info(msg, extra={"color": "gold"})
+
+    def success(self, msg: str, indent: int = 1):
+        prefix_indent = "\t" * indent
+        indented_msg = "\n".join(prefix_indent + line for line in msg.split("\n"))
+        self.info(indented_msg, extra={"color": "green"})
+
+
+def setup_logger(log_path: Optional[str] = None) -> MjolnirLogger:
+    """Configures and returns the application logger."""
+    logging.setLoggerClass(MjolnirLogger)
+    logger_instance = logging.getLogger("mjolnir")
+    logger_instance.setLevel(logging.INFO)
+    logger_instance.handlers.clear()
+
+    # Console Handler with ANSI colors
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(ColoredFormatter("%(message)s"))
+    logger_instance.addHandler(console_handler)
+
+    # File Handler if log_path is provided
+    if log_path:
+        file_handler = logging.FileHandler(log_path, mode="a")
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+        )
+        logger_instance.addHandler(file_handler)
+
+    return logger_instance
+
+
+logger: MjolnirLogger = setup_logger()

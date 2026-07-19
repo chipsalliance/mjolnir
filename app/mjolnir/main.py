@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import datetime
+from config import AppConfig
 import providers.adk.main as adk
 import providers.genai.main as genai
 import providers.mock.main as mock
@@ -15,7 +16,7 @@ from utilities.discovery import discover_source_files
 from utilities.threat_model import load_threat_model
 from utilities.metadata import write_metadata
 from utilities.dashboard import generate_dashboard
-from utilities.logger import logger
+from utilities.logger import logger, setup_logger
 from data.status import Status
 
 
@@ -99,7 +100,10 @@ def _run_orchestrator():
     workspace_dir = os.path.abspath(os.path.expanduser(raw_workspace))
 
     code_dir = os.path.join(workspace_dir, repo_name)
-    os.environ["CODE_DIR"] = code_dir
+    app_config = AppConfig.from_env(
+        code_dir=code_dir,
+        workspace_dir=workspace_dir,
+    )
 
     # Load threat model
 
@@ -121,7 +125,7 @@ def _run_orchestrator():
 
     # Initialize Logging
 
-    logger.init(log_path)
+    setup_logger(log_path)
 
     logger.header("Welcome to Mjolnir!")
 
