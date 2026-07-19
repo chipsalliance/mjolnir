@@ -14,12 +14,26 @@ from providers.adk.utilities.async_runner import (
 from providers.adk.agents.auditor import get_auditor_agent
 
 
+def checkpoint_audit_findings(vulns: list[Vulnerability], run_dir: str | None) -> None:
+    """Serializes and checkpoints Phase 1 vulnerability findings to disk."""
+    if not run_dir:
+        return
+    audit_path = os.path.join(run_dir, "audit_findings.json")
+    try:
+        with open(audit_path, "w") as f:
+            json.dump([v.model_dump() for v in vulns], f, indent=2)
+        logger.write(
+            f"Checkpointed {len(vulns)} Phase 1 vulnerabilities to {audit_path}"
+        )
+    except Exception as e:
+        logger.error(f"Failed to checkpoint Phase 1 vulnerabilities: {e}")
+
+
 @node(rerun_on_resume=True)
 async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability]:
     """Phase 1: Dynamic File Auditing (Discovery)."""
     logger.write("Starting Phase 1: Exploration Audits...", stdout=True)
 
-    files = node_input
     model = ctx.state["model"]
     code_dir = ctx.state["code_dir"]
     threat_model = ctx.state["threat_model_context"]
@@ -59,7 +73,7 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
         return vulns
 
     results, exceptions = await run_batch_with_concurrency(
-        items=files,
+        items=node_input,
         worker_fn=audit_single_file,
         concurrency_limit=batch_size,
         desc="Scanning files",
@@ -74,16 +88,7 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
         logger.error(f"Phase 1 errors: {exceptions[0]}", exc_info=exceptions[0])
 
     flat_vulns = [vuln for file_vulns in results for vuln in file_vulns]
-    if run_dir:
-        audit_path = os.path.join(run_dir, "audit_findings.json")
-        try:
-            with open(audit_path, "w") as f:
-                json.dump([v.model_dump() for v in flat_vulns], f, indent=2)
-            logger.write(
-                f"Checkpointed {len(flat_vulns)} Phase 1 vulnerabilities to {audit_path}"
-            )
-        except Exception as e:
-            logger.error(f"Failed to checkpoint Phase 1 vulnerabilities: {e}")
+    checkpoint_audit_findings(flat_vulns, run_dir)
 
     logger.write(
         f"Phase 1 complete. Found {len(flat_vulns)} total vulnerabilities.", stdout=True

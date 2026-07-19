@@ -16,15 +16,13 @@ from agent_tools.read_file import read_file
 from agent_tools.glob import glob
 
 
+from utilities.prompt_loader import prompt_registry
+
+
 def get_ingestion_agent(model: str) -> Agent:
     """Factory to create an IngestionAgent to parse unstructured reports."""
-    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    prompt_path = os.path.join(current_dir, "prompts", "ingestion.md")
-
-    instruction = "You are an expert security report parsing agent.\n\n"
-    if os.path.exists(prompt_path):
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            instruction = f.read().strip()
+    fallback_instruction = "You are an expert security report parsing agent."
+    instruction = prompt_registry.load_prompt("ingestion", fallback=fallback_instruction)
 
     return IsolatedAgent(
         name="IngestionAgent",

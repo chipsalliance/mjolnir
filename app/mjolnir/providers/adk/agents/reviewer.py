@@ -20,17 +20,13 @@ from agent_tools.ast_search import ast_search
 from agent_tools.grep_search import grep_search
 
 
+from utilities.prompt_loader import prompt_registry
+
+
 def get_reviewer_agent(model: str, threat_model_context: str = "") -> Agent:
     """Factory to create a AdversarialReviewerAgent with appropriate prompts and tools."""
-    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    prompt_path = os.path.join(current_dir, "prompts", "reviewer.md")
-
-    instruction = (
-        "Analyze the security audit finding to determine if it is exploitable.\n\n"
-    )
-    if os.path.exists(prompt_path):
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            instruction = f.read().strip() + "\n\n"
+    fallback_instruction = "Analyze the security audit finding to determine if it is exploitable."
+    instruction = prompt_registry.load_prompt("reviewer", fallback=fallback_instruction) + "\n\n"
 
     if threat_model_context:
         instruction += threat_model_context

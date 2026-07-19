@@ -22,15 +22,14 @@ from agent_tools.glob import glob
 from agent_tools.grep_search import grep_search
 
 
+from utilities.prompt_loader import prompt_registry
+
+
 def get_auditor_agent(model: str, threat_model_context: str = "") -> Agent:
     """Factory to create an AuditorAgent with appropriate system prompts."""
     current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    prompt_path = os.path.join(current_dir, "prompts", "auditor.md")
-
-    instruction = "Analyze the codebase for vulnerabilities.\n\n"
-    if os.path.exists(prompt_path):
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            instruction = f.read().strip() + "\n\n"
+    fallback_instruction = "Analyze the codebase for vulnerabilities."
+    instruction = prompt_registry.load_prompt("auditor", fallback=fallback_instruction) + "\n\n"
 
     if threat_model_context:
         instruction += threat_model_context
