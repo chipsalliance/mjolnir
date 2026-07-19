@@ -41,6 +41,13 @@
                 <option value="sev-asc">Severity (Low to High)</option>
             </select>
         </div>
+        <div class="control-group" style="width: 200px;">
+            <label for="job-view-mode">View Mode</label>
+            <select id="job-view-mode" onchange="onJobSearch()" style="padding: 10px 15px; border: 1px solid var(--surface-border); border-radius: 8px; background: var(--input-bg); color: var(--text-color); font-size: 14px; outline: none; width: 100%; cursor: pointer;">
+                <option value="list">List View</option>
+                <option value="tree">Tree View</option>
+            </select>
+        </div>
     </div>
 
     <div class="grid" id="findings-container">

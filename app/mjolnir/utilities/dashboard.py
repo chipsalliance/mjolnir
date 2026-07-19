@@ -280,8 +280,8 @@ def render_sidebar(projects_list: list, runs_list: list) -> str:
         </div>
     </div>
     <nav class="sidebar-menu">
-        <a href="dashboard.html" class="menu-item" id="menu-overview">📊 Overview</a>
-        <a href="usage.html" class="menu-item" id="menu-usage">📈 Token Usage</a>
+        <a href="{{base_url}}dashboard.html" class="menu-item" id="menu-overview">📊 Overview</a>
+        <a href="{{base_url}}usage.html" class="menu-item" id="menu-usage">📈 Token Usage</a>
         <div class="menu-label">Projects</div>
         <div id="job-menu-list">
     """
@@ -291,7 +291,7 @@ def render_sidebar(projects_list: list, runs_list: list) -> str:
         test_class = " is-test-item" if is_test else ""
         prefix = "🧪 " if is_test else "📁 "
         html += f"""
-            <a href="project_{proj_name}.html" class="menu-item{test_class}" id="menu-project-{proj_name}">
+            <a href="{{{{base_url}}}}project/{proj_name}.html" class="menu-item{test_class}" id="menu-project-{proj_name}">
                 <span>{prefix}{proj_name}</span> <span class="menu-badge">{stat["totalVulns"]}</span>
             </a>
         """
@@ -313,7 +313,7 @@ def render_sidebar(projects_list: list, runs_list: list) -> str:
             status_badge = ' <span style="background-color: var(--critical-color); color: white; padding: 2px 4px; border-radius: 4px; font-size: 9px; margin-left: 4px;">FAILED</span>'
 
         html += f"""
-            <a href="run_{run_id}.html" class="menu-item{test_class}" id="menu-run-{run_id}" style="font-size: 13px; padding: 8px 10px; flex-direction: column; align-items: flex-start; gap: 4px;">
+            <a href="{{{{base_url}}}}run/{r["project"]}/{r["job_folder"]}/{r["run_folder"]}.html" class="menu-item{test_class}" id="menu-run-{run_id}" style="font-size: 13px; padding: 8px 10px; flex-direction: column; align-items: flex-start; gap: 4px;">
                 <div style="display: flex; justify-content: space-between; width: 100%;">
                     <span>⏱️ {r["project"]}{status_badge}</span>
                 </div>
@@ -342,7 +342,7 @@ def render_projects_summary_table(projects_list: list) -> str:
 
         html += f"""
         <tr{test_class}>
-            <td><a href="project_{proj_name}.html" class="job-link">{name_display}</a></td>
+            <td><a href="{{{{base_url}}}}project/{proj_name}.html" class="job-link">{name_display}</a></td>
             <td>{stat["totalRuns"]}</td>
             <td><strong>{stat["totalVulns"]}</strong></td>
             <td style="font-weight: 600; color: var(--critical-color)">{stat["bySeverity"].get("Critical", 0)}</td>
@@ -360,6 +360,7 @@ def compile_page(
     page_data: dict,
     active_menu_id: str,
     templates_dir: Path,
+    base_url: str = "./",
 ) -> str:
     """Compiles page shell with pageData script block and highlights sidebar menu item."""
     template_path = templates_dir / "dashboard.html.tpl"
@@ -370,6 +371,7 @@ def compile_page(
     html = html.replace("{{page_data_json}}", page_data_json)
     html = html.replace("{{sidebar}}", sidebar_html)
     html = html.replace("{{content}}", content_html)
+    html = html.replace("{{base_url}}", base_url)
 
     active_script = ""
     if active_menu_id:
@@ -524,7 +526,12 @@ def generate_dashboard(output_dir: str):
     }
 
     html = compile_page(
-        sidebar_html, global_content, global_page_data, "menu-overview", templates_dir
+        sidebar_html,
+        global_content,
+        global_page_data,
+        "menu-overview",
+        templates_dir,
+        "./",
     )
     with open(output_root / "dashboard.html", "w", encoding="utf-8") as f:
         f.write(html)
@@ -552,10 +559,12 @@ def generate_dashboard(output_dir: str):
             proj_page_data,
             f"menu-project-{proj_name}",
             templates_dir,
+            "../",
         )
-        with open(
-            output_root / f"project_{proj_name}.html", "w", encoding="utf-8"
-        ) as f:
+
+        project_dir_path = output_root / "project"
+        project_dir_path.mkdir(exist_ok=True)
+        with open(project_dir_path / f"{proj_name}.html", "w", encoding="utf-8") as f:
             f.write(html)
 
     # 3. COMPILE RUNS PAGES (run_[id].html)
@@ -609,8 +618,18 @@ def generate_dashboard(output_dir: str):
             run_page_data,
             f"menu-run-{run_id}",
             templates_dir,
+            "../../../",
         )
-        with open(output_root / f"run_{run_id}.html", "w", encoding="utf-8") as f:
+
+        run_file_path = (
+            output_root
+            / "run"
+            / r["project"]
+            / r["job_folder"]
+            / f"{r['run_folder']}.html"
+        )
+        run_file_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(run_file_path, "w", encoding="utf-8") as f:
             f.write(html)
 
     # 4. COMPILE USAGE PAGE (usage.html)
@@ -623,7 +642,12 @@ def generate_dashboard(output_dir: str):
             "runs": list(runs_data.values()),
         }
         html = compile_page(
-            sidebar_html, usage_content, usage_page_data, "menu-usage", templates_dir
+            sidebar_html,
+            usage_content,
+            usage_page_data,
+            "menu-usage",
+            templates_dir,
+            "./",
         )
         with open(output_root / "usage.html", "w", encoding="utf-8") as f:
             f.write(html)
