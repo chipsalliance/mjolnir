@@ -25,8 +25,12 @@ from utilities.prompt_loader import prompt_registry
 
 def get_reviewer_agent(model: str, threat_model_context: str = "") -> Agent:
     """Factory to create a AdversarialReviewerAgent with appropriate prompts and tools."""
-    fallback_instruction = "Analyze the security audit finding to determine if it is exploitable."
-    instruction = prompt_registry.load_prompt("reviewer", fallback=fallback_instruction) + "\n\n"
+    fallback_instruction = (
+        "Analyze the security audit finding to determine if it is exploitable."
+    )
+    instruction = (
+        prompt_registry.load_prompt("reviewer", fallback=fallback_instruction) + "\n\n"
+    )
 
     if threat_model_context:
         instruction += threat_model_context

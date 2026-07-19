@@ -13,10 +13,7 @@ class PromptRegistry:
             self.prompts_dir = Path(base_dir).resolve()
         else:
             self.prompts_dir = (
-                Path(__file__).resolve().parent.parent
-                / "providers"
-                / "adk"
-                / "prompts"
+                Path(__file__).resolve().parent.parent / "providers" / "adk" / "prompts"
             )
 
     def load_prompt(self, prompt_name: str, fallback: str = "") -> str:
