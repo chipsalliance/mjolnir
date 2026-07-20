@@ -231,10 +231,15 @@ async def run_batch_with_concurrency(
                 exceptions.append(e)
                 return e
             finally:
-                pbar.set_postfix(
-                    In=usage_tracker.total_usage.get("total_input_tokens", 0),
-                    Out=usage_tracker.total_usage.get("total_output_tokens", 0),
-                )
+                if (
+                    usage_tracker
+                    and hasattr(usage_tracker, "total_usage")
+                    and isinstance(usage_tracker.total_usage, dict)
+                ):
+                    pbar.set_postfix(
+                        In=usage_tracker.total_usage.get("total_input_tokens", 0),
+                        Out=usage_tracker.total_usage.get("total_output_tokens", 0),
+                    )
                 pbar.update(1)
 
     tasks = [wrapped_worker(item) for item in items]

@@ -79,6 +79,7 @@ async def review_phase(
         concurrency_limit=batch_size,
         desc="Reviewing findings",
         unit="finding",
+        usage_tracker=ctx.state.get("usage_tracker"),
     )
 
     if exceptions:

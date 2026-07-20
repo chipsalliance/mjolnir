@@ -78,6 +78,7 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
         concurrency_limit=batch_size,
         desc="Scanning files",
         unit="file",
+        usage_tracker=ctx.state.get("usage_tracker"),
     )
 
     if exceptions:
