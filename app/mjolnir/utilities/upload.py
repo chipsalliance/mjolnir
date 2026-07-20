@@ -6,6 +6,7 @@ import os
 import sys
 from google.cloud import storage
 from utilities.logger import logger
+from utilities import dashboard
 
 
 def _upload_to_gcs(bucket_name: str, run_dir: str, destination_prefix: str):
@@ -51,8 +52,6 @@ def upload_run_to_gcs(run_dir: str, repo_name: str, job_name: str, run_id_dir: s
 
 def upload_dashboard_to_gcs():
     """Downloads GCS run reports in memory, compiles the dashboard, and uploads it back to GCS."""
-    from utilities import dashboard
-
     gcs_bucket = os.environ.get("CLOUD_STORAGE_BUCKET")
 
     if not gcs_bucket:

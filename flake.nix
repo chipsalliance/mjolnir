@@ -176,10 +176,13 @@
               name = "test-all";
               description = "All tests";
               jobs = [
-                discovered.gcs-test
-                discovered.gemini-gcs-test
-                discovered.gemini-test
-                discovered.smoke-test
+                discovered.mock-smoke-test
+                discovered.mock-gcs-test
+                discovered.genai-gemini-test
+                discovered.genai-gemini-gcs-test
+                discovered.adk-gemini-test
+                discovered.adk-gemini-gcs-test
+                discovered.adk-gemini-ingest-test
               ];
             };
 

@@ -11,8 +11,8 @@ def limit_tool_output(max_chars=40000):
         def wrapper(*args, **kwargs):
             result = func(*args, **kwargs)
             if isinstance(result, str) and len(result) > max_chars:
-                truncated_info = f"\n\n... [Warning: Output truncated to {max_chars} chars to save tokens. Please refine your query if you need more data.]"
-                return result[:max_chars] + truncated_info
+                truncated_info = f"\n\n... [Observation truncated at {max_chars} characters (~{max_chars // 4} tokens). To inspect remaining contents, specify narrower query terms or line ranges (start_line/end_line).]"
+                result = result[:max_chars] + truncated_info
             return result
 
         return wrapper

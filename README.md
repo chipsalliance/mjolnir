@@ -178,7 +178,7 @@ To verify end-to-end LLM scanning combined with GCS upload:
 
 ```bash
 export MJOLNIR_GCS_BUCKET="your-bucket"
-nix run .#gemini-gcs-test
+nix run .#genai-gemini-gcs-test
 ```
 
 ### Running All Tests
