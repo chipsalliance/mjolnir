@@ -3,6 +3,7 @@
 """Runner abstraction for Glob file search."""
 
 import fnmatch
+from typing import Callable
 from pathlib import Path
 from utilities.git import GitOperation
 
@@ -22,6 +23,29 @@ class GlobRunner:
         self.case_sensitive = case_sensitive
         self.respect_git_ignore = respect_git_ignore
 
+    def filter_files(
+        self,
+        candidate_files: list[str],
+        predicate: Callable[[str], bool],
+    ) -> list[str]:
+        """Filters candidate files using a closure predicate."""
+        matched_files: list[str] = []
+        for f in candidate_files:
+            candidates = (
+                [
+                    f,
+                    str(self.search_path.relative_to(self.code_dir)),
+                    str(self.search_path),
+                ]
+                if self.search_path.is_file()
+                else [f]
+            )
+            for cand in candidates:
+                if predicate(cand):
+                    matched_files.append(f)
+                    break
+        return matched_files
+
     def search(self, pattern: str, dir_path: str = ".") -> str:
         """Finds files matching pattern within search_path."""
         git_op = GitOperation(
@@ -35,21 +59,7 @@ class GlobRunner:
             else (lambda cand: fnmatch.fnmatchcase(cand.lower(), pattern.lower()))
         )
 
-        matched_files: list[str] = []
-        for f in candidate_files:
-            candidates = (
-                [
-                    f,
-                    str(self.search_path.relative_to(self.code_dir)),
-                    str(self.search_path),
-                ]
-                if self.search_path.is_file()
-                else [f]
-            )
-            for cand in candidates:
-                if glob_predicate(cand):
-                    matched_files.append(f)
-                    break
+        matched_files = self.filter_files(candidate_files, glob_predicate)
 
         if not matched_files:
             return f"No files matching '{pattern}' found within '{dir_path}'."
