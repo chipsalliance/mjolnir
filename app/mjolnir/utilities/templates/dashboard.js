@@ -97,12 +97,43 @@ function initPage() {
         drawSankeyChart(rows, 'overview-sankey-chart');
     } else if (pageData.type === 'project') {
         populateProjectFilters();
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const pMap = {
+            'search': 'project-search-input',
+            'severity': 'project-severity-filter',
+            'model': 'project-model-filter',
+            'run': 'project-run-filter',
+            'sort': 'project-sort-order',
+            'view': 'project-view-mode'
+        };
+        Object.entries(pMap).forEach(([param, id]) => {
+            const el = document.getElementById(id);
+            const val = urlParams.get(param);
+            if (el && val) el.value = val;
+        });
+
         activeFindings = pageData.findings;
         applyProjectFilters();
     } else if (pageData.type === 'run') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const rMap = {
+            'search': 'search-input',
+            'severity': 'filter-severity',
+            'sort': 'job-sort-order',
+            'view': 'job-view-mode'
+        };
+        Object.entries(rMap).forEach(([param, id]) => {
+            const el = document.getElementById(id);
+            const val = urlParams.get(param);
+            if (el && val) el.value = val;
+        });
+        
         drawSankeyChart(pageData.sankeyRows, 'job-sankey-chart');
         activeFindings = pageData.findings;
         applyFilters();
+    } else if (pageData.type === 'usage') {
+        drawUsageChart(pageData.runs);
     }
 }
 
@@ -110,11 +141,12 @@ function initPage() {
 function getSeverityRank(sev) {
     if (!sev) return 0;
     const s = sev.toLowerCase().trim();
-    if (s.includes('critical')) return 4;
-    if (s.includes('high')) return 3;
-    if (s.includes('medium')) return 2;
-    if (s.includes('low')) return 1;
-    return 0;
+    if (s.includes('critical')) return 5;
+    if (s.includes('high')) return 4;
+    if (s.includes('medium')) return 3;
+    if (s.includes('low')) return 2;
+    if (s.includes('info')) return 1;
+    return 0; // Unknown
 }
 
 // Markdown helpers
@@ -172,7 +204,7 @@ function renderFindings(findings, containerId) {
             <div class="finding-header">
                 <span class="${badgeClass}">${finding.severity}</span>
                 <span class="finding-id" style="font-size:11px; font-family: monospace; color:var(--text-muted); margin-left: 8px;">ID: ${finding.id}</span>
-                <span class="copy-link-btn" onclick="copyCardLink('${card.id}')" title="Copy link to this finding">🔗 Link</span>
+                <span class="copy-link-btn" data-id="${card.id}" title="Copy link to this finding">🔗 Link</span>
             </div>
         `;
 
@@ -213,6 +245,152 @@ function renderFindings(findings, containerId) {
     });
 
     // After appending all cards, highlight code blocks
+    if (typeof hljs !== 'undefined') {
+        container.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+        });
+    }
+}
+
+// Tree view renderer
+function renderFindingsTree(findings, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    
+    if (findings.length === 0) {
+        container.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted); background: var(--surface-color); border: 1px dashed var(--surface-border); border-radius: 8px;">
+                🔍 No findings match search or filters.
+            </div>
+        `;
+        return;
+    }
+
+    const tree = {};
+    findings.forEach(finding => {
+        const fp = finding.file || 'Unknown';
+        const parts = fp.split('/');
+        let current = tree;
+        const rank = getSeverityRank(finding.severity);
+        for (let i = 0; i < parts.length - 1; i++) {
+            const p = parts[i];
+            if (!current[p]) current[p] = { _isDir: true, _children: {}, _count: 0, _findings: [], _maxRank: 0 };
+            current[p]._count++;
+            if (rank > current[p]._maxRank) current[p]._maxRank = rank;
+            current = current[p]._children;
+        }
+        const fileName = parts[parts.length - 1];
+        if (!current[fileName]) current[fileName] = { _isDir: false, _findings: [], _maxRank: 0 };
+        current[fileName]._findings.push(finding);
+        if (rank > current[fileName]._maxRank) current[fileName]._maxRank = rank;
+    });
+
+    const wrapper = document.createElement('div');
+    wrapper.style.gridColumn = '1/-1';
+    wrapper.style.display = 'flex';
+    wrapper.style.flexDirection = 'column';
+    wrapper.style.gap = '8px';
+    
+    function buildTreeHtml(node, path) {
+        let html = '';
+        const keys = Object.keys(node).filter(k => !k.startsWith('_')).sort();
+        
+        const getColorForRank = (rank) => {
+            if (rank === 5) return 'var(--critical-color)';
+            if (rank === 4) return 'var(--high-color)';
+            if (rank === 3) return 'var(--medium-color)';
+            if (rank === 2) return 'var(--low-color)';
+            if (rank === 1) return 'var(--info-color)';
+            return 'inherit';
+        };
+
+        const folderSVG = (color) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="${color}" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align: text-bottom;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+        const fileSVG = (color) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="${color}" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align: text-bottom;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`;
+
+        keys.forEach(k => {
+            const child = node[k];
+            const iconColor = getColorForRank(child._maxRank);
+            if (child._isDir) {
+                html += `
+                    <div class="tree-node" style="margin-left: 10px; border-left: 1px solid var(--surface-border); padding-left: 15px; margin-top: 4px;">
+                        <div class="tree-node-header" style="cursor: pointer; padding: 6px; font-weight: bold; color: var(--text-bright); border-radius: 4px; transition: background 0.2s;">
+                            ${folderSVG(iconColor)} ${k} <span style="font-weight: normal; font-size:12px; color:var(--text-muted); margin-left: 8px;">${child._count} findings</span>
+                        </div>
+                        <div class="tree-node-children" style="display: block;">
+                            ${buildTreeHtml(child._children, path + k + '/')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="tree-node" style="margin-left: 10px; border-left: 1px solid var(--surface-border); padding-left: 15px; margin-top: 4px;">
+                        <div class="tree-node-header" style="cursor: pointer; padding: 6px; font-weight: 600; color: var(--text-color); border-radius: 4px; transition: background 0.2s;">
+                            ${fileSVG(iconColor)} ${k} <span style="font-weight: normal; font-size:12px; color:var(--text-muted); margin-left: 8px;">${child._findings.length} findings</span>
+                        </div>
+                        <div class="tree-file-findings" style="display: none; flex-direction: column; gap: 15px; margin-top: 10px; margin-bottom: 10px; padding-left: 10px;">
+                `;
+                
+                child._findings.forEach(finding => {
+                    let badgeClass = `badge badge-${finding.severity.toLowerCase()}`;
+                    let statusClass = 'status-badge';
+                    if (finding.status) {
+                         statusClass += ` status-${finding.status.toLowerCase()}`;
+                    }
+                    let statusHtml = finding.status ? `<span class="${statusClass}">${finding.status}</span>` : '';
+                    
+                    let headerHtml = `
+                        <div class="finding-header">
+                            <span class="${badgeClass}">${finding.severity}</span>
+                            <span class="finding-id" style="font-size:11px; font-family: monospace; color:var(--text-muted); margin-left: 8px;">ID: ${finding.id}</span>
+                            <span class="copy-link-btn" data-id="${finding.id}" title="Copy link to this finding">🔗 Link</span>
+                        </div>
+                    `;
+
+                    html += `
+                        <div class="finding-card ${finding.severity.toLowerCase()}" id="${finding.id}">
+                            ${headerHtml}
+                            ${statusHtml}
+                            <div class="finding-title" style="margin-top:8px;">${finding.title}</div>
+                            <div class="finding-file">Location: <span style="font-weight:600">${finding.location}</span></div>
+                            
+                            <div class="card-details">
+                                <div class="details-section">
+                                    <strong>Description:</strong>
+                                    ${getMdContentHtml(finding.description)}
+                                </div>
+                                ${finding.recommendation ? `
+                                <div class="details-section">
+                                    <strong>Recommendation:</strong>
+                                    ${getMdContentHtml(finding.recommendation)}
+                                </div>` : ''}
+                                ${finding.attack_vector ? `
+                                <div class="details-section">
+                                    <strong>Attack Vector:</strong>
+                                    ${getMdContentHtml(finding.attack_vector)}
+                                </div>` : ''}
+                                ${finding.justification ? `
+                                <div class="details-section">
+                                    <strong>Justification:</strong>
+                                    ${getMdContentHtml(finding.justification)}
+                                </div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        return html;
+    }
+    
+    wrapper.innerHTML = buildTreeHtml(tree, '');
+    container.appendChild(wrapper);
+
     if (typeof hljs !== 'undefined') {
         container.querySelectorAll('pre code').forEach((block) => {
             hljs.highlightElement(block);
@@ -459,14 +637,25 @@ function applyProjectFilters() {
         return sortOrder === 'sev-desc' ? rankB - rankA : rankA - rankB;
     });
 
-    const totalMatching = filtered.length;
-    const paginated = filtered.slice(0, projectFindingsLimit);
+    const viewModeEl = document.getElementById('project-view-mode');
+    const viewMode = viewModeEl ? viewModeEl.value : 'list';
 
-    renderFindings(paginated, 'project-findings-container');
-
-    const loadMoreContainer = document.getElementById('project-load-more-container');
-    if (loadMoreContainer) {
-        loadMoreContainer.style.display = totalMatching > projectFindingsLimit ? 'block' : 'none';
+    if (viewMode === 'tree') {
+        renderFindingsTree(filtered, 'project-findings-container');
+        const loadMoreContainer = document.getElementById('project-load-more-container');
+        if (loadMoreContainer) {
+            loadMoreContainer.style.display = 'none';
+        }
+    } else {
+        const totalMatching = filtered.length;
+        const paginated = filtered.slice(0, projectFindingsLimit);
+    
+        renderFindings(paginated, 'project-findings-container');
+    
+        const loadMoreContainer = document.getElementById('project-load-more-container');
+        if (loadMoreContainer) {
+            loadMoreContainer.style.display = totalMatching > projectFindingsLimit ? 'block' : 'none';
+        }
     }
 
     // Update Sankey
@@ -485,6 +674,25 @@ function applyProjectFilters() {
 
 function onProjectSearch() {
     projectFindingsLimit = 20;
+    
+    const params = new URLSearchParams();
+    const searchVal = document.getElementById('project-search-input')?.value;
+    const sevFilter = document.getElementById('project-severity-filter')?.value;
+    const modelFilter = document.getElementById('project-model-filter')?.value;
+    const runFilter = document.getElementById('project-run-filter')?.value;
+    const sortOrder = document.getElementById('project-sort-order')?.value;
+    const viewMode = document.getElementById('project-view-mode')?.value;
+
+    if (searchVal) params.set('search', searchVal);
+    if (sevFilter && sevFilter !== 'all') params.set('severity', sevFilter);
+    if (modelFilter && modelFilter !== 'all') params.set('model', modelFilter);
+    if (runFilter && runFilter !== 'all') params.set('run', runFilter);
+    if (sortOrder && sortOrder !== 'sev-desc') params.set('sort', sortOrder);
+    if (viewMode && viewMode !== 'list') params.set('view', viewMode);
+
+    const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + params.toString() + window.location.hash;
+    window.history.replaceState({path:newurl}, '', newurl);
+    
     applyProjectFilters();
 }
 
@@ -520,19 +728,45 @@ function applyFilters() {
         return sortOrder === 'sev-desc' ? rankB - rankA : rankA - rankB;
     });
 
-    const totalMatching = filtered.length;
-    const paginated = filtered.slice(0, jobFindingsLimit);
+    const viewModeEl = document.getElementById('job-view-mode');
+    const viewMode = viewModeEl ? viewModeEl.value : 'list';
 
-    renderFindings(paginated, 'findings-container');
-
-    const loadMoreContainer = document.getElementById('job-load-more-container');
-    if (loadMoreContainer) {
-        loadMoreContainer.style.display = totalMatching > jobFindingsLimit ? 'block' : 'none';
+    if (viewMode === 'tree') {
+        renderFindingsTree(filtered, 'findings-container');
+        const loadMoreContainer = document.getElementById('job-load-more-container');
+        if (loadMoreContainer) {
+            loadMoreContainer.style.display = 'none';
+        }
+    } else {
+        const totalMatching = filtered.length;
+        const paginated = filtered.slice(0, jobFindingsLimit);
+    
+        renderFindings(paginated, 'findings-container');
+    
+        const loadMoreContainer = document.getElementById('job-load-more-container');
+        if (loadMoreContainer) {
+            loadMoreContainer.style.display = totalMatching > jobFindingsLimit ? 'block' : 'none';
+        }
     }
 }
 
 function onJobSearch() {
     jobFindingsLimit = 20;
+    
+    const params = new URLSearchParams();
+    const searchVal = document.getElementById('search-input')?.value;
+    const sevFilter = document.getElementById('filter-severity')?.value;
+    const sortOrder = document.getElementById('job-sort-order')?.value;
+    const viewMode = document.getElementById('job-view-mode')?.value;
+    
+    if (searchVal) params.set('search', searchVal);
+    if (sevFilter && sevFilter !== 'all') params.set('severity', sevFilter);
+    if (sortOrder && sortOrder !== 'sev-desc') params.set('sort', sortOrder);
+    if (viewMode && viewMode !== 'list') params.set('view', viewMode);
+
+    const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + params.toString() + window.location.hash;
+    window.history.replaceState({path:newurl}, '', newurl);
+
     applyFilters();
 }
 
@@ -572,10 +806,25 @@ function drawSankeyChart(rows, containerId) {
 
     // Extract unique nodes in order of appearance
     const uniqueNodes = [];
+    const nodesPerPrefix = {};
+    let maxNodesInColumn = 1;
+
     rows.forEach(row => {
         if (!uniqueNodes.includes(row[0])) uniqueNodes.push(row[0]);
         if (!uniqueNodes.includes(row[1])) uniqueNodes.push(row[1]);
     });
+
+    uniqueNodes.forEach(node => {
+        const parts = node.split(' - ');
+        const prefix = parts.length > 1 ? parts.slice(0, -1).join(' - ') : 'default';
+        nodesPerPrefix[prefix] = (nodesPerPrefix[prefix] || 0) + 1;
+        if (nodesPerPrefix[prefix] > maxNodesInColumn) {
+            maxNodesInColumn = nodesPerPrefix[prefix];
+        }
+    });
+
+    const calculatedHeight = Math.max(350, (maxNodesInColumn * 45) + 50);
+    container.style.height = calculatedHeight + 'px';
 
     // Map severity names to matching colors
     const nodeColors = uniqueNodes.map(nodeName => {
@@ -592,11 +841,12 @@ function drawSankeyChart(rows, containerId) {
     const labelColor = isDark ? '#8b949e' : '#3c4043';
 
     const options = {
+        height: calculatedHeight,
         sankey: {
             iterations: 0,
             node: {
                 colors: nodeColors,
-                nodePadding: 24,
+                nodePadding: 16,
                 width: 18,
                 label: { 
                     fontName: 'Segoe UI', 
@@ -615,7 +865,190 @@ function drawSankeyChart(rows, containerId) {
     chart.draw(data, options);
 }
 
+// Usage Chart logic
+window.onUsageIntervalChange = function() {
+    if (typeof pageData !== 'undefined' && pageData && pageData.runs) {
+        drawUsageChart(pageData.runs);
+    }
+};
+
+function drawUsageChart(runs) {
+    const container = document.getElementById('usage-chart-container');
+    const breakdownContainer = document.getElementById('usage-breakdown-container');
+    if (!container) return;
+
+    if (typeof google === 'undefined' || !google.visualization || !google.visualization.ColumnChart) {
+        setTimeout(() => drawUsageChart(runs), 100);
+        return;
+    }
+
+    if (!runs || runs.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted); text-align:center;">No run data available.</div>';
+        if (breakdownContainer) breakdownContainer.innerHTML = '';
+        return;
+    }
+
+    const intervalSelect = document.getElementById('usage-interval-select');
+    const interval = intervalSelect ? intervalSelect.value : 'day';
+
+    // Aggregate tokens
+    const usageData = {};
+    const modelBreakdown = {};
+    
+    runs.forEach(r => {
+        if (!r.timestamp || !r.model || !r.usage || !r.usage.total) return;
+        
+        let timeKey = '';
+        if (interval === 'hour') {
+            timeKey = r.timestamp.substring(0, 13).replace('T', ' ') + ':00';
+        } else if (interval === 'week') {
+            const d = new Date(r.timestamp.replace(' ', 'T'));
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(d.setDate(diff));
+            const y = monday.getFullYear();
+            const m = String(monday.getMonth() + 1).padStart(2, '0');
+            const dt = String(monday.getDate()).padStart(2, '0');
+            timeKey = `Week ${y}-${m}-${dt}`;
+        } else {
+            timeKey = r.timestamp.substring(0, 10);
+        }
+        
+        const model = r.model;
+        const key = `${timeKey} | ${model}`;
+        
+        const inTokens = r.usage.total.total_input_tokens || 0;
+        const outTokens = r.usage.total.total_output_tokens || 0;
+
+        if (!usageData[key]) {
+            usageData[key] = { timeKey, model, input: 0, output: 0 };
+        }
+        
+        usageData[key].input += inTokens;
+        usageData[key].output += outTokens;
+
+        if (!modelBreakdown[model]) {
+            modelBreakdown[model] = { input: 0, output: 0, total: 0 };
+        }
+        modelBreakdown[model].input += inTokens;
+        modelBreakdown[model].output += outTokens;
+        modelBreakdown[model].total += (inTokens + outTokens);
+    });
+
+    const keys = Object.keys(usageData).sort();
+    if (keys.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted); text-align:center;">No token usage data available across runs.</div>';
+        if (breakdownContainer) breakdownContainer.innerHTML = '';
+        return;
+    }
+
+    const data = new google.visualization.DataTable();
+    data.addColumn('string', `${interval.charAt(0).toUpperCase() + interval.slice(1)} - Model`);
+    data.addColumn('number', 'Input Tokens');
+    data.addColumn('number', 'Output Tokens');
+
+    const rows = keys.map(k => {
+        const item = usageData[k];
+        return [k, item.input, item.output];
+    });
+    
+    data.addRows(rows);
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#8b949e' : '#3c4043';
+    const bgColor = isDark ? 'transparent' : 'transparent';
+
+    const options = {
+        isStacked: true,
+        backgroundColor: bgColor,
+        chartArea: { width: '80%', height: '70%' },
+        legend: { textStyle: { color: textColor } },
+        hAxis: { 
+            textStyle: { color: textColor, fontSize: 11 },
+            slantedText: true,
+            slantedTextAngle: 45
+        },
+        vAxis: { 
+            title: 'Tokens',
+            titleTextStyle: { color: textColor },
+            textStyle: { color: textColor },
+            gridlines: { color: isDark ? '#333' : '#e0e0e0' }
+        },
+        colors: ['#4285F4', '#34A853'] // Input=Blue, Output=Green
+    };
+
+    const chart = new google.visualization.ColumnChart(container);
+    chart.draw(data, options);
+
+    // Draw Breakdown Table
+    if (breakdownContainer) {
+        let tableHTML = `
+            <table style="width: 100%; border-collapse: collapse; text-align: left; color: var(--text-bright);">
+                <thead>
+                    <tr>
+                        <th style="padding: 12px; border-bottom: 2px solid var(--surface-border);">Model</th>
+                        <th style="padding: 12px; border-bottom: 2px solid var(--surface-border);">Input Tokens</th>
+                        <th style="padding: 12px; border-bottom: 2px solid var(--surface-border);">Output Tokens</th>
+                        <th style="padding: 12px; border-bottom: 2px solid var(--surface-border);">Total Tokens</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        const modelKeys = Object.keys(modelBreakdown).sort();
+        modelKeys.forEach(m => {
+            const stat = modelBreakdown[m];
+            tableHTML += `
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--surface-border);">${m}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--surface-border);">${stat.input.toLocaleString()}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--surface-border);">${stat.output.toLocaleString()}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--surface-border);">${stat.total.toLocaleString()}</td>
+                    </tr>
+            `;
+        });
+        tableHTML += `
+                </tbody>
+            </table>
+        `;
+        breakdownContainer.innerHTML = tableHTML;
+    }
+}
+
 // Initialize Google Charts loader
 if (typeof google !== 'undefined') {
-    google.charts.load('current', {'packages':['sankey']});
+    google.charts.load('current', {'packages':['sankey', 'corechart']});
 }
+
+// Delegated Event Handlers to avoid CSP script-src 'none' blocks on inline scripts
+document.addEventListener('click', (e) => {
+    // Copy Link Button
+    const copyBtn = e.target.closest('.copy-link-btn');
+    if (copyBtn) {
+        const id = copyBtn.getAttribute('data-id');
+        if (id) copyCardLink(id);
+        return;
+    }
+
+    // Tree View Expand/Collapse
+    const treeHeader = e.target.closest('.tree-node-header');
+    if (treeHeader) {
+        const nextElement = treeHeader.nextElementSibling;
+        if (nextElement) {
+            if (nextElement.classList.contains('tree-file-findings')) {
+                nextElement.style.display = nextElement.style.display === 'none' ? 'flex' : 'none';
+            } else {
+                nextElement.style.display = nextElement.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+    }
+});
+
+document.addEventListener('mouseover', (e) => {
+    const treeHeader = e.target.closest('.tree-node-header');
+    if (treeHeader) treeHeader.style.background = 'var(--item-hover-bg)';
+});
+
+document.addEventListener('mouseout', (e) => {
+    const treeHeader = e.target.closest('.tree-node-header');
+    if (treeHeader) treeHeader.style.background = 'transparent';
+});

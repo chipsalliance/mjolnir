@@ -23,7 +23,7 @@
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
-    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="{{base_url}}dashboard.css">
 </head>
 <body>
     <div class="app-layout">
@@ -36,6 +36,6 @@
     <script>
         const pageData = {{page_data_json}};
     </script>
-    <script src="dashboard.js" defer></script>
+    <script src="{{base_url}}dashboard.js" defer></script>
 </body>
 </html>
