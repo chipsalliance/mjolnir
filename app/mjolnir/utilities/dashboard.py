@@ -70,6 +70,7 @@ def format_scan_data(
     report_data: dict,
     metadata: dict,
     flow_records: list,
+    usage: dict = None,
 ) -> dict:
     """Formats findings and returns a structured dictionary for the template renderer."""
     findings = report_data.get("vulnerabilities") or []
@@ -83,6 +84,8 @@ def format_scan_data(
         "timestamp": metadata.get("timestamp", "unknown"),
         "model": metadata.get("model", "mock"),
         "commit": metadata.get("target_commit", "unknown"),
+        "status": metadata.get("status", "Success"),
+        "usage": usage or {},
         "findings": format_findings(
             findings,
             run_id_key=run_id_key,
@@ -277,7 +280,8 @@ def render_sidebar(projects_list: list, runs_list: list) -> str:
         </div>
     </div>
     <nav class="sidebar-menu">
-        <a href="dashboard.html" class="menu-item" id="menu-overview">📊 Overview</a>
+        <a href="{{base_url}}dashboard.html" class="menu-item" id="menu-overview">📊 Overview</a>
+        <a href="{{base_url}}usage.html" class="menu-item" id="menu-usage">📈 Token Usage</a>
         <div class="menu-label">Projects</div>
         <div id="job-menu-list">
     """
@@ -287,7 +291,7 @@ def render_sidebar(projects_list: list, runs_list: list) -> str:
         test_class = " is-test-item" if is_test else ""
         prefix = "🧪 " if is_test else "📁 "
         html += f"""
-            <a href="project_{proj_name}.html" class="menu-item{test_class}" id="menu-project-{proj_name}">
+            <a href="{{{{base_url}}}}project/{proj_name}.html" class="menu-item{test_class}" id="menu-project-{proj_name}">
                 <span>{prefix}{proj_name}</span> <span class="menu-badge">{stat["totalVulns"]}</span>
             </a>
         """
@@ -304,10 +308,19 @@ def render_sidebar(projects_list: list, runs_list: list) -> str:
         test_class = " is-test-item" if is_test else ""
         short_time = r["timestamp"][5:16]
 
+        status_badge = ""
+        if r.get("status") == "Failed":
+            status_badge = ' <span style="background-color: var(--critical-color); color: white; padding: 2px 4px; border-radius: 4px; font-size: 9px; margin-left: 4px;">FAILED</span>'
+
         html += f"""
-            <a href="run_{run_id}.html" class="menu-item{test_class}" id="menu-run-{run_id}" style="font-size: 12px; padding: 6px 10px;">
-                <span>⏱️ {r["name"]}</span> 
-                <span style="font-size: 10px; color: var(--text-muted); margin-left: auto; padding-left: 8px;">{short_time}</span>
+            <a href="{{{{base_url}}}}run/{r["project"]}/{r["job_folder"]}/{r["run_folder"]}.html" class="menu-item{test_class}" id="menu-run-{run_id}" style="font-size: 13px; padding: 8px 10px; flex-direction: column; align-items: flex-start; gap: 4px;">
+                <div style="display: flex; justify-content: space-between; width: 100%;">
+                    <span>⏱️ {r["project"]}{status_badge}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; width: 100%;">
+                    <span style="font-size: 11px; color: var(--text-muted);">{r["name"]}</span>
+                    <span style="font-size: 10px; color: var(--text-muted);">{short_time}</span>
+                </div>
             </a>
         """
 
@@ -329,7 +342,7 @@ def render_projects_summary_table(projects_list: list) -> str:
 
         html += f"""
         <tr{test_class}>
-            <td><a href="project_{proj_name}.html" class="job-link">{name_display}</a></td>
+            <td><a href="{{{{base_url}}}}project/{proj_name}.html" class="job-link">{name_display}</a></td>
             <td>{stat["totalRuns"]}</td>
             <td><strong>{stat["totalVulns"]}</strong></td>
             <td style="font-weight: 600; color: var(--critical-color)">{stat["bySeverity"].get("Critical", 0)}</td>
@@ -341,12 +354,19 @@ def render_projects_summary_table(projects_list: list) -> str:
     return html
 
 
+def compute_base_url(output_root: Path, target_file_path: Path) -> str:
+    """Computes relative base_url from target_file_path parent directory back to output_root."""
+    rel = os.path.relpath(output_root, target_file_path.parent)
+    return "./" if rel == "." else f"{rel}/"
+
+
 def compile_page(
     sidebar_html: str,
     content_html: str,
     page_data: dict,
     active_menu_id: str,
     templates_dir: Path,
+    base_url: str = "./",
 ) -> str:
     """Compiles page shell with pageData script block and highlights sidebar menu item."""
     template_path = templates_dir / "dashboard.html.tpl"
@@ -357,6 +377,7 @@ def compile_page(
     html = html.replace("{{page_data_json}}", page_data_json)
     html = html.replace("{{sidebar}}", sidebar_html)
     html = html.replace("{{content}}", content_html)
+    html = html.replace("{{base_url}}", base_url)
 
     active_script = ""
     if active_menu_id:
@@ -429,6 +450,12 @@ def generate_dashboard(output_dir: str):
                         with open(metadata_json, "r") as f:
                             metadata = json.load(f)
 
+                    usage = {}
+                    usage_json = run_dir / "usage.json"
+                    if usage_json.exists():
+                        with open(usage_json, "r") as f:
+                            usage = json.load(f)
+
                     open_findings = [
                         v for v in history_data if v.get("status") == "Open"
                     ]
@@ -442,6 +469,7 @@ def generate_dashboard(output_dir: str):
                         report_data,
                         metadata,
                         history_data,
+                        usage,
                     )
 
                     timestamp = metadata.get("timestamp")
@@ -463,6 +491,10 @@ def generate_dashboard(output_dir: str):
         return
 
     templates_dir = Path(__file__).parent / "templates"
+
+    # Move all files into web/ subfolder
+    output_root = output_root / "web"
+    output_root.mkdir(parents=True, exist_ok=True)
 
     # Write CSS & JS assets directly to output root
     with open(templates_dir / "dashboard.css", "r", encoding="utf-8") as f:
@@ -499,10 +531,17 @@ def generate_dashboard(output_dir: str):
         "sankeyRowsNoTests": sankey_no_tests,
     }
 
+    dashboard_file_path = output_root / "dashboard.html"
+    base_url = compute_base_url(output_root, dashboard_file_path)
     html = compile_page(
-        sidebar_html, global_content, global_page_data, "menu-overview", templates_dir
+        sidebar_html,
+        global_content,
+        global_page_data,
+        "menu-overview",
+        templates_dir,
+        base_url,
     )
-    with open(output_root / "dashboard.html", "w", encoding="utf-8") as f:
+    with open(dashboard_file_path, "w", encoding="utf-8") as f:
         f.write(html)
 
     # 2. COMPILE PROJECTS PAGES (project_[name].html)
@@ -522,16 +561,21 @@ def generate_dashboard(output_dir: str):
             "runs": proj_runs,
         }
 
+        project_dir_path = output_root / "project"
+        project_dir_path.mkdir(exist_ok=True)
+        project_file_path = project_dir_path / f"{proj_name}.html"
+        base_url = compute_base_url(output_root, project_file_path)
+
         html = compile_page(
             sidebar_html,
             proj_content,
             proj_page_data,
             f"menu-project-{proj_name}",
             templates_dir,
+            base_url,
         )
-        with open(
-            output_root / f"project_{proj_name}.html", "w", encoding="utf-8"
-        ) as f:
+
+        with open(project_file_path, "w", encoding="utf-8") as f:
             f.write(html)
 
     # 3. COMPILE RUNS PAGES (run_[id].html)
@@ -547,6 +591,30 @@ def generate_dashboard(output_dir: str):
         run_content = run_content.replace("{{run_folder}}", r["run_folder"])
         run_content = run_content.replace("{{timestamp}}", r["timestamp"])
 
+        total_tokens = str(r.get("usage", {}).get("total", {}).get("total_tokens", "0"))
+        run_content = run_content.replace("{{total_tokens}}", total_tokens)
+        run_content = run_content.replace(
+            "{{pipeline_mode}}", r.get("mode", "Discovery")
+        )
+
+        status_str = r.get("status", "Success")
+        status_color = (
+            "var(--critical-color)" if status_str == "Failed" else "var(--low-color)"
+        )
+        run_content = run_content.replace("{{status}}", status_str)
+        run_content = run_content.replace("{{status_color}}", status_color)
+
+        errors_grouped = r.get("usage", {}).get("errors_grouped", {})
+        if errors_grouped:
+            errors_html = '<div class="run-errors-container" style="margin-top: 15px; padding: 15px; border-radius: 8px; border: 1px solid var(--critical-color); background: rgba(217, 48, 37, 0.1);">'
+            errors_html += '<h3 style="margin-top: 0; color: var(--critical-color); margin-bottom: 10px;">Run Errors</h3><ul style="margin: 0; padding-left: 20px; color: var(--text-bright);">'
+            for err, count in errors_grouped.items():
+                errors_html += f"<li><strong>{err}</strong>: {count} errors</li>"
+            errors_html += "</ul></div>"
+        else:
+            errors_html = ""
+        run_content = run_content.replace("{{errors_block}}", errors_html)
+
         run_sankey = get_sankey_rows([r])
 
         run_page_data = {
@@ -555,14 +623,48 @@ def generate_dashboard(output_dir: str):
             "findings": r["findings"],
         }
 
+        run_file_path = (
+            output_root
+            / "run"
+            / r["project"]
+            / r["job_folder"]
+            / f"{r['run_folder']}.html"
+        )
+        run_file_path.parent.mkdir(parents=True, exist_ok=True)
+        base_url = compute_base_url(output_root, run_file_path)
+
         html = compile_page(
             sidebar_html,
             run_content,
             run_page_data,
             f"menu-run-{run_id}",
             templates_dir,
+            base_url,
         )
-        with open(output_root / f"run_{run_id}.html", "w", encoding="utf-8") as f:
+
+        with open(run_file_path, "w", encoding="utf-8") as f:
+            f.write(html)
+
+    # 4. COMPILE USAGE PAGE (usage.html)
+    usage_tpl_path = templates_dir / "view_usage.html.tpl"
+    if usage_tpl_path.exists():
+        with open(usage_tpl_path, "r", encoding="utf-8") as f:
+            usage_content = f.read()
+        usage_page_data = {
+            "type": "usage",
+            "runs": list(runs_data.values()),
+        }
+        usage_file_path = output_root / "usage.html"
+        base_url = compute_base_url(output_root, usage_file_path)
+        html = compile_page(
+            sidebar_html,
+            usage_content,
+            usage_page_data,
+            "menu-usage",
+            templates_dir,
+            base_url,
+        )
+        with open(usage_file_path, "w", encoding="utf-8") as f:
             f.write(html)
 
     logger.success(f"Dashboard compilation finished successfully.")

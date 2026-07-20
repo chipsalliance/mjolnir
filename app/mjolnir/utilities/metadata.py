@@ -12,6 +12,7 @@ def write_metadata(
     ref: str,
     code_dir: str,
     timestamp_pretty: str,
+    ingest_path: str = None,
 ):
     """Resolves HEAD commit hash and dumps run metadata.json."""
     metadata_file = os.path.join(run_dir, "metadata.json")
@@ -23,6 +24,7 @@ def write_metadata(
         "ref": ref or "HEAD",
         "target_commit": resolved_commit,
         "timestamp": timestamp_pretty,
+        "mode": "Ingestion" if ingest_path else "Discovery",
     }
     with open(metadata_file, "w") as f:
         json.dump(metadata, f, indent=2)
