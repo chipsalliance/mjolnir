@@ -74,12 +74,18 @@ def run_command(args, cwd=None, env=None):
         sys.exit(rc)
 
 
-def run_command_capture(args, cwd=None, env=None, check=True):
-    """Executes a command and returns its stdout.
+def run_command_capture(
+    args: list[str],
+    cwd: str | None = None,
+    env: dict[str, str] | None = None,
+    check: bool = False,
+    timeout: float | None = None,
+) -> subprocess.CompletedProcess:
+    """Executes a command and returns CompletedProcess object.
     Logs execution and output to the logger.
     If check=True and command fails, exits the program.
     """
-    logger.write(f"Executing: {' '.join(args)} in {cwd or '.'}")
+    logger.write(f"Executing: {' '.join(args)} in {cwd or '.'}", stdout=False)
     try:
         res = subprocess.run(
             args,
@@ -87,8 +93,8 @@ def run_command_capture(args, cwd=None, env=None, check=True):
             env=env,
             capture_output=True,
             text=True,
+            timeout=timeout,
         )
-        # Log stdout/stderr lines to logger (file only)
         if res.stdout:
             for line in res.stdout.splitlines():
                 logger.write(line, stdout=False)
@@ -97,15 +103,15 @@ def run_command_capture(args, cwd=None, env=None, check=True):
                 logger.write(line, stdout=False)
 
         if res.returncode == 0:
-            logger.success("Execution succeeded.")
+            logger.success("Execution succeeded.", indent=0)
         else:
-            logger.error(f"Execution failed with exit code: {res.returncode}.")
             if check:
+                logger.error(f"Execution failed with exit code: {res.returncode}.")
                 sys.__stderr__.write(res.stderr)
                 sys.__stderr__.flush()
                 sys.exit(res.returncode)
 
-        return res.stdout.strip()
+        return res
     except Exception as e:
         logger.error(f"Execution failed with exception: {e}.")
         if check:

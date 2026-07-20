@@ -3,6 +3,7 @@
 from executors.ctags import CtagsRunner
 from security.path_sanitizer import resolve_workspace_path
 from utilities.decorators import limit_tool_output
+from utilities.logger import logger
 
 
 @limit_tool_output(max_chars=40000)
@@ -20,9 +21,8 @@ def ctags_search(
     if not search_path.exists():
         return f"Error: Path '{dir_path}' does not exist."
 
-    print(
-        f"[Tool Execution] ctags_search: symbol='{symbol}', dir_path='{dir_path}'",
-        flush=True,
+    logger.write(
+        f"[Tool Execution] ctags_search: symbol='{symbol}', dir_path='{dir_path}'"
     )
     runner = CtagsRunner()
     return runner.search(symbol, search_path)

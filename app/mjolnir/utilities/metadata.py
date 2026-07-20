@@ -17,9 +17,10 @@ def write_metadata(
     """Resolves HEAD commit hash and dumps run metadata.json."""
     metadata_file = os.path.join(run_dir, "metadata.json")
     try:
-        resolved_commit = run_command_capture(
+        res = run_command_capture(
             ["git", "rev-parse", "HEAD"], cwd=code_dir, check=False
         )
+        resolved_commit = res.stdout.strip() if res and res.stdout else "unknown"
         if not resolved_commit:
             resolved_commit = "unknown"
     except Exception:

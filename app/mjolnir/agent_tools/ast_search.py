@@ -3,6 +3,7 @@
 from executors.ast_grep import AstGrepRunner
 from security.path_sanitizer import resolve_workspace_path
 from utilities.decorators import limit_tool_output
+from utilities.logger import logger
 
 
 @limit_tool_output(max_chars=40000)
@@ -21,9 +22,8 @@ def ast_search(
     if not search_path.exists():
         return f"Error: Path '{dir_path}' does not exist."
 
-    print(
-        f"[Tool Execution] ast_search: pattern='{pattern}', lang='{lang}', dir_path='{dir_path}'",
-        flush=True,
+    logger.write(
+        f"[Tool Execution] ast_search: pattern='{pattern}', lang='{lang}', dir_path='{dir_path}'"
     )
     runner = AstGrepRunner()
     return runner.search(pattern, lang, search_path)

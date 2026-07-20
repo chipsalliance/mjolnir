@@ -52,7 +52,7 @@ def _run_orchestrator():
         output_dir = "./output/runs"
         if args.spec:
             if not os.path.exists(args.spec):
-                print(f"Error: Spec file {args.spec} not found!", file=sys.stderr)
+                logger.error(f"Error: Spec file {args.spec} not found!")
                 sys.exit(1)
             with open(args.spec, "r") as f:
                 spec = json.load(f)
@@ -63,20 +63,19 @@ def _run_orchestrator():
         else:
             output_dir = os.path.abspath(os.path.expanduser(args.output_dir))
 
-        print(f"Compiling dashboard from existing runs in {output_dir}...")
+        logger.write(f"Compiling dashboard from existing runs in {output_dir}...")
         generate_dashboard(output_dir)
-        print("Dashboard generated successfully.")
+        logger.write("Dashboard generated successfully.")
         return
 
     if not args.spec:
-        print(
-            "Error: The --spec argument is required when not in --gen-dashboard mode.",
-            file=sys.stderr,
+        logger.error(
+            "Error: The --spec argument is required when not in --gen-dashboard mode."
         )
         sys.exit(1)
 
     if not os.path.exists(args.spec):
-        print(f"Error: Spec file {args.spec} not found!", file=sys.stderr)
+        logger.error(f"Error: Spec file {args.spec} not found!")
         sys.exit(1)
 
     with open(args.spec, "r") as f:

@@ -4,7 +4,7 @@
 
 from pathlib import Path
 import re
-import subprocess
+from utilities.command import run_command_capture
 
 
 class CtagsRunner:
@@ -14,10 +14,7 @@ class CtagsRunner:
         self.timeout = timeout
 
     def search(self, symbol: str, search_path: Path) -> str:
-        """Executes readtags or ctags on search_path.
-
-        Since Nix guarantees ctags is installed, execution fails fast if missing.
-        """
+        """Executes readtags or ctags on search_path."""
         tags_file = search_path / "tags"
 
         if tags_file.exists():
@@ -25,11 +22,9 @@ class CtagsRunner:
         else:
             cmd = ["ctags", "-x", "--_xformat=%K %f:%n %S", "-R", str(search_path)]
 
-        res = subprocess.run(
+        res = run_command_capture(
             cmd,
             cwd=str(search_path),
-            capture_output=True,
-            text=True,
             timeout=self.timeout,
         )
 
@@ -43,7 +38,7 @@ class CtagsRunner:
             filtered_lines = [l for l in lines if pattern.search(l)]
             if not filtered_lines:
                 return f"No definitions found for '{symbol}'."
-            return f"Definitions for '{symbol}':\n" + "\n".join(filtered_lines[:50])
+            return f"Definitions for '{symbol}':\n" + "\n".join(filtered_lines)
         elif output:
             return f"Definitions for '{symbol}':\n{output}"
         else:

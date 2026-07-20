@@ -3,26 +3,26 @@
 """Runner abstraction for ast-grep (sg) CLI tool."""
 
 from pathlib import Path
-import subprocess
+from utilities.command import run_command_capture
 
 
 class AstGrepRunner:
     """Encapsulates ast-grep CLI execution for structural syntax code search."""
 
-    def __init__(self, timeout: float = 15.0) -> None:
+    def __init__(self, search_path: Path | None = None, timeout: float = 15.0) -> None:
+        self.search_path = search_path
         self.timeout = timeout
 
-    def search(self, pattern: str, lang: str, search_path: Path) -> str:
-        """Executes sg CLI on search_path.
+    def search(self, pattern: str, lang: str, search_path: Path | None = None) -> str:
+        """Executes sg CLI on search_path."""
+        target_path = search_path or self.search_path
+        if target_path is None:
+            return "Error executing ast-grep (sg): search_path must be specified."
 
-        Since Nix guarantees ast-grep ('sg') is installed, execution fails fast if missing.
-        """
-        cmd = ["sg", "--pattern", pattern, "--lang", lang, str(search_path)]
-        res = subprocess.run(
+        cmd = ["sg", "--pattern", pattern, "--lang", lang, str(target_path)]
+        res = run_command_capture(
             cmd,
-            cwd=str(search_path),
-            capture_output=True,
-            text=True,
+            cwd=str(target_path),
             timeout=self.timeout,
         )
 
@@ -33,11 +33,4 @@ class AstGrepRunner:
         if not output.strip():
             return f"No structural matches found for pattern '{pattern}' in {lang}."
 
-        lines = output.splitlines()
-        max_lines = 100
-        if len(lines) > max_lines:
-            return (
-                "\n".join(lines[:max_lines])
-                + f"\n\n... [Truncated {len(lines) - max_lines} more lines]"
-            )
         return output
