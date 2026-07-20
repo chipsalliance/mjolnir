@@ -1,5 +1,6 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
+from pathlib import Path
 import subprocess
 import sys
 from google.cloud import storage
@@ -117,3 +118,29 @@ def run_command_capture(
         if check:
             sys.exit(1)
         raise e
+
+
+class CommandRunner:
+    """Encapsulates CLI execution, logging, return code checks, and error formatting."""
+
+    def __init__(
+        self,
+        args: list[str],
+        cwd: str | Path | None = None,
+        timeout: float | None = 5.0,
+        env: dict[str, str] | None = None,
+    ) -> None:
+        self.args = args
+        self.cwd = str(cwd) if cwd else None
+        self.timeout = timeout
+        self.env = env
+
+    def execute(self, tool_name: str = "") -> tuple[bool, str]:
+        """Executes CLI command and returns (success_flag, output_or_error_string)."""
+        res = run_command_capture(
+            self.args, cwd=self.cwd, env=self.env, timeout=self.timeout
+        )
+        if res.returncode != 0 and not res.stdout:
+            err_msg = res.stderr.strip() or f"Process exited with code {res.returncode}"
+            return False, f"Error executing {tool_name or self.args[0]}: {err_msg}"
+        return True, res.stdout

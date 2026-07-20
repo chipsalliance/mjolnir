@@ -3,7 +3,7 @@
 """Runner abstraction for Ripgrep (rg) CLI tool."""
 
 from pathlib import Path
-from utilities.command import run_command_capture
+from utilities.command import CommandRunner
 
 
 def format_grep_output(
@@ -86,15 +86,8 @@ class RipgrepRunner:
             cmd.extend(["-g", f"!{exclude_pattern}"])
         cmd.extend([pattern, target_path])
 
-        try:
-            res = run_command_capture(
-                cmd,
-                cwd=cwd_path,
-                timeout=self.timeout,
-            )
-            stdout_content = res.stdout if res.stdout else "No matches found."
-            return format_grep_output(
-                stdout_content, pattern, dir_path, include_pattern
-            )
-        except Exception as e:
-            return f"Error executing ripgrep: {str(e)}"
+        cmd_runner = CommandRunner(cmd, cwd=cwd_path, timeout=self.timeout)
+        _, stdout_content = cmd_runner.execute(tool_name="ripgrep")
+        return format_grep_output(
+            stdout_content or "No matches found.", pattern, dir_path, include_pattern
+        )

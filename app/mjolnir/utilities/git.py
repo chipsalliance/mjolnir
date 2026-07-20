@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
 import shutil
-from utilities.command import run_command, run_command_capture
+from utilities.command import CommandRunner, run_command
 
 
 def setup_repository(repo_url: str, code_dir: str, ref: str, workspace_dir: str):
@@ -35,6 +35,18 @@ def setup_repository(repo_url: str, code_dir: str, ref: str, workspace_dir: str)
         )
 
 
+def get_head_commit(code_dir: str) -> str:
+    """Returns the current HEAD commit hash for code_dir, or 'unknown' on error."""
+    try:
+        cmd = ["git", "rev-parse", "HEAD"]
+        success, output = CommandRunner(cmd, cwd=code_dir, timeout=5.0).execute(
+            tool_name="git rev-parse"
+        )
+        return output.strip() if success and output.strip() else "unknown"
+    except Exception:
+        return "unknown"
+
+
 class GitOperation:
     """Encapsulates Git operations such as listing tracked/untracked candidate files."""
 
@@ -48,29 +60,27 @@ class GitOperation:
             target_name = os.path.basename(self.directory)
             cwd_path = os.path.dirname(self.directory)
             if self.respect_git_ignore:
-                res = run_command_capture(
-                    [
-                        "git",
-                        "ls-files",
-                        "-c",
-                        "-o",
-                        "--exclude-standard",
-                        "--",
-                        target_name,
-                    ],
-                    cwd=cwd_path,
-                    timeout=5.0,
+                cmd = [
+                    "git",
+                    "ls-files",
+                    "-c",
+                    "-o",
+                    "--exclude-standard",
+                    "--",
+                    target_name,
+                ]
+                _, output = CommandRunner(cmd, cwd=cwd_path, timeout=5.0).execute(
+                    tool_name="git ls-files"
                 )
-                return [target_name] if res.stdout.strip() else []
+                return [target_name] if output.strip() else []
             return [target_name]
 
         if self.respect_git_ignore:
-            res = run_command_capture(
-                ["git", "ls-files", "-c", "-o", "--exclude-standard"],
-                cwd=self.directory,
-                timeout=5.0,
+            cmd = ["git", "ls-files", "-c", "-o", "--exclude-standard"]
+            _, output = CommandRunner(cmd, cwd=self.directory, timeout=5.0).execute(
+                tool_name="git ls-files"
             )
-            return res.stdout.splitlines()
+            return output.splitlines()
 
         files: list[str] = []
         for root, _, filenames in os.walk(self.directory):

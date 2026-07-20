@@ -3,7 +3,7 @@
 """Runner abstraction for ast-grep (sg) CLI tool."""
 
 from pathlib import Path
-from utilities.command import run_command_capture
+from utilities.command import CommandRunner
 
 
 class AstGrepRunner:
@@ -19,16 +19,14 @@ class AstGrepRunner:
         if target_path is None:
             return "Error executing ast-grep (sg): search_path must be specified."
 
-        cmd = ["sg", "--pattern", pattern, "--lang", lang, str(target_path)]
-        res = run_command_capture(
-            cmd,
-            cwd=str(target_path),
+        cmd_runner = CommandRunner(
+            args=["sg", "--pattern", pattern, "--lang", lang, str(target_path)],
+            cwd=target_path,
             timeout=self.timeout,
         )
-
-        output = res.stdout
-        if res.returncode != 0 and not output:
-            return f"Error executing ast-grep (sg): {res.stderr}"
+        success, output = cmd_runner.execute(tool_name="ast-grep (sg)")
+        if not success:
+            return output
 
         if not output.strip():
             return f"No structural matches found for pattern '{pattern}' in {lang}."

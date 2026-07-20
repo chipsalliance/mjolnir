@@ -4,7 +4,7 @@
 
 from pathlib import Path
 import re
-from utilities.command import run_command_capture
+from utilities.command import CommandRunner
 
 
 class CtagsRunner:
@@ -22,16 +22,11 @@ class CtagsRunner:
         else:
             cmd = ["ctags", "-x", "--_xformat=%K %f:%n %S", "-R", str(search_path)]
 
-        res = run_command_capture(
-            cmd,
-            cwd=str(search_path),
-            timeout=self.timeout,
-        )
+        cmd_runner = CommandRunner(cmd, cwd=search_path, timeout=self.timeout)
+        success, output = cmd_runner.execute(tool_name="ctags")
+        if not success and "readtags" not in cmd[0]:
+            return output
 
-        if res.returncode != 0 and "readtags" not in cmd[0]:
-            return f"Error executing ctags: {res.stderr}"
-
-        output = res.stdout
         if "readtags" not in cmd[0] and output:
             lines = output.splitlines()
             pattern = re.compile(rf"\b{re.escape(symbol)}\b")
