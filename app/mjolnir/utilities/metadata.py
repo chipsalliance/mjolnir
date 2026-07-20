@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
 import json
-from utilities.command import run_command_capture
+from utilities.git import get_head_commit
 
 
 def write_metadata(
@@ -15,14 +15,7 @@ def write_metadata(
 ):
     """Resolves HEAD commit hash and dumps run metadata.json."""
     metadata_file = os.path.join(run_dir, "metadata.json")
-    try:
-        resolved_commit = run_command_capture(
-            ["git", "rev-parse", "HEAD"], cwd=code_dir, check=False
-        )
-        if not resolved_commit:
-            resolved_commit = "unknown"
-    except Exception:
-        resolved_commit = "unknown"
+    resolved_commit = get_head_commit(code_dir)
 
     metadata = {
         "repo": repo_url,

@@ -1,5 +1,6 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
+from pathlib import Path
 import subprocess
 import sys
 from google.cloud import storage
@@ -74,12 +75,18 @@ def run_command(args, cwd=None, env=None):
         sys.exit(rc)
 
 
-def run_command_capture(args, cwd=None, env=None, check=True):
-    """Executes a command and returns its stdout.
+def run_command_capture(
+    args: list[str],
+    cwd: str | None = None,
+    env: dict[str, str] | None = None,
+    check: bool = False,
+    timeout: float | None = None,
+) -> subprocess.CompletedProcess:
+    """Executes a command and returns CompletedProcess object.
     Logs execution and output to the logger.
     If check=True and command fails, exits the program.
     """
-    logger.write(f"Executing: {' '.join(args)} in {cwd or '.'}")
+    logger.write(f"Executing: {' '.join(args)} in {cwd or '.'}", stdout=False)
     try:
         res = subprocess.run(
             args,
@@ -87,8 +94,8 @@ def run_command_capture(args, cwd=None, env=None, check=True):
             env=env,
             capture_output=True,
             text=True,
+            timeout=timeout,
         )
-        # Log stdout/stderr lines to logger (file only)
         if res.stdout:
             for line in res.stdout.splitlines():
                 logger.write(line, stdout=False)
@@ -97,17 +104,43 @@ def run_command_capture(args, cwd=None, env=None, check=True):
                 logger.write(line, stdout=False)
 
         if res.returncode == 0:
-            logger.success("Execution succeeded.")
+            logger.success("Execution succeeded.", indent=0)
         else:
-            logger.error(f"Execution failed with exit code: {res.returncode}.")
             if check:
+                logger.error(f"Execution failed with exit code: {res.returncode}.")
                 sys.__stderr__.write(res.stderr)
                 sys.__stderr__.flush()
                 sys.exit(res.returncode)
 
-        return res.stdout.strip()
+        return res
     except Exception as e:
         logger.error(f"Execution failed with exception: {e}.")
         if check:
             sys.exit(1)
         raise e
+
+
+class CommandRunner:
+    """Encapsulates CLI execution, logging, return code checks, and error formatting."""
+
+    def __init__(
+        self,
+        args: list[str],
+        cwd: str | Path | None = None,
+        timeout_sec: float | None = 5.0,
+        env: dict[str, str] | None = None,
+    ) -> None:
+        self.args = args
+        self.cwd = str(Path(cwd).resolve()) if cwd else str(Path.cwd().resolve())
+        self.timeout_sec = timeout_sec
+        self.env = env
+
+    def execute(self) -> tuple[bool, str]:
+        """Executes CLI command and returns (success_flag, output_or_error_string)."""
+        res = run_command_capture(
+            self.args, cwd=self.cwd, env=self.env, timeout=self.timeout_sec
+        )
+        if res.returncode != 0 and not res.stdout:
+            err_msg = res.stderr.strip() or f"Process exited with code {res.returncode}"
+            return False, f"Error executing {self.args[0]}: {err_msg}"
+        return True, res.stdout.strip()
