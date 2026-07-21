@@ -2,25 +2,26 @@
 # SPDX-License-Identifier: Apache-2.0
 import asyncio
 import json
-import os
+from pathlib import Path
+
 from google.adk import Context
 from google.adk.workflow import node
-from utilities.logger import logger
 from data.security_report import SecurityReport
 from data.vulnerability import Vulnerability
+from providers.adk.agents.auditor import get_auditor_agent
 from providers.adk.utilities.async_runner import (
     run_agent_with_backoff,
     run_batch_with_concurrency,
 )
-from providers.adk.agents.auditor import get_auditor_agent
+from utilities.logger import logger
 
 
-def _write_checkpoint_sync(audit_path: str, vulns_data: list[dict]) -> None:
+def _write_checkpoint_sync(audit_path: Path, vulns_data: list[dict]) -> None:
     with open(audit_path, "w") as f:
         json.dump(vulns_data, f, indent=2)
 
 
-def _read_file_contents_sync(full_file_path: str) -> str:
+def _read_file_contents_sync(full_file_path: Path) -> str:
     with open(full_file_path, "r", errors="ignore") as f:
         return f.read()
 
@@ -36,7 +37,7 @@ async def checkpoint_audit_findings(
         logger.warning("No run_dir provided, skipping checkpointing of audit findings.")
         return
     checkpoint_name = filename or f"finding_phase_{phase_id}.json"
-    audit_path = os.path.join(run_dir, checkpoint_name)
+    audit_path = Path(run_dir) / checkpoint_name
     try:
         vulns_data = [v.model_dump() for v in vulns]
         await asyncio.to_thread(_write_checkpoint_sync, audit_path, vulns_data)
@@ -61,7 +62,7 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
     auditor_agent = get_auditor_agent(model, threat_model)
 
     async def audit_single_file(f_path: str) -> list[Vulnerability]:
-        full_file_path = os.path.join(code_dir, f_path)
+        full_file_path = Path(code_dir) / f_path
         try:
             contents = await asyncio.to_thread(_read_file_contents_sync, full_file_path)
         except Exception as e:

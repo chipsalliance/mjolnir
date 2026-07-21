@@ -1,7 +1,8 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
-import os
 import json
+from pathlib import Path
+
 from utilities.git import get_head_commit
 
 
@@ -15,7 +16,7 @@ def write_metadata(
     ingest_path: str = None,
 ):
     """Resolves HEAD commit hash and dumps run metadata.json."""
-    metadata_file = os.path.join(run_dir, "metadata.json")
+    metadata_file = Path(run_dir) / "metadata.json"
     resolved_commit = get_head_commit(code_dir)
 
     metadata = {

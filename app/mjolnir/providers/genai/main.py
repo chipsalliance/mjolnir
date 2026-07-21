@@ -1,10 +1,10 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
-import os
-import sys
 import json
+import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from providers.genai.client import get_client
 from providers.genai.agents.auditor import AuditorAgent
 from providers.genai.agents.adversarial_reviewer import AdversarialReviewerAgent
@@ -30,10 +30,9 @@ def phase_1_source_file_exploration(
 
     try:
         for f_path in files:
-            full_file_path = os.path.join(code_dir, f_path)
+            full_file_path = Path(code_dir) / f_path
             try:
-                with open(full_file_path, "r", errors="ignore") as f:
-                    contents = f.read()
+                contents = full_file_path.read_text(errors="ignore")
                 futures[executor.submit(auditor.run, f_path, contents)] = f_path
             except Exception as e:
                 logger.error(f"Could not read {f_path}: {e}.")
@@ -165,10 +164,10 @@ def run_analysis(
     # Initialize Agents
     auditor = AuditorAgent(client, model, threat_model_context)
 
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    adv_prompt_path = os.path.join(current_dir, "prompts", "adversarial_reviewer.txt")
+    current_dir = Path(__file__).resolve().parent
+    adv_prompt_path = current_dir / "prompts" / "adversarial_reviewer.txt"
     adv_instruction = "Verify and filter the listed codebase vulnerability findings. Mark false positives as 'False Positive'."
-    if os.path.exists(adv_prompt_path):
+    if adv_prompt_path.exists():
         with open(adv_prompt_path, "r", encoding="utf-8") as f:
             adv_instruction = f.read().strip()
     adv_instruction = adv_instruction + threat_model_context

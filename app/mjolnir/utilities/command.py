@@ -131,7 +131,7 @@ class CommandRunner:
         env: dict[str, str] | None = None,
     ) -> None:
         self.args = args
-        self.cwd = str(Path(cwd).resolve()) if cwd else str(Path.cwd().resolve())
+        self.cwd = str(cwd) if cwd is not None else None
         self.timeout_sec = timeout_sec
         self.env = env
 

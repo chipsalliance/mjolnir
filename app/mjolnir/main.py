@@ -1,22 +1,23 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 import argparse
-import json
-import os
-import sys
 import datetime
+import json
+import sys
+from pathlib import Path
+
 from config import AppConfig
 import providers.genai.main as genai
 import providers.mock.main as mock
+from data.status import Status
 from utilities import upload
 from utilities.command import run_command
-from utilities.git import setup_repository
-from utilities.discovery import discover_source_files
-from utilities.threat_model import load_threat_model
-from utilities.metadata import write_metadata
 from utilities.dashboard import generate_dashboard
+from utilities.discovery import discover_source_files
+from utilities.git import setup_repository
 from utilities.logger import logger, setup_logger
-from data.status import Status
+from utilities.metadata import write_metadata
+from utilities.threat_model import load_threat_model
 
 
 def main():
@@ -25,7 +26,7 @@ def main():
     except SystemExit as e:
         if e.code != 0:
             logger.error("Exited with error!")
-        os._exit(e.code)
+        sys.exit(e.code)
 
 
 def _run_orchestrator():
@@ -50,7 +51,7 @@ def _run_orchestrator():
     if args.gen_dashboard:
         output_dir = "./output/runs"
         if args.spec:
-            if not os.path.exists(args.spec):
+            if not Path(args.spec).exists():
                 logger.error(f"Error: Spec file {args.spec} not found!")
                 sys.exit(1)
             with open(args.spec, "r") as f:
@@ -58,9 +59,9 @@ def _run_orchestrator():
             config = spec.get("config", {})
             raw_output = config.get("outputDir")
             if raw_output:
-                output_dir = os.path.abspath(os.path.expanduser(raw_output))
+                output_dir = str(Path(raw_output).expanduser().resolve())
         else:
-            output_dir = os.path.abspath(os.path.expanduser(args.output_dir))
+            output_dir = str(Path(args.output_dir).expanduser().resolve())
 
         logger.write(f"Compiling dashboard from existing runs in {output_dir}...")
         generate_dashboard(output_dir)
@@ -73,7 +74,7 @@ def _run_orchestrator():
         )
         sys.exit(1)
 
-    if not os.path.exists(args.spec):
+    if not Path(args.spec).exists():
         logger.error(f"Error: Spec file {args.spec} not found!")
         sys.exit(1)
 
@@ -95,9 +96,9 @@ def _run_orchestrator():
     # Create workspace directories
 
     raw_workspace = config.get("workspaceDir")
-    workspace_dir = os.path.abspath(os.path.expanduser(raw_workspace))
+    workspace_dir = str(Path(raw_workspace).expanduser().resolve())
 
-    code_dir = os.path.join(workspace_dir, repo_name)
+    code_dir = str(Path(workspace_dir) / repo_name)
     app_config = AppConfig.from_env(
         code_dir=code_dir,
         workspace_dir=workspace_dir,
@@ -115,11 +116,11 @@ def _run_orchestrator():
 
     run_id = timestamp_dir
     raw_output = config.get("outputDir")
-    output_dir = os.path.abspath(os.path.expanduser(raw_output))
-    run_dir = os.path.join(output_dir, f"run_{run_id}")
-    os.makedirs(run_dir, exist_ok=False)
+    output_dir = str(Path(raw_output).expanduser().resolve())
+    run_dir = str(Path(output_dir) / f"run_{run_id}")
+    Path(run_dir).mkdir(parents=True, exist_ok=False)
 
-    log_path = os.path.join(run_dir, "job.log")
+    log_path = str(Path(run_dir) / "job.log")
 
     # Initialize Logging
 
@@ -214,8 +215,8 @@ def _run_orchestrator():
         sys.exit(1)
 
     # Update metadata with status
-    metadata_path = os.path.join(run_dir, "metadata.json")
-    if os.path.exists(metadata_path):
+    metadata_path = Path(run_dir) / "metadata.json"
+    if metadata_path.exists():
         with open(metadata_path, "r") as f:
             metadata = json.load(f)
         metadata["status"] = status
@@ -225,7 +226,7 @@ def _run_orchestrator():
 
     # Write vulnerabilities (all) to disk
 
-    vulnerabilities_path = os.path.join(run_dir, "vulnerabilities.json")
+    vulnerabilities_path = Path(run_dir) / "vulnerabilities.json"
     with open(vulnerabilities_path, "w") as f:
         json.dump([v.model_dump() for v in vulnerabilities], f, indent=2)
 
@@ -234,7 +235,7 @@ def _run_orchestrator():
     vulnerabilities_minimal = [v for v in vulnerabilities if v.status == Status.OPEN]
 
     # Write vulnerabilities (minimal) to disk
-    vulnerabilities_minimal_path = os.path.join(run_dir, "vulnerabilities_minimal.json")
+    vulnerabilities_minimal_path = Path(run_dir) / "vulnerabilities_minimal.json"
     with open(vulnerabilities_minimal_path, "w") as f:
         json.dump(
             [v.model_dump(exclude={"history"}) for v in vulnerabilities_minimal],

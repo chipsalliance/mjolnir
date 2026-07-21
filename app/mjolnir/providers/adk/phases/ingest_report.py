@@ -2,25 +2,26 @@
 # SPDX-License-Identifier: Apache-2.0
 import asyncio
 import json
-import os
+from pathlib import Path
+
 from google.adk import Context
 from google.adk.workflow import node
-from utilities.logger import logger
 from data.audit_finding import AuditFinding
 from data.security_report import SecurityReport
 from data.vulnerability import Vulnerability
-from providers.adk.utilities.async_runner import run_agent_with_backoff
 from providers.adk.agents.ingestion import get_ingestion_agent
+from providers.adk.utilities.async_runner import run_agent_with_backoff
+from utilities.logger import logger
 
 
-def _read_json_file_sync(full_path: str):
+def _read_json_file_sync(full_path: Path):
     with open(full_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-async def _try_fast_json_ingestion(full_path: str) -> list[Vulnerability] | None:
+async def _try_fast_json_ingestion(full_path: Path) -> list[Vulnerability] | None:
     """Attempts fast-path loading from a JSON checkpoint file asynchronously."""
-    if not (os.path.isfile(full_path) and full_path.endswith(".json")):
+    if not (full_path.is_file() and full_path.suffix == ".json"):
         return None
 
     try:
@@ -52,10 +53,11 @@ async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerabili
     code_dir = ctx.state["code_dir"]
     run_dir = ctx.state.get("run_dir")
 
-    if os.path.isabs(report_file_path) or os.path.exists(report_file_path):
-        full_path = report_file_path
+    report_path = Path(report_file_path)
+    if report_path.is_absolute() or report_path.exists():
+        full_path = report_path
     else:
-        full_path = os.path.join(code_dir, report_file_path)
+        full_path = Path(code_dir) / report_file_path
 
     # Fast-Path Checkpoint Check (`vulnerabilities.json` or `audit_findings.json`)
     fast_vulns = await _try_fast_json_ingestion(full_path)
@@ -63,7 +65,7 @@ async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerabili
         return fast_vulns
 
     # Tool Delegation: IngestionAgent autonomously reads the directory/file using its read_file & glob tools
-    if os.path.isdir(full_path):
+    if full_path.is_dir():
         document_text = (
             f"Ingestion Target Directory: {full_path}\n\n"
             "This target is a directory. Please use your `glob` and `read_file` tools to discover "

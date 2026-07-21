@@ -107,13 +107,13 @@ class UsageTracker:
 
     def write_to_disk(self, run_dir: str):
         """Writes the usage statistics to a JSON file in the run directory."""
-        if run_dir and os.path.exists(run_dir):
+        if run_dir and Path(run_dir).exists():
             usage_data = {
                 "total": self.total_usage,
                 "errors_grouped": self.error_counts,
                 "by_agent": self.usage_by_agent,
             }
-            usage_path = os.path.join(run_dir, "usage.json")
+            usage_path = Path(run_dir) / "usage.json"
             with open(usage_path, "w") as f:
                 json.dump(usage_data, f, indent=2)
             logger.write(f"Token and error usage breakdown saved to {usage_path}")

@@ -125,11 +125,11 @@ def run_analysis(
     usage_tracker.write_to_disk(run_dir)
 
     if not vulnerabilities and run_dir:
-        audit_path = os.path.join(run_dir, "finding_phase_1.json")
-        if not os.path.exists(audit_path):
-            audit_path = os.path.join(run_dir, "audit_findings.json")
+        audit_path = Path(run_dir) / "finding_phase_1.json"
+        if not audit_path.exists():
+            audit_path = Path(run_dir) / "audit_findings.json"
 
-        if os.path.exists(audit_path):
+        if audit_path.exists():
             logger.warning(
                 "Falling back to unreviewed Phase 1 vulnerabilities due to Phase 2 interruption."
             )

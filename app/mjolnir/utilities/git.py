@@ -2,19 +2,22 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
 import shutil
+from pathlib import Path
+
 from utilities.command import CommandRunner, run_command
 from utilities.logger import logger
 
 
 def setup_repository(repo_url: str, code_dir: str, ref: str, workspace_dir: str):
     """Clones the target repository if missing, otherwise cleans it, and checks out the requested ref."""
-    os.makedirs(workspace_dir, exist_ok=True)
+    Path(workspace_dir).mkdir(parents=True, exist_ok=True)
 
     # Perform Git Clone if missing or corrupt
-    git_dir = os.path.join(code_dir, ".git")
-    if not os.path.exists(git_dir):
-        if os.path.exists(code_dir):
-            shutil.rmtree(code_dir)
+    code_path = Path(code_dir)
+    git_dir = code_path / ".git"
+    if not git_dir.exists():
+        if code_path.exists():
+            shutil.rmtree(code_path)
         run_command(["git", "clone", "--recurse-submodules", repo_url, code_dir])
     else:
         run_command(["git", "reset", "--hard"], cwd=code_dir)
@@ -62,18 +65,18 @@ class GitOperation:
     """Encapsulates Git operations such as listing tracked/untracked candidate files."""
 
     def __init__(self, directory: str | os.PathLike, respect_git_ignore: bool = True):
-        self.directory = str(directory)
+        self.directory = Path(directory)
         self.respect_git_ignore = respect_git_ignore
 
     def list_files(self) -> list[str]:
         """Lists candidate files using git ls-files when respect_git_ignore is True, or directory walk when False."""
-        is_file = os.path.isfile(self.directory)
+        is_file = self.directory.is_file()
         if is_file:
-            cwd_path = os.path.dirname(self.directory)
-            target_name = os.path.basename(self.directory)
+            cwd_path = str(self.directory.parent)
+            target_name = self.directory.name
             path_args = ["--", target_name]
         else:
-            cwd_path = self.directory
+            cwd_path = str(self.directory)
             target_name = None
             path_args = []
 
@@ -88,7 +91,9 @@ class GitOperation:
 
         files: list[str] = []
         for root, _, filenames in os.walk(self.directory):
+            root_path = Path(root)
             for filename in filenames:
-                rel_path = os.path.relpath(os.path.join(root, filename), self.directory)
+                file_path = root_path / filename
+                rel_path = str(file_path.relative_to(self.directory))
                 files.append(rel_path)
         return files

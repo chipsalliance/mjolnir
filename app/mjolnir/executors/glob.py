@@ -19,7 +19,7 @@ class GlobRunner:
         respect_git_ignore: bool = True,
     ) -> None:
         self.search_path = search_path
-        self.code_dir = Path(code_dir).resolve()
+        self.code_dir = Path(code_dir).absolute()
         self.case_sensitive = case_sensitive
         self.respect_git_ignore = respect_git_ignore
 
@@ -67,7 +67,7 @@ class GlobRunner:
         absolute_matches = (
             [str(self.search_path)]
             if self.search_path.is_file()
-            else [str((self.search_path / m).resolve()) for m in matched_files]
+            else [str(self.search_path / m) for m in matched_files]
         )
         return (
             f"Found {len(absolute_matches)} file(s) matching '{pattern}' within '{dir_path}':\n"

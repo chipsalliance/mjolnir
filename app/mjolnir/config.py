@@ -12,7 +12,7 @@ from typing import Optional
 class AppConfig:
     """Immutable application configuration instantiated once at application startup."""
 
-    code_dir: Path = field(default_factory=lambda: Path(".").resolve())
+    code_dir: Path = field(default_factory=lambda: Path(".").absolute())
     workspace_dir: Optional[Path] = None
     output_dir: Optional[Path] = None
     run_id: Optional[str] = None
@@ -38,9 +38,11 @@ class AppConfig:
         run_id: Optional[str] = None,
     ) -> "AppConfig":
         """Instantiates AppConfig with explicit parameters or default working directory."""
-        target_code_dir = Path(code_dir).resolve() if code_dir else Path(".").resolve()
-        target_workspace_dir = Path(workspace_dir).resolve() if workspace_dir else None
-        target_output_dir = Path(output_dir).resolve() if output_dir else None
+        target_code_dir = (
+            Path(code_dir).absolute() if code_dir else Path(".").absolute()
+        )
+        target_workspace_dir = Path(workspace_dir).absolute() if workspace_dir else None
+        target_output_dir = Path(output_dir).absolute() if output_dir else None
 
         return cls(
             code_dir=target_code_dir,

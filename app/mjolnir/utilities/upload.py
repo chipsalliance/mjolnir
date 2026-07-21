@@ -5,6 +5,7 @@ from pathlib import Path
 import os
 import sys
 from google.cloud import storage
+
 from utilities.logger import logger
 from utilities import dashboard
 
@@ -16,11 +17,13 @@ def _upload_to_gcs(bucket_name: str, run_dir: str, destination_prefix: str):
     client = storage.Client()
     bucket = client.bucket(bucket_name)
 
+    run_path = Path(run_dir)
     for root, _, files in os.walk(run_dir):
+        root_path = Path(root)
         for file in files:
-            local_file_path = os.path.join(root, file)
+            local_file_path = root_path / file
             # Resolve path relative to target run directory
-            rel_path = os.path.relpath(local_file_path, run_dir)
+            rel_path = str(local_file_path.relative_to(run_path))
             blob_name = f"{destination_prefix}/{rel_path}"
 
             logger.write(
