@@ -8,46 +8,13 @@ from typing import Any, Optional
 from tqdm import tqdm
 from utilities.logger import logger
 
-# ----------------- AIMD CONCURRENCY CONTROLLER -----------------
-# Additive Increase / Multiplicative Decrease (TCP Congestion Control)
-# Shrinks active connections automatically when Vertex quotas hit.
-_CURRENT_CONCURRENCY_LIMIT = 4.0
-_ACTIVE_REQUESTS = 0
-_AIMD_LOCK = asyncio.Lock()
-_AIMD_COND = asyncio.Condition(_AIMD_LOCK)
+from providers.adk.utilities.aimd_controller import AIMDConcurrencyController
 
-
-async def _acquire_concurrency_slot(max_concurrency: float):
-    global _ACTIVE_REQUESTS
-    async with _AIMD_COND:
-        effective_limit = min(max_concurrency, _CURRENT_CONCURRENCY_LIMIT)
-        while _ACTIVE_REQUESTS >= int(effective_limit):
-            await _AIMD_COND.wait()
-        _ACTIVE_REQUESTS += 1
-
-
-async def _release_concurrency_slot(is_quota_hit: bool, max_concurrency: float):
-    global _ACTIVE_REQUESTS, _CURRENT_CONCURRENCY_LIMIT
-    async with _AIMD_COND:
-        _ACTIVE_REQUESTS -= 1
-
-        if not is_quota_hit:
-            # Additive Increase (slow, careful growth to probe capacity)
-            if _CURRENT_CONCURRENCY_LIMIT < max_concurrency:
-                _CURRENT_CONCURRENCY_LIMIT = min(
-                    max_concurrency, _CURRENT_CONCURRENCY_LIMIT + 0.25
-                )
-        else:
-            # Multiplicative Decrease (rapid shrinking on quota rejection)
-            new_limit = max(1.0, _CURRENT_CONCURRENCY_LIMIT * 0.5)
-            if int(new_limit) < int(_CURRENT_CONCURRENCY_LIMIT):
-                logger.write(
-                    f"AIMD Controller: Fast-shrinking concurrency from {int(_CURRENT_CONCURRENCY_LIMIT)} down to {int(new_limit)} due to 429 constraint.",
-                    stdout=True,
-                )
-            _CURRENT_CONCURRENCY_LIMIT = new_limit
-
-        _AIMD_COND.notify_all()
+DEFAULT_MAX_RETRIES = 6
+DEFAULT_BASE_DELAY = 2.0
+MAX_BACKOFF_DELAY = 60.0  # Cap maximum backoff at 60s
+QUOTA_BACKOFF_MULTIPLIER = 4.0
+TRANSIENT_BACKOFF_MULTIPLIER = 2.0
 
 
 def extract_agent_output(res: Any, expected_schema: Any) -> Any:
@@ -59,7 +26,10 @@ def extract_agent_output(res: Any, expected_schema: Any) -> Any:
     if isinstance(res, dict):
         try:
             return expected_schema.model_validate(res)
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                f"Failed to validate dict output against {expected_schema}: {e}"
+            )
             return None
 
     text_val = (
@@ -75,7 +45,10 @@ def extract_agent_output(res: Any, expected_schema: Any) -> Any:
             )
         try:
             return expected_schema.model_validate_json(text_val.strip())
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                f"Failed to validate JSON output against {expected_schema}: {e}"
+            )
             return None
 
     return None
@@ -86,16 +59,21 @@ async def run_agent_with_backoff(
     agent,
     node_input: Any,
     run_id: str,
-    max_retries: int = 6,
+    max_retries: int = DEFAULT_MAX_RETRIES,
     expected_schema: Any = None,
+    aimd_controller: Optional[AIMDConcurrencyController] = None,
 ) -> Any:
     """Executes an ADK agent with AIMD Concurrency limits and localized exponential backoff on quota hits."""
+    if aimd_controller is None:
+        aimd_controller = ctx.state.setdefault(
+            "aimd_controller", AIMDConcurrencyController()
+        )
     max_concurrency = float(ctx.state["batch_size"])
     attempt = 0
-    base_delay = 2.0
+    base_delay = DEFAULT_BASE_DELAY
 
     while True:
-        await _acquire_concurrency_slot(max_concurrency)
+        await aimd_controller.acquire(max_concurrency)
 
         try:
             res = await ctx.run_node(
@@ -105,7 +83,7 @@ async def run_agent_with_backoff(
                 use_sub_branch=True,
                 override_isolation_scope=run_id,
             )
-            await _release_concurrency_slot(
+            await aimd_controller.release(
                 is_quota_hit=False, max_concurrency=max_concurrency
             )
             return (
@@ -130,7 +108,7 @@ async def run_agent_with_backoff(
                 for sig in ["500", "502", "503", "timeout", "unavailable", "connection"]
             )
 
-            await _release_concurrency_slot(
+            await aimd_controller.release(
                 is_quota_hit=is_quota, max_concurrency=max_concurrency
             )
 
@@ -149,8 +127,10 @@ async def run_agent_with_backoff(
                 )
                 raise e
 
-            multiplier = 4.0 if is_quota else 2.0
-            delay = base_delay * (multiplier ** (attempt - 1))
+            multiplier = (
+                QUOTA_BACKOFF_MULTIPLIER if is_quota else TRANSIENT_BACKOFF_MULTIPLIER
+            )
+            delay = min(MAX_BACKOFF_DELAY, base_delay * (multiplier ** (attempt - 1)))
             jitter = random.uniform(0.1, 2.0)
             total_sleep = delay + jitter
 
