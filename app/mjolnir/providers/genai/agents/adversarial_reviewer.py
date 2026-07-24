@@ -8,7 +8,7 @@ from agent_tools.grep_search import grep_search
 from agent_tools.glob import glob
 
 
-class ReviewerAgent(MjolnirAgent):
+class AdversarialReviewerAgent(MjolnirAgent):
     """Adversarial reviewer agent validating a single finding using workspace search tools."""
 
     def run(self, finding_json_str: str) -> ReviewFinding:

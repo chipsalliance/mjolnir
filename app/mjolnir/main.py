@@ -14,7 +14,7 @@ from utilities.discovery import discover_source_files
 from utilities.threat_model import load_threat_model
 from utilities.metadata import write_metadata
 from utilities.dashboard import generate_dashboard
-from utilities.logger import logger
+from utilities.logger import logger, setup_logger
 from data.status import Status
 
 
@@ -46,7 +46,7 @@ def _run_orchestrator():
         output_dir = "./output/runs"
         if args.spec:
             if not os.path.exists(args.spec):
-                print(f"Error: Spec file {args.spec} not found!", file=sys.stderr)
+                logger.error(f"Error: Spec file {args.spec} not found!")
                 sys.exit(1)
             with open(args.spec, "r") as f:
                 spec = json.load(f)
@@ -57,20 +57,19 @@ def _run_orchestrator():
         else:
             output_dir = os.path.abspath(os.path.expanduser(args.output_dir))
 
-        print(f"Compiling dashboard from existing runs in {output_dir}...")
+        logger.write(f"Compiling dashboard from existing runs in {output_dir}...")
         generate_dashboard(output_dir)
-        print("Dashboard generated successfully.")
+        logger.write("Dashboard generated successfully.")
         return
 
     if not args.spec:
-        print(
-            "Error: The --spec argument is required when not in --gen-dashboard mode.",
-            file=sys.stderr,
+        logger.error(
+            "Error: The --spec argument is required when not in --gen-dashboard mode."
         )
         sys.exit(1)
 
     if not os.path.exists(args.spec):
-        print(f"Error: Spec file {args.spec} not found!", file=sys.stderr)
+        logger.error(f"Error: Spec file {args.spec} not found!")
         sys.exit(1)
 
     with open(args.spec, "r") as f:
@@ -116,7 +115,7 @@ def _run_orchestrator():
 
     # Initialize Logging
 
-    logger.init(log_path)
+    setup_logger(log_path)
 
     logger.header("Welcome to Mjolnir!")
 
@@ -163,7 +162,7 @@ def _run_orchestrator():
     batch_size = job.get("batchSize")
 
     if provider_name == "mock":
-        vulnerabilities = mock.run_analysis(
+        vulnerabilities, status = mock.run_analysis(
             model_name,
             code_dir,
             files_to_scan,
@@ -172,7 +171,7 @@ def _run_orchestrator():
             batch_size,
         )
     elif provider_name == "genai":
-        vulnerabilities = genai.run_analysis(
+        vulnerabilities, status = genai.run_analysis(
             model_name,
             code_dir,
             files_to_scan,
@@ -183,6 +182,15 @@ def _run_orchestrator():
     else:
         logger.error(f"Unknown provider: {provider_name}")
         sys.exit(1)
+
+    # Update metadata with status
+    metadata_path = os.path.join(run_dir, "metadata.json")
+    if os.path.exists(metadata_path):
+        with open(metadata_path, "r") as f:
+            metadata = json.load(f)
+        metadata["status"] = status
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=2)
 
     # Write vulnerabilities (all) to disk
 
@@ -219,6 +227,8 @@ def _run_orchestrator():
         upload.upload_dashboard_to_gcs()
 
     logger.header("Exiting Mjolnir!")
+    if status == "Failed":
+        sys.exit(1)
 
 
 if __name__ == "__main__":

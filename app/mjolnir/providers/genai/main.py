@@ -7,13 +7,14 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from providers.genai.client import get_client
 from providers.genai.agents.auditor import AuditorAgent
-from providers.genai.agents.adversarial_reviewer import ReviewerAgent
+from providers.genai.agents.adversarial_reviewer import AdversarialReviewerAgent
 from data.vulnerability import Vulnerability
 from data.audit_finding import AuditFinding
 from data.review_finding import ReviewFinding
 from data.verdict import Verdict
 from data.status import Status
 from utilities.logger import logger
+from tqdm import tqdm
 
 
 def phase_1_source_file_exploration(
@@ -36,9 +37,6 @@ def phase_1_source_file_exploration(
                 futures[executor.submit(auditor.run, f_path, contents)] = f_path
             except Exception as e:
                 logger.error(f"Could not read {f_path}: {e}.")
-
-        from tqdm import tqdm
-
         pbar = tqdm(
             as_completed(futures),
             total=len(futures),
@@ -78,7 +76,7 @@ def phase_1_source_file_exploration(
 
 
 def phase_2_initial_review(
-    reviewer: ReviewerAgent,
+    reviewer: AdversarialReviewerAgent,
     vulnerabilities: list[Vulnerability],
     batch_size: int,
 ) -> list[Vulnerability]:
@@ -107,9 +105,6 @@ def phase_2_initial_review(
             reviewer_futures[reviewer_executor.submit(reviewer.run, vuln_json_str)] = (
                 vuln
             )
-
-        from tqdm import tqdm
-
         reviewer_pbar = tqdm(
             as_completed(reviewer_futures),
             total=len(reviewer_futures),
@@ -157,8 +152,12 @@ def run_analysis(
     threat_model_context: str,
     run_dir: str,
     batch_size: int,
+    ingest_path: str = None,
 ) -> list:
     """Executes the E2E production GenAI agent loop (scanning, review, merging)."""
+    if ingest_path:
+        raise NotImplementedError("GenAI provider does not support ingestion mode.")
+
     client = get_client()
     if not client:
         raise ValueError("GenAI client credentials not set.")
@@ -173,7 +172,7 @@ def run_analysis(
         with open(adv_prompt_path, "r", encoding="utf-8") as f:
             adv_instruction = f.read().strip()
     adv_instruction = adv_instruction + threat_model_context
-    reviewer = ReviewerAgent(client, model, adv_instruction)
+    reviewer = AdversarialReviewerAgent(client, model, adv_instruction)
 
     # PHASE 1: Source File Exploration (Audit)
     all_vulnerabilities = phase_1_source_file_exploration(
@@ -186,4 +185,4 @@ def run_analysis(
     )
 
     logger.success("Analysis pipeline completed.")
-    return all_vulnerabilities
+    return all_vulnerabilities, "Success"
