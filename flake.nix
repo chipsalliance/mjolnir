@@ -35,12 +35,63 @@
             tests = tests-env.packages.${system}.default;
           };
 
+          google-genai-latest = pkgs.python3Packages.google-genai.overridePythonAttrs (old: rec {
+            version = "2.10.0";
+            src = pkgs.python3Packages.fetchPypi {
+              pname = "google_genai";
+              inherit version;
+              hash = "sha256-d5Es1VjNff1bdcJf0cYJ5415VN3lgzMRBAIqRuqQ+e4=";
+            };
+            doCheck = false;
+          });
+
+          google-adk = pkgs.python3Packages.buildPythonPackage {
+            pname = "google-adk";
+            version = "2.4.0";
+            pyproject = true;
+            src = pkgs.python3Packages.fetchPypi {
+              pname = "google_adk";
+              version = "2.4.0";
+              hash = "sha256-WimWsojVkd7vyyd+7ut9qDjXIFZnV2O/71KtOzaXXd4=";
+            };
+            postPatch = import ./nix/adk_telemetry_patch.nix;
+            nativeBuildInputs = with pkgs.python3Packages; [
+              flit-core
+            ];
+            dontCheckRuntimeDeps = true;
+            dependencies = with pkgs.python3Packages; [
+              google-genai-latest
+              pydantic
+              aiosqlite
+              authlib
+              fastapi
+              click
+              jsonschema
+              pyyaml
+              python-dotenv
+              python-multipart
+              uvicorn
+              websockets
+              watchdog
+              tzlocal
+              opentelemetry-api
+              opentelemetry-sdk
+              packaging
+            ];
+            pythonImportsCheck = [ "google.adk" ];
+            doCheck = false;
+          };
+
           pythonEnv = pkgs.python3.withPackages (ps: [
             ps.pydantic
-            ps.google-genai
+            google-genai-latest
             ps.google-cloud-storage
             ps.pyopenssl
             ps.tqdm
+            ps.pandas
+            ps.openpyxl
+            ps.tabulate
+            google-adk
           ]);
 
           mjolnir-app = pkgs.stdenv.mkDerivation {
@@ -56,7 +107,7 @@
               makeWrapper ${pythonEnv}/bin/python3 $out/bin/mjolnir-run \
                 --add-flags "$out/lib/main.py" \
                 --prefix PYTHONPATH : "$out/lib" \
-                --prefix PATH : "${pkgs.lib.makeBinPath [ pkgs.git pkgs.ripgrep ]}" \
+                --prefix PATH : "${pkgs.lib.makeBinPath [ pkgs.git pkgs.ripgrep pkgs.universal-ctags pkgs.ast-grep ]}" \
                 --set GOOGLE_API_USE_CLIENT_CERTIFICATE false
             '';
           };
