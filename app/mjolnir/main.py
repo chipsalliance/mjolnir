@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import datetime
+from config import AppConfig
 import providers.genai.main as genai
 import providers.mock.main as mock
 from utilities import upload
@@ -39,6 +40,10 @@ def _run_orchestrator():
         "--output-dir",
         default="./output/runs",
         help="Default runs directory to compile if spec is missing",
+    )
+    parser.add_argument(
+        "--ingest",
+        help="Path to report file to ingest. Implicitly triggers report ingestion mode.",
     )
     args, unknown_args = parser.parse_known_args()
 
@@ -93,7 +98,10 @@ def _run_orchestrator():
     workspace_dir = os.path.abspath(os.path.expanduser(raw_workspace))
 
     code_dir = os.path.join(workspace_dir, repo_name)
-    os.environ["CODE_DIR"] = code_dir
+    app_config = AppConfig.from_env(
+        code_dir=code_dir,
+        workspace_dir=workspace_dir,
+    )
 
     # Load threat model
 
@@ -122,8 +130,13 @@ def _run_orchestrator():
     logger.write(f"Setting up repository for {repo_name}.")
     setup_repository(repo_url, code_dir, repo_ref, workspace_dir)
 
+    # File discovery & Ingestion routing
+    ingest_path = args.ingest or job.get("ingestionReport")
+
     logger.write(f"Writing project metadata.")
-    write_metadata(run_dir, repo_url, model_name, repo_ref, code_dir, timestamp_pretty)
+    write_metadata(
+        run_dir, repo_url, model_name, repo_ref, code_dir, timestamp_pretty, ingest_path
+    )
 
     # Execute command, if one is provided
 
@@ -139,17 +152,20 @@ def _run_orchestrator():
             env=run_env,
         )
 
-    # File discovery
+    # Ingestion check and File discovery
 
-    logger.write(f"Looking for files to analyze.")
-
-    files_to_scan = discover_source_files(code_dir, job)
-
-    if files_to_scan:
-        logger.write(f"Discovered {len(files_to_scan)} files to analyze.")
+    if ingest_path:
+        logger.write(f"Ingestion Mode enabled. Ingesting report path: {ingest_path}")
+        files_to_scan = []
     else:
-        logger.write(f"Discovered no files to analyze. Exiting.")
-        sys.exit(1)
+        logger.write(f"Discovery Mode enabled. Looking for files to analyze.")
+        files_to_scan = discover_source_files(code_dir, job)
+
+        if files_to_scan:
+            logger.write(f"Discovered {len(files_to_scan)} files to analyze.")
+        else:
+            logger.write(f"Discovered no files to analyze. Exiting.")
+            sys.exit(1)
 
     # Execute analyis via selected provider
 
@@ -169,6 +185,7 @@ def _run_orchestrator():
             threat_model_context,
             run_dir,
             batch_size,
+            ingest_path=ingest_path,
         )
     elif provider_name == "genai":
         vulnerabilities, status = genai.run_analysis(
@@ -178,6 +195,19 @@ def _run_orchestrator():
             threat_model_context,
             run_dir,
             batch_size,
+            ingest_path=ingest_path,
+        )
+    elif provider_name == "adk":
+        import providers.adk.main as adk
+
+        vulnerabilities, status = adk.run_analysis(
+            model_name,
+            code_dir,
+            files_to_scan,
+            threat_model_context,
+            run_dir,
+            batch_size,
+            ingest_path=ingest_path,
         )
     else:
         logger.error(f"Unknown provider: {provider_name}")
@@ -189,6 +219,7 @@ def _run_orchestrator():
         with open(metadata_path, "r") as f:
             metadata = json.load(f)
         metadata["status"] = status
+        metadata["mode"] = "Ingestion" if ingest_path else "Discovery"
         with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
 
