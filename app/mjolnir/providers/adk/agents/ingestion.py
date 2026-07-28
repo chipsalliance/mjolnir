@@ -22,9 +22,7 @@ from utilities.prompt_loader import prompt_registry
 def get_ingestion_agent(model: str) -> Agent:
     """Factory to create an IngestionAgent to parse unstructured reports."""
     fallback_instruction = "You are an expert security report parsing agent."
-    instruction = prompt_registry.load_prompt(
-        "ingestion", fallback=fallback_instruction
-    )
+    instruction = prompt_registry.load_prompt("ingestion", fallback=fallback_instruction)
 
     return IsolatedAgent(
         name="IngestionAgent",

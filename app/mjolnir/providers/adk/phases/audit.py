@@ -41,9 +41,7 @@ async def checkpoint_audit_findings(
     try:
         vulns_data = [v.model_dump() for v in vulns]
         await asyncio.to_thread(_write_checkpoint_sync, audit_path, vulns_data)
-        logger.write(
-            f"Checkpointed {len(vulns)} Phase {phase_id} vulnerabilities to {audit_path}"
-        )
+        logger.write(f"Checkpointed {len(vulns)} Phase {phase_id} vulnerabilities to {audit_path}")
     except Exception as e:
         logger.error(f"Failed to checkpoint Phase {phase_id} vulnerabilities: {e}")
 
@@ -77,11 +75,7 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
             expected_schema=SecurityReport,
             run_id=run_id,
         )
-        if (
-            not report
-            or not hasattr(report, "vulnerabilities")
-            or not report.vulnerabilities
-        ):
+        if not report or not hasattr(report, "vulnerabilities") or not report.vulnerabilities:
             return []
 
         vulns: list[Vulnerability] = []
@@ -110,7 +104,5 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
     flat_vulns = [vuln for file_vulns in results for vuln in file_vulns]
     await checkpoint_audit_findings(flat_vulns, run_dir)
 
-    logger.write(
-        f"Phase 1 complete. Found {len(flat_vulns)} total vulnerabilities.", stdout=True
-    )
+    logger.write(f"Phase 1 complete. Found {len(flat_vulns)} total vulnerabilities.", stdout=True)
     return flat_vulns

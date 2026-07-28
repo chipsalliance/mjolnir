@@ -410,9 +410,7 @@ def generate_dashboard(output_dir: str):
                 break
 
     if not runs_path or not runs_path.exists():
-        logger.write(
-            f"Error: Could not locate 'runs' directory starting from {output_dir}"
-        )
+        logger.write(f"Error: Could not locate 'runs' directory starting from {output_dir}")
         return
 
     output_root = runs_path.parent
@@ -456,9 +454,7 @@ def generate_dashboard(output_dir: str):
                         with open(usage_json, "r") as f:
                             usage = json.load(f)
 
-                    open_findings = [
-                        v for v in history_data if v.get("status") == "Open"
-                    ]
+                    open_findings = [v for v in history_data if v.get("status") == "Open"]
                     report_data = {"vulnerabilities": open_findings}
 
                     run_id_key = f"{project_dir.name}-{job_dir.name}-{run_dir.name}"
@@ -482,9 +478,7 @@ def generate_dashboard(output_dir: str):
                     )
                     project_vulns[proj_name].extend(formatted_for_project)
                 except Exception as e:
-                    logger.write(
-                        f"Warning: Failed to load findings for run {run_dir.name}: {e}"
-                    )
+                    logger.write(f"Warning: Failed to load findings for run {run_dir.name}: {e}")
 
     if not runs_data:
         logger.write("No scan reports found. Local dashboard not compiled.")
@@ -508,9 +502,7 @@ def generate_dashboard(output_dir: str):
     # Pre-compute sidebar listings
     project_stats = compute_project_stats(runs_data)
     projects_list = sorted(list(project_stats.items()))
-    runs_list = sorted(
-        list(runs_data.values()), key=lambda x: x["timestamp"], reverse=True
-    )
+    runs_list = sorted(list(runs_data.values()), key=lambda x: x["timestamp"], reverse=True)
     sidebar_html = render_sidebar(projects_list, runs_list)
 
     # 1. COMPILE GLOBAL OVERVIEW (dashboard.html)
@@ -521,9 +513,7 @@ def generate_dashboard(output_dir: str):
     global_content = global_content.replace("{{projects_summary_rows}}", summary_rows)
 
     sankey_all = get_sankey_rows(list(runs_data.values()))
-    sankey_no_tests = get_sankey_rows(
-        [r for r in runs_data.values() if r["project"] != "tests"]
-    )
+    sankey_no_tests = get_sankey_rows([r for r in runs_data.values() if r["project"] != "tests"])
 
     global_page_data = {
         "type": "global",
@@ -593,14 +583,10 @@ def generate_dashboard(output_dir: str):
 
         total_tokens = str(r.get("usage", {}).get("total", {}).get("total_tokens", "0"))
         run_content = run_content.replace("{{total_tokens}}", total_tokens)
-        run_content = run_content.replace(
-            "{{pipeline_mode}}", r.get("mode", "Discovery")
-        )
+        run_content = run_content.replace("{{pipeline_mode}}", r.get("mode", "Discovery"))
 
         status_str = r.get("status", "Success")
-        status_color = (
-            "var(--critical-color)" if status_str == "Failed" else "var(--low-color)"
-        )
+        status_color = "var(--critical-color)" if status_str == "Failed" else "var(--low-color)"
         run_content = run_content.replace("{{status}}", status_str)
         run_content = run_content.replace("{{status_color}}", status_color)
 
@@ -624,11 +610,7 @@ def generate_dashboard(output_dir: str):
         }
 
         run_file_path = (
-            output_root
-            / "run"
-            / r["project"]
-            / r["job_folder"]
-            / f"{r['run_folder']}.html"
+            output_root / "run" / r["project"] / r["job_folder"] / f"{r['run_folder']}.html"
         )
         run_file_path.parent.mkdir(parents=True, exist_ok=True)
         base_url = compute_base_url(output_root, run_file_path)

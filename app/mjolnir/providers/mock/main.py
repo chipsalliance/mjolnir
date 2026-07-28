@@ -55,9 +55,7 @@ def run_analysis(
             description=audit_finding.description,
             recommendation=audit_finding.recommendation,
         )
-        vuln.add(
-            phase_id="1", phase_name="Source File Exploration", finding=audit_finding
-        )
+        vuln.add(phase_id="1", phase_name="Source File Exploration", finding=audit_finding)
 
         # 2. Simulate Reviewer (Phase 2)
         # We vary status to test all flow branches (kept, downgraded, FP/discarded, skipped/kept)

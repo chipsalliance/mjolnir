@@ -13,13 +13,13 @@ class FileReader:
     def __init__(self, safe_path: Path) -> None:
         self.safe_path = safe_path
 
-    def read(
-        self, file_path: str, start_line: int = 1, end_line: int | None = None
-    ) -> str:
+    def read(self, file_path: str, start_line: int = 1, end_line: int | None = None) -> str:
         """Reads file contents and returns formatted line range string."""
         file_size = self.safe_path.stat().st_size
         if file_size > MAX_FILE_SIZE_BYTES:
-            return f"Error: File '{file_path}' exceeds safety limit ({file_size // (1024 * 1024)}MB)."
+            return (
+                f"Error: File '{file_path}' exceeds safety limit ({file_size // (1024 * 1024)}MB)."
+            )
 
         try:
             with open(self.safe_path, "r", errors="ignore") as f:

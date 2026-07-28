@@ -48,9 +48,7 @@ class GlobRunner:
 
     def search(self, pattern: str, dir_path: str = ".") -> str:
         """Finds files matching pattern within search_path."""
-        git_op = GitOperation(
-            self.search_path, respect_git_ignore=self.respect_git_ignore
-        )
+        git_op = GitOperation(self.search_path, respect_git_ignore=self.respect_git_ignore)
         candidate_files = git_op.list_files()
 
         glob_predicate = (

@@ -14,6 +14,4 @@ class ReviewFinding(BaseModel):
 
     verdict: Verdict = Field(description="Exploitability verdict.")
     justification: str = Field(description="Justification of the verdict.")
-    attack_vector: str = Field(
-        default="", description="Description of the attack vector."
-    )
+    attack_vector: str = Field(default="", description="Description of the attack vector.")

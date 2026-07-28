@@ -59,7 +59,9 @@ def main() -> None:
                 missing_license_files.append(str(rel_path))
 
     if missing_license_files:
-        print(f"FAILED: Found {len(missing_license_files)} file(s) missing '{REQUIRED_LICENSE_HEADER}' in top 5 lines:")
+        print(
+            f"FAILED: Found {len(missing_license_files)} file(s) missing '{REQUIRED_LICENSE_HEADER}' in top 5 lines:"
+        )
         for f in sorted(missing_license_files):
             print(f"  - {f}")
         sys.exit(1)

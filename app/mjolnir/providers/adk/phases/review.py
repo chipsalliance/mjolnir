@@ -16,9 +16,7 @@ from providers.adk.agents.reviewer import get_reviewer_agent
 
 
 @node(rerun_on_resume=True)
-async def review_phase(
-    ctx: Context, node_input: list[Vulnerability]
-) -> list[Vulnerability]:
+async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vulnerability]:
     """Phase 2: Adversarial Triaging (Validation)."""
     logger.write("Starting Phase 2: Adversarial Reviews...", stdout=True)
 

@@ -69,9 +69,7 @@ def _run_orchestrator():
         return
 
     if not args.spec:
-        logger.error(
-            "Error: The --spec argument is required when not in --gen-dashboard mode."
-        )
+        logger.error("Error: The --spec argument is required when not in --gen-dashboard mode.")
         sys.exit(1)
 
     if not Path(args.spec).exists():
@@ -135,9 +133,7 @@ def _run_orchestrator():
     ingest_path = args.ingest or job.get("ingestionReport")
 
     logger.write(f"Writing project metadata.")
-    write_metadata(
-        run_dir, repo_url, model_name, repo_ref, code_dir, timestamp_pretty, ingest_path
-    )
+    write_metadata(run_dir, repo_url, model_name, repo_ref, code_dir, timestamp_pretty, ingest_path)
 
     # Execute command, if one is provided
 
@@ -172,9 +168,7 @@ def _run_orchestrator():
 
     provider_name = job.get("provider")
 
-    logger.write(
-        f"Executing analysis using {provider_name} provider (model={model_name})."
-    )
+    logger.write(f"Executing analysis using {provider_name} provider (model={model_name}).")
 
     batch_size = job.get("batchSize")
 

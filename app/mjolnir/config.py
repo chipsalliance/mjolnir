@@ -19,9 +19,7 @@ class AppConfig:
     cloud_storage_bucket: Optional[str] = field(
         default_factory=lambda: os.environ.get("CLOUD_STORAGE_BUCKET")
     )
-    gemini_api_key: Optional[str] = field(
-        default_factory=lambda: os.environ.get("GEMINI_API_KEY")
-    )
+    gemini_api_key: Optional[str] = field(default_factory=lambda: os.environ.get("GEMINI_API_KEY"))
     google_cloud_project: Optional[str] = field(
         default_factory=lambda: os.environ.get("GOOGLE_CLOUD_PROJECT")
     )
@@ -38,9 +36,7 @@ class AppConfig:
         run_id: Optional[str] = None,
     ) -> "AppConfig":
         """Instantiates AppConfig with explicit parameters or default working directory."""
-        target_code_dir = (
-            Path(code_dir).absolute() if code_dir else Path(".").absolute()
-        )
+        target_code_dir = Path(code_dir).absolute() if code_dir else Path(".").absolute()
         target_workspace_dir = Path(workspace_dir).absolute() if workspace_dir else None
         target_output_dir = Path(output_dir).absolute() if output_dir else None
 

@@ -14,8 +14,8 @@ ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 mapfile -t SCRIPTS < <(git -C "${ROOT_DIR}" ls-files '*.sh')
 
 if [[ ${#SCRIPTS[@]} -eq 0 ]]; then
-  echo "PASSED: No tracked shell scripts found to check."
-  exit 0
+	echo "PASSED: No tracked shell scripts found to check."
+	exit 0
 fi
 
 echo "Running shellcheck (${SHELLCHECK}) on ${#SCRIPTS[@]} shell script(s)..."

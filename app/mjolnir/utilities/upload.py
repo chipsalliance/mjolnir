@@ -26,9 +26,7 @@ def _upload_to_gcs(bucket_name: str, run_dir: str, destination_prefix: str):
             rel_path = str(local_file_path.relative_to(run_path))
             blob_name = f"{destination_prefix}/{rel_path}"
 
-            logger.write(
-                f"Uploading {rel_path} -> gs://{bucket_name}/{blob_name}", stdout=False
-            )
+            logger.write(f"Uploading {rel_path} -> gs://{bucket_name}/{blob_name}", stdout=False)
 
             blob = bucket.blob(blob_name)
             blob.upload_from_filename(local_file_path)
@@ -96,20 +94,14 @@ def upload_dashboard_to_gcs():
             }
 
         scan_data = {}
-        logger.write(
-            f"Parsing {len(remote_runs)} remote run reports in memory...", stdout=False
-        )
+        logger.write(f"Parsing {len(remote_runs)} remote run reports in memory...", stdout=False)
         for run_key, run_info in remote_runs.items():
             try:
                 # 1. Download and parse GCS vulnerabilities.json (contains history)
-                full_vulnerabilities = json.loads(
-                    run_info["report_blob"].download_as_text()
-                )
+                full_vulnerabilities = json.loads(run_info["report_blob"].download_as_text())
 
                 # Filter for OPEN findings
-                open_findings = [
-                    v for v in full_vulnerabilities if v.get("status") == "Open"
-                ]
+                open_findings = [v for v in full_vulnerabilities if v.get("status") == "Open"]
                 report_data = {"vulnerabilities": open_findings}
 
                 # 2. Download and parse metadata if present
@@ -128,9 +120,7 @@ def upload_dashboard_to_gcs():
                     full_vulnerabilities,
                 )
             except Exception as e:
-                logger.write(
-                    f"Warning: Failed to parse GCS run {run_key}: {e}", stdout=False
-                )
+                logger.write(f"Warning: Failed to parse GCS run {run_key}: {e}", stdout=False)
 
         if not scan_data:
             logger.write("No valid GCS scan reports found. GCS dashboard not compiled.")
@@ -141,9 +131,7 @@ def upload_dashboard_to_gcs():
 
         # Upload CSS & JS assets
         with open(templates_dir / "dashboard.css", "r", encoding="utf-8") as f:
-            bucket.blob("v0/dashboard.css").upload_from_string(
-                f.read(), content_type="text/css"
-            )
+            bucket.blob("v0/dashboard.css").upload_from_string(f.read(), content_type="text/css")
         with open(templates_dir / "dashboard.js", "r", encoding="utf-8") as f:
             bucket.blob("v0/dashboard.js").upload_from_string(
                 f.read(), content_type="application/javascript"
@@ -152,18 +140,14 @@ def upload_dashboard_to_gcs():
         # Compile listings
         project_stats = dashboard.compute_project_stats(scan_data)
         projects_list = sorted(list(project_stats.items()))
-        runs_list = sorted(
-            list(scan_data.values()), key=lambda x: x["timestamp"], reverse=True
-        )
+        runs_list = sorted(list(scan_data.values()), key=lambda x: x["timestamp"], reverse=True)
         sidebar_html = dashboard.render_sidebar(projects_list, runs_list)
 
         # Upload Global Overview
         with open(templates_dir / "view_global.html.tpl", "r", encoding="utf-8") as f:
             global_content = f.read()
         summary_rows = dashboard.render_projects_summary_table(projects_list)
-        global_content = global_content.replace(
-            "{{projects_summary_rows}}", summary_rows
-        )
+        global_content = global_content.replace("{{projects_summary_rows}}", summary_rows)
 
         sankey_all = dashboard.get_sankey_rows(list(scan_data.values()))
         sankey_no_tests = dashboard.get_sankey_rows(
@@ -181,9 +165,7 @@ def upload_dashboard_to_gcs():
             "menu-overview",
             templates_dir,
         )
-        bucket.blob("v0/dashboard.html").upload_from_string(
-            global_html, content_type="text/html"
-        )
+        bucket.blob("v0/dashboard.html").upload_from_string(global_html, content_type="text/html")
 
         # Upload Projects
         project_vulns = {}

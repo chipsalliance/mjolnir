@@ -27,9 +27,7 @@ def extract_agent_output(res: Any, expected_schema: Any) -> Any:
         try:
             return expected_schema.model_validate(res)
         except Exception as e:
-            logger.warning(
-                f"Failed to validate dict output against {expected_schema}: {e}"
-            )
+            logger.warning(f"Failed to validate dict output against {expected_schema}: {e}")
             return None
 
     text_val = (
@@ -40,15 +38,11 @@ def extract_agent_output(res: Any, expected_schema: Any) -> Any:
     if isinstance(text_val, str):
         text_val = text_val.strip()
         if text_val.startswith("```"):
-            text_val = re.sub(
-                r"^```(?:json)?\s*|\s*```$", "", text_val, flags=re.DOTALL
-            )
+            text_val = re.sub(r"^```(?:json)?\s*|\s*```$", "", text_val, flags=re.DOTALL)
         try:
             return expected_schema.model_validate_json(text_val.strip())
         except Exception as e:
-            logger.warning(
-                f"Failed to validate JSON output against {expected_schema}: {e}"
-            )
+            logger.warning(f"Failed to validate JSON output against {expected_schema}: {e}")
             return None
 
     return None
@@ -65,9 +59,7 @@ async def run_agent_with_backoff(
 ) -> Any:
     """Executes an ADK agent with AIMD Concurrency limits and localized exponential backoff on quota hits."""
     if aimd_controller is None:
-        aimd_controller = ctx.state.setdefault(
-            "aimd_controller", AIMDConcurrencyController()
-        )
+        aimd_controller = ctx.state.setdefault("aimd_controller", AIMDConcurrencyController())
     max_concurrency = float(ctx.state["batch_size"])
     attempt = 0
     base_delay = DEFAULT_BASE_DELAY
@@ -83,34 +75,25 @@ async def run_agent_with_backoff(
                 use_sub_branch=True,
                 override_isolation_scope=run_id,
             )
-            await aimd_controller.release(
-                is_quota_hit=False, max_concurrency=max_concurrency
-            )
-            return (
-                extract_agent_output(res, expected_schema) if expected_schema else res
-            )
+            await aimd_controller.release(is_quota_hit=False, max_concurrency=max_concurrency)
+            return extract_agent_output(res, expected_schema) if expected_schema else res
         except Exception as e:
             tracker = ctx.state.get("usage_tracker")
             if tracker:
                 tracker.track_error(e, agent.name)
 
-            root_e = (
-                getattr(e, "__cause__", None) or getattr(e, "__context__", None) or e
-            )
+            root_e = getattr(e, "__cause__", None) or getattr(e, "__context__", None) or e
             error_str = f"{type(root_e).__name__} {str(root_e)}".lower()
 
             is_quota = any(
-                q in error_str
-                for q in ["429", "quota", "resourceexhausted", "overload", "prefill"]
+                q in error_str for q in ["429", "quota", "resourceexhausted", "overload", "prefill"]
             )
             is_transient = is_quota or any(
                 sig in error_str
                 for sig in ["500", "502", "503", "timeout", "unavailable", "connection"]
             )
 
-            await aimd_controller.release(
-                is_quota_hit=is_quota, max_concurrency=max_concurrency
-            )
+            await aimd_controller.release(is_quota_hit=is_quota, max_concurrency=max_concurrency)
 
             if not is_transient:
                 logger.error(
@@ -127,9 +110,7 @@ async def run_agent_with_backoff(
                 )
                 raise e
 
-            multiplier = (
-                QUOTA_BACKOFF_MULTIPLIER if is_quota else TRANSIENT_BACKOFF_MULTIPLIER
-            )
+            multiplier = QUOTA_BACKOFF_MULTIPLIER if is_quota else TRANSIENT_BACKOFF_MULTIPLIER
             delay = min(MAX_BACKOFF_DELAY, base_delay * (multiplier ** (attempt - 1)))
             jitter = random.uniform(0.1, 2.0)
             total_sleep = delay + jitter

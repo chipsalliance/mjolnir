@@ -101,9 +101,7 @@ def phase_2_initial_review(
                 recommendation=vuln.recommendation,
             )
             vuln_json_str = json.dumps(audit_view.model_dump())
-            reviewer_futures[reviewer_executor.submit(reviewer.run, vuln_json_str)] = (
-                vuln
-            )
+            reviewer_futures[reviewer_executor.submit(reviewer.run, vuln_json_str)] = vuln
         reviewer_pbar = tqdm(
             as_completed(reviewer_futures),
             total=len(reviewer_futures),
@@ -118,9 +116,7 @@ def phase_2_initial_review(
             reviewer_pbar.set_description(f"Reviewing {orig_vuln.title[:30]}")
             try:
                 review_finding = future.result()
-                orig_vuln.add(
-                    phase_id="2", phase_name="Initial Review", finding=review_finding
-                )
+                orig_vuln.add(phase_id="2", phase_name="Initial Review", finding=review_finding)
                 reviewed_ids.add(orig_vuln.id)
             except Exception as e:
                 logger.error(f"Adversarial review failed for {orig_vuln.title}: {e}.")
@@ -174,14 +170,10 @@ def run_analysis(
     reviewer = AdversarialReviewerAgent(client, model, adv_instruction)
 
     # PHASE 1: Source File Exploration (Audit)
-    all_vulnerabilities = phase_1_source_file_exploration(
-        auditor, files, code_dir, batch_size
-    )
+    all_vulnerabilities = phase_1_source_file_exploration(auditor, files, code_dir, batch_size)
 
     # PHASE 2: Initial Review (Adversarial Review)
-    all_vulnerabilities = phase_2_initial_review(
-        reviewer, all_vulnerabilities, batch_size
-    )
+    all_vulnerabilities = phase_2_initial_review(reviewer, all_vulnerabilities, batch_size)
 
     logger.success("Analysis pipeline completed.")
     return all_vulnerabilities, "Success"

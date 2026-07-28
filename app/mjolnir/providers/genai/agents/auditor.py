@@ -49,16 +49,13 @@ class AuditorAgent(MjolnirAgent):
                 )
                 return base_prompt + self.threat_model_context
         return (
-            "Analyze this file for potential security vulnerabilities."
-            + self.threat_model_context
+            "Analyze this file for potential security vulnerabilities." + self.threat_model_context
         )
 
     def run(self, file_rel_path: str, contents: str) -> SecurityReport:
         logger.write(f"Scanning {file_rel_path} (GenAI)...", stdout=False)
         system_instruction = self._resolve_instruction(file_rel_path)
-        file_prompt = (
-            f"Analyze this file:\n\nFilename: {file_rel_path}\n\nContent:\n{contents}"
-        )
+        file_prompt = f"Analyze this file:\n\nFilename: {file_rel_path}\n\nContent:\n{contents}"
 
         response = self.client.models.generate_content(
             model=self.model,

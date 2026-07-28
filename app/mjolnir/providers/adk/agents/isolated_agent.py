@@ -32,9 +32,7 @@ class IsolatedAgent(Agent):
 
     run_config: Optional[RunConfig] = None
 
-    def _create_invocation_context(
-        self, parent_context: InvocationContext
-    ) -> InvocationContext:
+    def _create_invocation_context(self, parent_context: InvocationContext) -> InvocationContext:
         ctx = super()._create_invocation_context(parent_context)
         ctx._invocation_cost_manager = _InvocationCostManager()
         if self.run_config:

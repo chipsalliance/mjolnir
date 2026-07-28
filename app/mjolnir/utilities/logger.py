@@ -30,9 +30,7 @@ class ColoredFormatter(logging.Formatter):
     }
 
     def format(self, record: logging.LogRecord) -> str:
-        color = getattr(
-            record, "color", self.LEVEL_COLORS.get(record.levelno, COLORS["reset"])
-        )
+        color = getattr(record, "color", self.LEVEL_COLORS.get(record.levelno, COLORS["reset"]))
         prefix = COLORS.get(color, color) if color else ""
         suffix = COLORS["reset"] if color else ""
         msg = super().format(record)
@@ -80,9 +78,7 @@ def setup_logger(log_path: Optional[str] = None) -> MjolnirLogger:
     # File Handler if log_path is provided
     if log_path:
         file_handler = logging.FileHandler(log_path, mode="a")
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-        )
+        file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
         logger_instance.addHandler(file_handler)
 
     return logger_instance

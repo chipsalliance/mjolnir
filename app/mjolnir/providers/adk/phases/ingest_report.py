@@ -37,9 +37,7 @@ async def _try_fast_json_ingestion(full_path: Path) -> list[Vulnerability] | Non
             )
             return vulns
     except Exception as e:
-        logger.info(
-            f"JSON fast ingestion failed ({e}). Falling back to LLM tool delegation."
-        )
+        logger.info(f"JSON fast ingestion failed ({e}). Falling back to LLM tool delegation.")
     return None
 
 
@@ -98,7 +96,5 @@ async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerabili
 
         await checkpoint_audit_findings(vulns, run_dir, phase_id="1")
 
-    logger.write(
-        f"Ingestion complete. Extracted {len(vulns)} vulnerabilities.", stdout=True
-    )
+    logger.write(f"Ingestion complete. Extracted {len(vulns)} vulnerabilities.", stdout=True)
     return vulns

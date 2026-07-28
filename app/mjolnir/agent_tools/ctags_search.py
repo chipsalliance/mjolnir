@@ -21,8 +21,6 @@ def ctags_search(
     if not search_path.exists():
         return f"Error: Path '{dir_path}' does not exist."
 
-    logger.write(
-        f"[Tool Execution] ctags_search: symbol='{symbol}', dir_path='{dir_path}'"
-    )
+    logger.write(f"[Tool Execution] ctags_search: symbol='{symbol}', dir_path='{dir_path}'")
     runner = CtagsRunner()
     return runner.search(symbol, search_path)

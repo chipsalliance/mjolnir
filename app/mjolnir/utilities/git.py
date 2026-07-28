@@ -34,9 +34,7 @@ def setup_repository(repo_url: str, code_dir: str, ref: str, workspace_dir: str)
     # Perform Git Checkout
     if ref:
         run_command(["git", "checkout", ref], cwd=code_dir)
-        run_command(
-            ["git", "submodule", "update", "--init", "--recursive"], cwd=code_dir
-        )
+        run_command(["git", "submodule", "update", "--init", "--recursive"], cwd=code_dir)
 
     return get_head_commit(code_dir)
 

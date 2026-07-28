@@ -44,13 +44,9 @@ class MjolnirAgent:
                     f" [API Warning] Prompt BLOCKED by safety filter. Reason: {block_reason}",
                     stdout=True,
                 )
-                if (
-                    hasattr(prompt_feedback, "safety_ratings")
-                    and prompt_feedback.safety_ratings
-                ):
+                if hasattr(prompt_feedback, "safety_ratings") and prompt_feedback.safety_ratings:
                     ratings = [
-                        f"{r.category}: {r.probability}"
-                        for r in prompt_feedback.safety_ratings
+                        f"{r.category}: {r.probability}" for r in prompt_feedback.safety_ratings
                     ]
                     logger.write(
                         f" [API Warning] Prompt Safety Ratings: {', '.join(ratings)}",
@@ -58,9 +54,7 @@ class MjolnirAgent:
                     )
 
         if not response.candidates:
-            logger.write(
-                " [API Warning] API response contains zero candidates.", stdout=True
-            )
+            logger.write(" [API Warning] API response contains zero candidates.", stdout=True)
             return ""
 
         candidate = response.candidates[0]
@@ -73,9 +67,7 @@ class MjolnirAgent:
                 stdout=True,
             )
             if hasattr(candidate, "safety_ratings") and candidate.safety_ratings:
-                ratings = [
-                    f"{r.category}: {r.probability}" for r in candidate.safety_ratings
-                ]
+                ratings = [f"{r.category}: {r.probability}" for r in candidate.safety_ratings]
                 logger.write(
                     f" [API Warning] Candidate Safety Ratings: {', '.join(ratings)}",
                     stdout=True,
@@ -85,9 +77,7 @@ class MjolnirAgent:
             return ""
 
         has_text = any(getattr(part, "text", None) for part in candidate.content.parts)
-        has_calls = any(
-            getattr(part, "function_call", None) for part in candidate.content.parts
-        )
+        has_calls = any(getattr(part, "function_call", None) for part in candidate.content.parts)
 
         if not has_text and has_calls:
             logger.write(

@@ -28,11 +28,7 @@ class UsageTracker:
         """Records an encountered error to surface in the final summary."""
         root_e = getattr(e, "__cause__", None) or getattr(e, "__context__", None) or e
         root_type = type(root_e).__name__
-        code = (
-            getattr(root_e, "code", None)
-            or getattr(root_e, "status_code", None)
-            or root_type
-        )
+        code = getattr(root_e, "code", None) or getattr(root_e, "status_code", None) or root_type
 
         msg = str(root_e).splitlines()[0] if str(root_e) else ""
         clean_err = f"{code}: {msg[:100]}" if msg and msg != str(code) else str(code)
