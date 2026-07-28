@@ -1,5 +1,6 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
+import asyncio
 import json
 import os
 from google.adk import Context
@@ -12,14 +13,18 @@ from providers.adk.utilities.async_runner import run_agent_with_backoff
 from providers.adk.agents.ingestion import get_ingestion_agent
 
 
-def _try_fast_json_ingestion(full_path: str) -> list[Vulnerability] | None:
-    """Attempts fast-path loading from a JSON checkpoint file."""
+def _read_json_file_sync(full_path: str):
+    with open(full_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+async def _try_fast_json_ingestion(full_path: str) -> list[Vulnerability] | None:
+    """Attempts fast-path loading from a JSON checkpoint file asynchronously."""
     if not (os.path.isfile(full_path) and full_path.endswith(".json")):
         return None
 
     try:
-        with open(full_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        data = await asyncio.to_thread(_read_json_file_sync, full_path)
         if not (isinstance(data, list) and data):
             return None
 
@@ -53,7 +58,7 @@ async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerabili
         full_path = os.path.join(code_dir, report_file_path)
 
     # Fast-Path Checkpoint Check (`vulnerabilities.json` or `audit_findings.json`)
-    fast_vulns = _try_fast_json_ingestion(full_path)
+    fast_vulns = await _try_fast_json_ingestion(full_path)
     if fast_vulns is not None:
         return fast_vulns
 
@@ -89,7 +94,7 @@ async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerabili
     if run_dir:
         from providers.adk.phases.audit import checkpoint_audit_findings
 
-        checkpoint_audit_findings(vulns, run_dir, phase_id="1")
+        await checkpoint_audit_findings(vulns, run_dir, phase_id="1")
 
     logger.write(
         f"Ingestion complete. Extracted {len(vulns)} vulnerabilities.", stdout=True

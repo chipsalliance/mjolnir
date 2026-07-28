@@ -21,6 +21,35 @@ from providers.adk.phases import (
 )
 
 
+def build_audit_workflow(name: str = "MjolnirAuditWorkflow") -> Workflow:
+    """Factory builder for standard discovery and audit workflow graph."""
+    edges = [
+        ("START", initialize),
+        (initialize, audit_phase),
+        (audit_phase, review_phase),
+    ]
+    return Workflow(name=name, edges=edges)
+
+
+def build_ingest_workflow(name: str = "MjolnirIngestWorkflow") -> Workflow:
+    """Factory builder for report ingestion workflow graph."""
+    edges = [
+        ("START", initialize),
+        (initialize, ingest_report_phase),
+        (ingest_report_phase, review_phase),
+    ]
+    return Workflow(name=name, edges=edges)
+
+
+def build_analysis_workflow(
+    ingest_path: str | None = None, name: str = "MjolnirAnalysis"
+) -> Workflow:
+    """Builds a multi-node workflow graph based on execution parameters."""
+    if ingest_path:
+        return build_ingest_workflow(name=name)
+    return build_audit_workflow(name=name)
+
+
 def run_analysis(
     model: str,
     code_dir: str,
@@ -33,21 +62,8 @@ def run_analysis(
     """ADK 2.0 provider pipeline: executes a multi-node workflow graph."""
     logger.write("Initializing ADK 2.0 Workflow Engine...")
 
-    # Build the multi-node workflow graph dynamically
-    if ingest_path:
-        edges = [
-            ("START", initialize),
-            (initialize, ingest_report_phase),
-            (ingest_report_phase, review_phase),
-        ]
-    else:
-        edges = [
-            ("START", initialize),
-            (initialize, audit_phase),
-            (audit_phase, review_phase),
-        ]
-
-    analysis_workflow = Workflow(name="MjolnirAnalysis", edges=edges)
+    # Build the multi-node workflow graph dynamically via workflow builders
+    analysis_workflow = build_analysis_workflow(ingest_path=ingest_path)
 
     session_service = InMemorySessionService()
     runner = Runner(

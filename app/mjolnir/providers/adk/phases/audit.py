@@ -1,5 +1,6 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
+import asyncio
 import json
 import os
 from google.adk import Context
@@ -14,21 +15,31 @@ from providers.adk.utilities.async_runner import (
 from providers.adk.agents.auditor import get_auditor_agent
 
 
-def checkpoint_audit_findings(
+def _write_checkpoint_sync(audit_path: str, vulns_data: list[dict]) -> None:
+    with open(audit_path, "w") as f:
+        json.dump(vulns_data, f, indent=2)
+
+
+def _read_file_contents_sync(full_file_path: str) -> str:
+    with open(full_file_path, "r", errors="ignore") as f:
+        return f.read()
+
+
+async def checkpoint_audit_findings(
     vulns: list[Vulnerability],
     run_dir: str | None,
     phase_id: str = "1",
     filename: str | None = None,
 ) -> None:
-    """Serializes and checkpoints Phase 1 vulnerability findings to disk."""
+    """Serializes and checkpoints Phase vulnerability findings to disk asynchronously."""
     if not run_dir:
         logger.warning("No run_dir provided, skipping checkpointing of audit findings.")
         return
     checkpoint_name = filename or f"finding_phase_{phase_id}.json"
     audit_path = os.path.join(run_dir, checkpoint_name)
     try:
-        with open(audit_path, "w") as f:
-            json.dump([v.model_dump() for v in vulns], f, indent=2)
+        vulns_data = [v.model_dump() for v in vulns]
+        await asyncio.to_thread(_write_checkpoint_sync, audit_path, vulns_data)
         logger.write(
             f"Checkpointed {len(vulns)} Phase {phase_id} vulnerabilities to {audit_path}"
         )
@@ -52,8 +63,7 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
     async def audit_single_file(f_path: str) -> list[Vulnerability]:
         full_file_path = os.path.join(code_dir, f_path)
         try:
-            with open(full_file_path, "r", errors="ignore") as f:
-                contents = f.read()
+            contents = await asyncio.to_thread(_read_file_contents_sync, full_file_path)
         except Exception as e:
             logger.error(f"Could not read {f_path}: {e}")
             return []
@@ -97,7 +107,7 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
             logger.error(f"Phase 1 error: {exc}", exc_info=exc)
 
     flat_vulns = [vuln for file_vulns in results for vuln in file_vulns]
-    checkpoint_audit_findings(flat_vulns, run_dir)
+    await checkpoint_audit_findings(flat_vulns, run_dir)
 
     logger.write(
         f"Phase 1 complete. Found {len(flat_vulns)} total vulnerabilities.", stdout=True
