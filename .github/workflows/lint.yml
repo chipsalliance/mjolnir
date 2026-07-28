@@ -1,11 +1,12 @@
-name: Format Check
+name: Lint
 
 on:
   pull_request:
     branches: [ "main" ]
 
 jobs:
-  format-check:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,5 +18,11 @@ jobs:
           disk-cache: ${{ github.workflow }}
           repository-cache: true
 
-      - name: Run Format Check
+      - name: Format Check
         run: bazel test //quality:format_check
+
+      - name: License Header Check
+        run: bazel test //quality:license_check
+
+      - name: Shell Script Check
+        run: bazel test //quality:shellcheck

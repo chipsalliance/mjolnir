@@ -1,3 +1,6 @@
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
+
 load("@aspect_rules_lint//format:defs.bzl", "format_multirun", "format_test")
 load("@npm//:prettier/package_json.bzl", prettier_bin = "bin")
 
@@ -6,20 +9,58 @@ prettier_bin.prettier_binary(
     env = {"BAZEL_BINDIR": "."},
 )
 
-# Run all formatters.
+# Run all formatters (bazel run //quality:format).
 format_multirun(
     name = "format",
     markdown = ":prettier",
     python = "@aspect_rules_lint//format:ruff",
+    shell = "@aspect_rules_lint//format:shfmt",
     starlark = "@buildifier_prebuilt//:buildifier",
 )
 
-# Check all formatting.
+# Check all formatting (bazel test //quality:format_check).
 format_test(
     name = "format_check",
     markdown = ":prettier",
     no_sandbox = True,
     python = "@aspect_rules_lint//format:ruff",
+    shell = "@aspect_rules_lint//format:shfmt",
     starlark = "@buildifier_prebuilt//:buildifier",
     workspace = "//:MODULE.bazel",
+)
+
+# Check license header compliance across source files (bazel test //quality:license_check).
+py_test(
+    name = "license_check",
+    srcs = ["license_check.py"],
+    args = [
+        "--extensions",
+        ".py",
+        ".sh",
+        ".nix",
+        ".bzl",
+        ".bazel",
+        "--filenames",
+        "BUILD",
+        "BUILD.bazel",
+        "MODULE.bazel",
+    ],
+    data = ["//:MODULE.bazel"],
+)
+
+# Check shell script quality and bash bug detection (bazel test //quality:shellcheck).
+sh_test(
+    name = "shellcheck",
+    srcs = ["run_shellcheck.sh"],
+    data = ["//:MODULE.bazel"],
+)
+
+# Run all quality checks at once (bazel test //quality).
+test_suite(
+    name = "quality",
+    tests = [
+        ":format_check",
+        ":license_check",
+        ":shellcheck",
+    ],
 )

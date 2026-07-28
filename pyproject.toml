@@ -1,0 +1,30 @@
+# Python formatting and linting configuration (Ruff)
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+indent-width = 4
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort (import sorting)
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "C4",  # flake8-comprehensions
+]
+ignore = [
+    "E501", # Line length handled by ruff format
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = ["mjolnir", "app"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
