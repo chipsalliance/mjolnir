@@ -40,9 +40,7 @@ async def review_phase(
             vuln.add_skipped("2", "Initial Review", f"Skipped: Status is {vuln.status}")
             return vuln
 
-        vuln_key = f"{vuln.file}:{vuln.title}:{vuln.location}"
-        vuln_hash = hashlib.md5(vuln_key.encode("utf-8")).hexdigest()[:12]
-        run_id = f"review_{vuln_hash}"
+        run_id = f"review_{vuln.id}"
 
         try:
             verdict = await run_agent_with_backoff(
@@ -84,10 +82,11 @@ async def review_phase(
 
     if exceptions:
         logger.write(
-            f"WARNING: Phase 2 encountered {len(exceptions)} fatal errors. Sample failure: {exceptions[0]}",
+            f"WARNING: Phase 2 encountered {len(exceptions)} fatal errors.",
             stdout=True,
         )
-        logger.error(f"Phase 2 errors: {exceptions[0]}", exc_info=exceptions[0])
+        for exc in exceptions:
+            logger.error(f"Phase 2 error: {exc}", exc_info=exc)
 
     logger.write("Phase 2 complete.", stdout=True)
     return results

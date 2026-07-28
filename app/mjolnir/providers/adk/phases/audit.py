@@ -14,19 +14,26 @@ from providers.adk.utilities.async_runner import (
 from providers.adk.agents.auditor import get_auditor_agent
 
 
-def checkpoint_audit_findings(vulns: list[Vulnerability], run_dir: str | None) -> None:
+def checkpoint_audit_findings(
+    vulns: list[Vulnerability],
+    run_dir: str | None,
+    phase_id: str = "1",
+    filename: str | None = None,
+) -> None:
     """Serializes and checkpoints Phase 1 vulnerability findings to disk."""
     if not run_dir:
+        logger.warning("No run_dir provided, skipping checkpointing of audit findings.")
         return
-    audit_path = os.path.join(run_dir, "audit_findings.json")
+    checkpoint_name = filename or f"finding_phase_{phase_id}.json"
+    audit_path = os.path.join(run_dir, checkpoint_name)
     try:
         with open(audit_path, "w") as f:
             json.dump([v.model_dump() for v in vulns], f, indent=2)
         logger.write(
-            f"Checkpointed {len(vulns)} Phase 1 vulnerabilities to {audit_path}"
+            f"Checkpointed {len(vulns)} Phase {phase_id} vulnerabilities to {audit_path}"
         )
     except Exception as e:
-        logger.error(f"Failed to checkpoint Phase 1 vulnerabilities: {e}")
+        logger.error(f"Failed to checkpoint Phase {phase_id} vulnerabilities: {e}")
 
 
 @node(rerun_on_resume=True)
@@ -83,10 +90,11 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
 
     if exceptions:
         logger.write(
-            f"WARNING: Phase 1 encountered {len(exceptions)} fatal errors. Sample failure: {exceptions[0]}",
+            f"WARNING: Phase 1 encountered {len(exceptions)} fatal errors.",
             stdout=True,
         )
-        logger.error(f"Phase 1 errors: {exceptions[0]}", exc_info=exceptions[0])
+        for exc in exceptions:
+            logger.error(f"Phase 1 error: {exc}", exc_info=exc)
 
     flat_vulns = [vuln for file_vulns in results for vuln in file_vulns]
     checkpoint_audit_findings(flat_vulns, run_dir)

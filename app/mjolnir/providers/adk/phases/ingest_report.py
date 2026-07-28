@@ -12,6 +12,31 @@ from providers.adk.utilities.async_runner import run_agent_with_backoff
 from providers.adk.agents.ingestion import get_ingestion_agent
 
 
+def _try_fast_json_ingestion(full_path: str) -> list[Vulnerability] | None:
+    """Attempts fast-path loading from a JSON checkpoint file."""
+    if not (os.path.isfile(full_path) and full_path.endswith(".json")):
+        return None
+
+    try:
+        with open(full_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not (isinstance(data, list) and data):
+            return None
+
+        vulns = [Vulnerability.from_dict(item) for item in data]
+        if vulns:
+            logger.write(
+                f"Fast Ingestion: Loaded {len(vulns)} structured vulnerabilities from JSON checkpoint.",
+                stdout=True,
+            )
+            return vulns
+    except Exception as e:
+        logger.info(
+            f"JSON fast ingestion failed ({e}). Falling back to LLM tool delegation."
+        )
+    return None
+
+
 @node(rerun_on_resume=True)
 async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerability]:
     """Alternative Phase 1: Ingests and parses unstructured security report findings using tool delegation."""
@@ -21,47 +46,24 @@ async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerabili
     model = ctx.state["model"]
     code_dir = ctx.state["code_dir"]
     run_dir = ctx.state.get("run_dir")
-    full_path = os.path.join(code_dir, report_file_path)
-    if not os.path.exists(full_path) and os.path.exists(report_file_path):
+
+    if os.path.isabs(report_file_path) or os.path.exists(report_file_path):
         full_path = report_file_path
+    else:
+        full_path = os.path.join(code_dir, report_file_path)
 
     # Fast-Path Checkpoint Check (`vulnerabilities.json` or `audit_findings.json`)
-    if os.path.isfile(full_path) and full_path.endswith(".json"):
-        try:
-            with open(full_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, list) and data:
-                vulns: list[Vulnerability] = []
-                for item in data:
-                    if isinstance(item, dict) and "history" in item and "id" in item:
-                        vulns.append(Vulnerability.model_validate(item))
-                    else:
-                        raw_af = item.get("audit_finding", item)
-                        af = AuditFinding.model_validate(raw_af)
-                        target_file = af.file or item.get(
-                            "file", item.get("location", "unknown_file")
-                        )
-                        vulns.append(
-                            Vulnerability.from_audit_finding(af, file_path=target_file)
-                        )
-                if vulns:
-                    logger.write(
-                        f"Fast Ingestion: Loaded {len(vulns)} structured vulnerabilities from JSON checkpoint.",
-                        stdout=True,
-                    )
-                    return vulns
-        except Exception as e:
-            logger.info(
-                f"JSON fast ingestion failed ({e}). Falling back to LLM tool delegation."
-            )
+    fast_vulns = _try_fast_json_ingestion(full_path)
+    if fast_vulns is not None:
+        return fast_vulns
 
     # Tool Delegation: IngestionAgent autonomously reads the directory/file using its read_file & glob tools
     if os.path.isdir(full_path):
         document_text = (
             f"Ingestion Target Directory: {full_path}\n\n"
-            f"This target is a directory. Please use your `glob` and `read_file` tools to discover "
+            "This target is a directory. Please use your `glob` and `read_file` tools to discover "
             f"and read all report files, spreadsheets, markdown logs, or JSON summaries inside `{full_path}`. "
-            f"Synthesize every security vulnerability found across these files into your unified SecurityReport output."
+            "Synthesize every security vulnerability found across these files into your unified SecurityReport output."
         )
     else:
         document_text = (
@@ -81,25 +83,13 @@ async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerabili
     )
 
     vulns: list[Vulnerability] = []
-    if report and hasattr(report, "vulnerabilities") and report.vulnerabilities:
-        for af in report.vulnerabilities:
-            target_file = (
-                af.file if af.file and af.file != "unknown_file" else report_file_path
-            )
-            if os.path.isdir(full_path) and (not af.file or af.file == "unknown_file"):
-                target_file = "unknown_file"
-            vulns.append(Vulnerability.from_audit_finding(af, file_path=target_file))
+    if report and hasattr(report, "to_vulnerabilities"):
+        vulns = report.to_vulnerabilities(fallback_file_path=report_file_path)
 
     if run_dir:
-        audit_path = os.path.join(run_dir, "audit_findings.json")
-        try:
-            with open(audit_path, "w") as f:
-                json.dump([v.model_dump() for v in vulns], f, indent=2)
-            logger.write(
-                f"Checkpointed {len(vulns)} Phase 1 vulnerabilities to {audit_path}"
-            )
-        except Exception as e:
-            logger.error(f"Failed to checkpoint Phase 1 vulnerabilities: {e}")
+        from providers.adk.phases.audit import checkpoint_audit_findings
+
+        checkpoint_audit_findings(vulns, run_dir, phase_id="1")
 
     logger.write(
         f"Ingestion complete. Extracted {len(vulns)} vulnerabilities.", stdout=True

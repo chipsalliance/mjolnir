@@ -4,7 +4,7 @@ This package implements the core multi-phase security auditing graph using Googl
 
 ## Architecture & Data Flow
 
-The workflow is architected for high scalability (6 to 8+ future phases) using a **unified domain carrier pattern**:
+The workflow is architected for high scalability using a **unified domain carrier pattern**:
 
 ```mermaid
 flowchart LR

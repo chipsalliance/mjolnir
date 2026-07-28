@@ -108,8 +108,11 @@ def run_analysis(
     # Write usage report
     usage_tracker.write_to_disk(run_dir)
 
-    if not vulnerabilities:
-        audit_path = os.path.join(run_dir, "audit_findings.json")
+    if not vulnerabilities and run_dir:
+        audit_path = os.path.join(run_dir, "finding_phase_1.json")
+        if not os.path.exists(audit_path):
+            audit_path = os.path.join(run_dir, "audit_findings.json")
+
         if os.path.exists(audit_path):
             logger.warning(
                 "Falling back to unreviewed Phase 1 vulnerabilities due to Phase 2 interruption."
@@ -117,24 +120,18 @@ def run_analysis(
             try:
                 with open(audit_path, "r", encoding="utf-8") as f:
                     raw_vulns = json.load(f)
-                for item in raw_vulns:
-                    if isinstance(item, dict):
-                        vulnerabilities.append(Vulnerability.model_validate(item))
-                    elif isinstance(item, Vulnerability):
-                        vulnerabilities.append(item)
+                if isinstance(raw_vulns, list):
+                    vulnerabilities = raw_vulns
             except Exception as e:
                 logger.error(f"Could not load fallback Phase 1 vulnerabilities: {e}")
 
     # Ensure all elements in vulnerabilities are validated Pydantic models
     clean_vulns: list[Vulnerability] = []
-    for v in vulnerabilities:
-        if isinstance(v, dict):
-            try:
-                clean_vulns.append(Vulnerability.model_validate(v))
-            except Exception as e:
-                logger.error(f"Failed to validate dict to Vulnerability: {e}")
-        elif isinstance(v, Vulnerability):
-            clean_vulns.append(v)
+    for item in vulnerabilities:
+        try:
+            clean_vulns.append(Vulnerability.from_dict(item))
+        except Exception as e:
+            logger.error(f"Failed to validate item to Vulnerability: {e}")
 
     logger.success("Analysis pipeline completed.")
     return clean_vulns, status
