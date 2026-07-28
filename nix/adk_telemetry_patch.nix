@@ -1,3 +1,5 @@
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
 ''
   # Replace incubating OTel imports in ADK telemetry files with safe fallback definitions
   for f in src/google/adk/telemetry/_experimental_semconv.py \
