@@ -142,20 +142,20 @@ Mjolnir includes a suite of test targets to verify local pipelines, GCS uploads,
 To verify that the Nix derivations build cleanly:
 
 ```bash
-nix build .#smoke-test --no-link
+nix build .#mock-smoke-test --no-link
 ```
 
 To run a local mock test (verifies the python runner and local file system hooks):
 
 ```bash
-nix run .#smoke-test
+nix run .#mock-smoke-test
 ```
 
 To verify GCS storage uploads with mock data:
 
 ```bash
 export MJOLNIR_GCS_BUCKET="your-bucket"
-nix run .#gcs-test
+nix run .#mock-gcs-test
 ```
 
 ### Live LLM Testing
@@ -163,15 +163,17 @@ nix run .#gcs-test
 To verify your credentials or `GEMINI_API_KEY` against a real Gemini model (runs on a small subset of files using `gemini-2.5-flash`):
 
 ```bash
-# Option A: Using API Key
+# Set credentials (either API key or GCP Vertex AI):
 export GEMINI_API_KEY="AIzaSy..."
-nix run .#gemini-test
 
-# Option B: Using GCP Vertex AI
-export GOOGLE_CLOUD_PROJECT="your-project"
-export GOOGLE_CLOUD_LOCATION="global"
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/credentials.json"
-nix run .#gemini-test
+# Option A: GenAI Provider Target
+nix run .#genai-gemini-test
+
+# Option B: ADK Provider Target (Google Agent Development Kit)
+nix run .#adk-gemini-test
+
+# Option C: ADK Ingestion Mode
+nix run .#adk-gemini-ingest-test
 ```
 
 To verify end-to-end LLM scanning combined with GCS upload:
@@ -179,6 +181,8 @@ To verify end-to-end LLM scanning combined with GCS upload:
 ```bash
 export MJOLNIR_GCS_BUCKET="your-bucket"
 nix run .#genai-gemini-gcs-test
+# or
+nix run .#adk-gemini-gcs-test
 ```
 
 ### Running All Tests
