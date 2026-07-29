@@ -19,11 +19,11 @@ from providers.adk.phases.audit import checkpoint_audit_findings
 @node(rerun_on_resume=True)
 async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vulnerability]:
     """Phase 2: Adversarial Triaging (Validation)."""
-    logger.write("Starting Phase 2: Adversarial Reviews...", stdout=True)
+    logger.info("Starting Phase 2: Adversarial Reviews...")
 
     vulnerabilities = node_input
     if not vulnerabilities:
-        logger.write("No vulnerabilities to review.", stdout=True)
+        logger.info("No vulnerabilities to review.")
         return []
 
     model = ctx.state["model"]
@@ -58,10 +58,7 @@ async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vu
                     "Reviewer agent returned empty/unparseable verdict after retries.",
                 )
         except Exception as rev_err:
-            logger.write(
-                f" [Reviewer FATAL] Failed {vuln.file} after max retries: {rev_err}",
-                stdout=True,
-            )
+            logger.error(f" [Reviewer FATAL] Failed {vuln.file} after max retries: {rev_err}")
             vuln.add_skipped(
                 "2",
                 "Initial Review",
@@ -80,10 +77,7 @@ async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vu
     )
 
     if exceptions:
-        logger.write(
-            f"WARNING: Phase 2 encountered {len(exceptions)} fatal errors.",
-            stdout=True,
-        )
+        logger.warning(f"Phase 2 encountered {len(exceptions)} fatal errors.")
         for exc in exceptions:
             logger.error(f"Phase 2 error: {exc}", exc_info=exc)
 
@@ -91,5 +85,5 @@ async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vu
 
     await checkpoint_audit_findings(results, run_dir, phase_id="2")
 
-    logger.write("Phase 2 complete.", stdout=True)
+    logger.info("Phase 2 complete.")
     return results

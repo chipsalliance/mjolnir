@@ -61,7 +61,7 @@ def run_analysis(
     ingest_path: str = None,
 ) -> tuple[list[Vulnerability], str]:
     """ADK 2.0 provider pipeline: executes a multi-node workflow graph."""
-    logger.write("Initializing ADK 2.0 Workflow Engine...")
+    logger.info("Initializing ADK 2.0 Workflow Engine...")
 
     # Build the multi-node workflow graph dynamically via workflow builders
     analysis_workflow = build_analysis_workflow(ingest_path=ingest_path)

@@ -30,9 +30,8 @@ class AuditorAgent(MjolnirAgent):
 
         ext = Path(file_path).suffix.lstrip(".").lower()
         if ext not in EXTENSION_TO_PROMPT:
-            logger.write(
-                f" [API Warning] Unsupported file extension: .{ext}. Defaulting to C auditor.",
-                stdout=True,
+            logger.warning(
+                f" [API Warning] Unsupported file extension: .{ext}. Defaulting to C auditor."
             )
             prompt_name = DEFAULT_PROMPT
         else:
@@ -42,18 +41,14 @@ class AuditorAgent(MjolnirAgent):
         if p_path.exists():
             with open(p_path, "r", encoding="utf-8") as f:
                 base_prompt = f.read().strip()
-                logger.write(
-                    f"[Prompt Loader] Loaded prompt for .{ext} from: {prompt_name}",
-                    stdout=False,
-                    indent=2,
-                )
+                logger.debug(f"[Prompt Loader] Loaded prompt for .{ext} from: {prompt_name}")
                 return base_prompt + self.threat_model_context
         return (
             "Analyze this file for potential security vulnerabilities." + self.threat_model_context
         )
 
     def run(self, file_rel_path: str, contents: str) -> SecurityReport:
-        logger.write(f"Scanning {file_rel_path} (GenAI)...", stdout=False)
+        logger.debug(f"Scanning {file_rel_path} (GenAI)...")
         system_instruction = self._resolve_instruction(file_rel_path)
         file_prompt = f"Analyze this file:\n\nFilename: {file_rel_path}\n\nContent:\n{contents}"
 

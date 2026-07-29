@@ -40,21 +40,17 @@ class MjolnirAgent:
         if prompt_feedback:
             block_reason = getattr(prompt_feedback, "block_reason", None)
             if block_reason and str(block_reason) not in IGNORED_BLOCK_REASONS:
-                logger.write(
-                    f" [API Warning] Prompt BLOCKED by safety filter. Reason: {block_reason}",
-                    stdout=True,
+                logger.warning(
+                    f" [API Warning] Prompt BLOCKED by safety filter. Reason: {block_reason}"
                 )
                 if hasattr(prompt_feedback, "safety_ratings") and prompt_feedback.safety_ratings:
                     ratings = [
                         f"{r.category}: {r.probability}" for r in prompt_feedback.safety_ratings
                     ]
-                    logger.write(
-                        f" [API Warning] Prompt Safety Ratings: {', '.join(ratings)}",
-                        stdout=True,
-                    )
+                    logger.warning(f" [API Warning] Prompt Safety Ratings: {', '.join(ratings)}")
 
         if not response.candidates:
-            logger.write(" [API Warning] API response contains zero candidates.", stdout=True)
+            logger.warning(" [API Warning] API response contains zero candidates.")
             return ""
 
         candidate = response.candidates[0]
@@ -62,16 +58,10 @@ class MjolnirAgent:
 
         # If finish reason is not normal completion, log details
         if finish_reason and str(finish_reason) not in IGNORED_FINISH_REASONS:
-            logger.write(
-                f" [API Warning] Model execution unfinished. Reason: {finish_reason}",
-                stdout=True,
-            )
+            logger.warning(f" [API Warning] Model execution unfinished. Reason: {finish_reason}")
             if hasattr(candidate, "safety_ratings") and candidate.safety_ratings:
                 ratings = [f"{r.category}: {r.probability}" for r in candidate.safety_ratings]
-                logger.write(
-                    f" [API Warning] Candidate Safety Ratings: {', '.join(ratings)}",
-                    stdout=True,
-                )
+                logger.warning(f" [API Warning] Candidate Safety Ratings: {', '.join(ratings)}")
 
         if not candidate.content or not candidate.content.parts:
             return ""
@@ -80,9 +70,8 @@ class MjolnirAgent:
         has_calls = any(getattr(part, "function_call", None) for part in candidate.content.parts)
 
         if not has_text and has_calls:
-            logger.write(
-                " [API Warning] Model session ended with a tool call request but no text parts. The maximum tool execution calls limit (10) was likely reached!",
-                stdout=True,
+            logger.warning(
+                " [API Warning] Model session ended with a tool call request but no text parts. The maximum tool execution calls limit (10) was likely reached!"
             )
 
         text_parts = []

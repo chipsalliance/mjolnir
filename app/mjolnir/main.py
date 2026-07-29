@@ -64,9 +64,9 @@ def _run_orchestrator():
         else:
             output_dir = str(Path(args.output_dir).expanduser().resolve())
 
-        logger.write(f"Compiling dashboard from existing runs in {output_dir}...")
+        logger.info(f"Compiling dashboard from existing runs in {output_dir}...")
         generate_dashboard(output_dir)
-        logger.write("Dashboard generated successfully.")
+        logger.info("Dashboard generated successfully.")
         return
 
     if not args.spec:
@@ -127,13 +127,13 @@ def _run_orchestrator():
 
     logger.header("Welcome to Mjolnir!")
 
-    logger.write(f"Setting up repository for {repo_name}.")
+    logger.info(f"Setting up repository for {repo_name}.")
     setup_repository(repo_url, code_dir, repo_ref, workspace_dir)
 
     # File discovery & Ingestion routing
     ingest_path = args.ingest or job.get("ingestionReport")
 
-    logger.write(f"Writing project metadata.")
+    logger.info(f"Writing project metadata.")
     write_metadata(run_dir, repo_url, model_name, repo_ref, code_dir, timestamp_pretty, ingest_path)
 
     # Execute command, if one is provided
@@ -141,7 +141,7 @@ def _run_orchestrator():
     cmd = job.get("cmd")
 
     if cmd:
-        logger.write(f"Recieved override command ({cmd}).")
+        logger.info(f"Recieved override command ({cmd}).")
         run_env = os.environ.copy()
         run_env["MJOLNIR_WORKSPACE"] = workspace_dir
         run_command(
@@ -153,23 +153,23 @@ def _run_orchestrator():
     # Ingestion check and File discovery
 
     if ingest_path:
-        logger.write(f"Ingestion Mode enabled. Ingesting report path: {ingest_path}")
+        logger.info(f"Ingestion Mode enabled. Ingesting report path: {ingest_path}")
         files_to_scan = []
     else:
-        logger.write(f"Discovery Mode enabled. Looking for files to analyze.")
+        logger.info(f"Discovery Mode enabled. Looking for files to analyze.")
         files_to_scan = discover_source_files(code_dir, job)
 
         if files_to_scan:
-            logger.write(f"Discovered {len(files_to_scan)} files to analyze.")
+            logger.info(f"Discovered {len(files_to_scan)} files to analyze.")
         else:
-            logger.write(f"Discovered no files to analyze. Exiting.")
+            logger.info(f"Discovered no files to analyze. Exiting.")
             sys.exit(1)
 
     # Execute analyis via selected provider
 
     provider_name = job.get("provider")
 
-    logger.write(f"Executing analysis using {provider_name} provider (model={model_name}).")
+    logger.info(f"Executing analysis using {provider_name} provider (model={model_name}).")
 
     batch_size = job.get("batchSize")
 
@@ -238,7 +238,7 @@ def _run_orchestrator():
 
     # Dashboard generation
 
-    logger.write(f"Generating dashboards.")
+    logger.info(f"Generating dashboards.")
 
     generate_dashboard(output_dir)
 
@@ -247,7 +247,7 @@ def _run_orchestrator():
     require_gcs = job.get("requireGcsUpload")
 
     if require_gcs:
-        logger.write(f"Uploading results to GCS.")
+        logger.info(f"Uploading results to GCS.")
         upload.upload_run_to_gcs(run_dir, repo_name, job.get("name"), timestamp_dir)
         upload.upload_dashboard_to_gcs()
 

@@ -27,7 +27,7 @@ async def read_file(
     if not safe_path.exists() or not safe_path.is_file():
         return f"Error: File '{file_path}' does not exist or is not a regular file."
 
-    logger.write(
+    logger.debug(
         f"[Tool Execution] read_file: {file_path} (lines {start_line} to {end_line if end_line else 'end'})"
     )
     reader = FileReader(safe_path)

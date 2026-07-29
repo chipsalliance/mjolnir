@@ -25,7 +25,7 @@ async def ast_search(
     if not search_path.exists():
         return f"Error: Path '{dir_path}' does not exist."
 
-    logger.write(
+    logger.debug(
         f"[Tool Execution] ast_search: pattern='{pattern}', lang='{lang}', dir_path='{dir_path}'"
     )
     runner = AstGrepRunner()

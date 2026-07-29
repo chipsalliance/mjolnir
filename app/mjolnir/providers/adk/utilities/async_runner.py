@@ -115,10 +115,9 @@ async def run_agent_with_backoff(
             jitter = random.uniform(0.1, 2.0)
             total_sleep = delay + jitter
 
-            logger.write(
+            logger.info(
                 f"Transient/Quota error for {run_id} ({error_str[:30]}...). "
-                f"Local backoff for {total_sleep:.1f}s (Attempt {attempt}/{max_retries})",
-                stdout=True,
+                f"Local backoff for {total_sleep:.1f}s (Attempt {attempt}/{max_retries})"
             )
             await asyncio.sleep(total_sleep)
 

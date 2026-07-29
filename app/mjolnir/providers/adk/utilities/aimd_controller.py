@@ -52,9 +52,8 @@ class AIMDConcurrencyController:
                     self.current_limit * CONCURRENCY_DECREASE_FACTOR,
                 )
                 if int(new_limit) < int(self.current_limit):
-                    logger.write(
-                        f"AIMD Controller: Fast-shrinking concurrency from {int(self.current_limit)} down to {int(new_limit)} due to 429 constraint.",
-                        stdout=True,
+                    logger.info(
+                        f"AIMD Controller: Fast-shrinking concurrency from {int(self.current_limit)} down to {int(new_limit)} due to 429 constraint."
                     )
                 self.current_limit = new_limit
 

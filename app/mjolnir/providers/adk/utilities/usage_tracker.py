@@ -113,4 +113,4 @@ class UsageTracker:
             usage_path = Path(run_dir) / "usage.json"
             with open(usage_path, "w") as f:
                 json.dump(usage_data, f, indent=2)
-            logger.write(f"Token and error usage breakdown saved to {usage_path}")
+            logger.info(f"Token and error usage breakdown saved to {usage_path}")

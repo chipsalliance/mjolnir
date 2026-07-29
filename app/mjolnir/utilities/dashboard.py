@@ -410,11 +410,11 @@ def generate_dashboard(output_dir: str):
                 break
 
     if not runs_path or not runs_path.exists():
-        logger.write(f"Error: Could not locate 'runs' directory starting from {output_dir}")
+        logger.error(f"Error: Could not locate 'runs' directory starting from {output_dir}")
         return
 
     output_root = runs_path.parent
-    logger.write(f"Compiling static MPA dashboard into {output_root}")
+    logger.info(f"Compiling static MPA dashboard into {output_root}")
 
     # Gather data
     runs_data = {}
@@ -478,10 +478,10 @@ def generate_dashboard(output_dir: str):
                     )
                     project_vulns[proj_name].extend(formatted_for_project)
                 except Exception as e:
-                    logger.write(f"Warning: Failed to load findings for run {run_dir.name}: {e}")
+                    logger.warning(f"Failed to load findings for run {run_dir.name}: {e}")
 
     if not runs_data:
-        logger.write("No scan reports found. Local dashboard not compiled.")
+        logger.info("No scan reports found. Local dashboard not compiled.")
         return
 
 
@@ -669,11 +669,11 @@ def generate_dashboard(output_dir: str):
                 break
 
     if not runs_path or not runs_path.exists():
-        logger.write(f"Error: Could not locate 'runs' directory starting from {output_dir}")
+        logger.error(f"Error: Could not locate 'runs' directory starting from {output_dir}")
         return
 
     output_root = runs_path.parent
-    logger.write(f"Compiling static MPA dashboard into {output_root}")
+    logger.info(f"Compiling static MPA dashboard into {output_root}")
 
     # Gather data
     runs_data = {}
@@ -723,10 +723,10 @@ def generate_dashboard(output_dir: str):
                         usage,
                     )
                 except Exception as e:
-                    logger.write(f"Warning: Failed to load findings for run {run_dir.name}: {e}")
+                    logger.warning(f"Failed to load findings for run {run_dir.name}: {e}")
 
     if not runs_data:
-        logger.write("No scan reports found. Local dashboard not compiled.")
+        logger.info("No scan reports found. Local dashboard not compiled.")
         return
 
     web_root = output_root / "web"

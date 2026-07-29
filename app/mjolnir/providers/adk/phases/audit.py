@@ -41,7 +41,7 @@ async def checkpoint_audit_findings(
     try:
         vulns_data = [v.model_dump() for v in vulns]
         await asyncio.to_thread(_write_checkpoint_sync, audit_path, vulns_data)
-        logger.write(f"Checkpointed {len(vulns)} Phase {phase_id} vulnerabilities to {audit_path}")
+        logger.info(f"Checkpointed {len(vulns)} Phase {phase_id} vulnerabilities to {audit_path}")
     except Exception as e:
         logger.error(f"Failed to checkpoint Phase {phase_id} vulnerabilities: {e}")
 
@@ -49,7 +49,7 @@ async def checkpoint_audit_findings(
 @node(rerun_on_resume=True)
 async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability]:
     """Phase 1: Dynamic File Auditing (Discovery)."""
-    logger.write("Starting Phase 1: Exploration Audits...", stdout=True)
+    logger.info("Starting Phase 1: Exploration Audits...")
 
     model = ctx.state["model"]
     code_dir = ctx.state["code_dir"]
@@ -94,15 +94,12 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
     )
 
     if exceptions:
-        logger.write(
-            f"WARNING: Phase 1 encountered {len(exceptions)} fatal errors.",
-            stdout=True,
-        )
+        logger.warning(f"Phase 1 encountered {len(exceptions)} fatal errors.")
         for exc in exceptions:
             logger.error(f"Phase 1 error: {exc}", exc_info=exc)
 
     flat_vulns = [vuln for file_vulns in results for vuln in file_vulns]
     await checkpoint_audit_findings(flat_vulns, run_dir)
 
-    logger.write(f"Phase 1 complete. Found {len(flat_vulns)} total vulnerabilities.", stdout=True)
+    logger.info(f"Phase 1 complete. Found {len(flat_vulns)} total vulnerabilities.")
     return flat_vulns

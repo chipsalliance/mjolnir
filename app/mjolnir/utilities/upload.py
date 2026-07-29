@@ -14,7 +14,7 @@ GCS_VERSION_PREFIX = "v0"
 
 def _upload_to_gcs(bucket_name: str, run_dir: str, destination_prefix: str):
     """Uploads the files in the scan run directory to Google Cloud Storage."""
-    logger.write(f"Connecting to GCS Bucket: {bucket_name}.")
+    logger.info(f"Connecting to GCS Bucket: {bucket_name}.")
 
     client = storage.Client()
     bucket = client.bucket(bucket_name)
@@ -28,7 +28,7 @@ def _upload_to_gcs(bucket_name: str, run_dir: str, destination_prefix: str):
             rel_path = str(local_file_path.relative_to(run_path))
             blob_name = f"{destination_prefix}/{rel_path}"
 
-            logger.write(f"Uploading {rel_path} -> gs://{bucket_name}/{blob_name}", stdout=False)
+            logger.debug(f"Uploading {rel_path} -> gs://{bucket_name}/{blob_name}")
 
             blob = bucket.blob(blob_name)
             blob.upload_from_filename(local_file_path)
@@ -65,7 +65,7 @@ def upload_dashboard_to_gcs():
         )
         sys.exit(1)
 
-    logger.write(f"Generating GCS dashboard.")
+    logger.info(f"Generating GCS dashboard.")
 
     try:
         client = storage.Client()
@@ -98,7 +98,7 @@ def upload_dashboard_to_gcs():
             }
 
         scan_data = {}
-        logger.write(f"Parsing {len(remote_runs)} remote run reports in memory...", stdout=False)
+        logger.debug(f"Parsing {len(remote_runs)} remote run reports in memory...")
         for run_key, run_info in remote_runs.items():
             try:
                 # 1. Download and parse GCS vulnerabilities.json (contains history)
@@ -124,10 +124,10 @@ def upload_dashboard_to_gcs():
                     full_vulnerabilities,
                 )
             except Exception as e:
-                logger.write(f"Warning: Failed to parse GCS run {run_key}: {e}", stdout=False)
+                logger.warning(f"Failed to parse GCS run {run_key}: {e}")
 
         if not scan_data:
-            logger.write("No valid GCS scan reports found. GCS dashboard not compiled.")
+            logger.info("No valid GCS scan reports found. GCS dashboard not compiled.")
             return
 
         # 4. Compile HTML pages using shared renderer and upload to GCS under v0/web/ (MPA)

@@ -32,9 +32,8 @@ async def _try_fast_json_ingestion(full_path: Path) -> list[Vulnerability] | Non
 
         vulns = [Vulnerability.from_dict(item) for item in data]
         if vulns:
-            logger.write(
-                f"Fast Ingestion: Loaded {len(vulns)} structured vulnerabilities from JSON checkpoint.",
-                stdout=True,
+            logger.info(
+                f"Fast Ingestion: Loaded {len(vulns)} structured vulnerabilities from JSON checkpoint."
             )
             return vulns
     except Exception as e:
@@ -45,7 +44,7 @@ async def _try_fast_json_ingestion(full_path: Path) -> list[Vulnerability] | Non
 @node(rerun_on_resume=True)
 async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerability]:
     """Alternative Phase 1: Ingests and parses unstructured security report findings using tool delegation."""
-    logger.write("Starting Ingestion Phase: Parsing report document(s)...", stdout=True)
+    logger.info("Starting Ingestion Phase: Parsing report document(s)...")
 
     report_file_path = node_input
     model = ctx.state["model"]
@@ -95,5 +94,5 @@ async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerabili
     if run_dir:
         await checkpoint_audit_findings(vulns, run_dir, phase_id="1")
 
-    logger.write(f"Ingestion complete. Extracted {len(vulns)} vulnerabilities.", stdout=True)
+    logger.info(f"Ingestion complete. Extracted {len(vulns)} vulnerabilities.")
     return vulns

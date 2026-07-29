@@ -28,7 +28,7 @@ async def glob(
     if not search_path.exists():
         return f"Error: Path '{dir_path}' does not exist."
 
-    logger.write(f"[Tool Execution] glob: pattern='{pattern}', dir_path='{dir_path}'")
+    logger.debug(f"[Tool Execution] glob: pattern='{pattern}', dir_path='{dir_path}'")
     runner = GlobRunner(
         search_path,
         code_dir=base_dir,

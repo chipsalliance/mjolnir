@@ -29,7 +29,7 @@ async def grep_search(
     if not search_path.exists():
         return f"Error: Path '{dir_path}' does not exist."
 
-    logger.write(
+    logger.debug(
         f"[Tool Execution] grep_search: pattern='{pattern}', dir_path='{dir_path}', "
         f"include={include_pattern}, exclude={exclude_pattern}, case_sensitive={case_sensitive}"
     )

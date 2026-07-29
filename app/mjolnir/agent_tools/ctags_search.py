@@ -24,6 +24,6 @@ async def ctags_search(
     if not search_path.exists():
         return f"Error: Path '{dir_path}' does not exist."
 
-    logger.write(f"[Tool Execution] ctags_search: symbol='{symbol}', dir_path='{dir_path}'")
+    logger.debug(f"[Tool Execution] ctags_search: symbol='{symbol}', dir_path='{dir_path}'")
     runner = CtagsRunner()
     return await runner.search_async(symbol, search_path)

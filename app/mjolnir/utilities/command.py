@@ -14,7 +14,7 @@ def run_command(args, cwd=None, env=None):
     On success, the rolling window is cleared and "Command succeeded." is printed.
     On failure, the rolling window is cleared and the full output is dumped to stderr.
     """
-    logger.write(f"Executing: {' '.join(args)} in {cwd or '.'}")
+    logger.debug(f"Executing: {' '.join(args)} in {cwd or '.'}")
 
     p = subprocess.Popen(
         args,
@@ -40,7 +40,7 @@ def run_command(args, cwd=None, env=None):
         if line:
             output_lines.append(line)
             # Log line output to file only
-            logger.write(line.rstrip("\r\n"), stdout=False)
+            logger.debug(line.rstrip("\r\n"))
 
             # Rolling console window
             if is_tty:
@@ -87,7 +87,7 @@ def run_command_capture(
     Logs execution and output to the logger.
     If check=True and command fails, exits the program.
     """
-    logger.write(f"Executing: {' '.join(args)} in {cwd or '.'}", stdout=False)
+    logger.debug(f"Executing: {' '.join(args)} in {cwd or '.'}")
     try:
         res = subprocess.run(
             args,
@@ -99,13 +99,13 @@ def run_command_capture(
         )
         if res.stdout:
             for line in res.stdout.splitlines():
-                logger.write(line, stdout=False)
+                logger.debug(line)
         if res.stderr:
             for line in res.stderr.splitlines():
-                logger.write(line, stdout=False)
+                logger.debug(line)
 
         if res.returncode == 0:
-            logger.success("Execution succeeded.", indent=0)
+            logger.success("Execution succeeded.")
         else:
             if check:
                 logger.error(f"Execution failed with exit code: {res.returncode}.")

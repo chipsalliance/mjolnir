@@ -36,8 +36,8 @@ def discover_source_files(code_dir: str, job) -> list:
                     files_to_scan.append(rel_path)
 
     if max_files and isinstance(max_files, int) and len(files_to_scan) > max_files:
-        logger.write(
-            f"     [Config Loader] Limiting scan from {len(files_to_scan)} to first {max_files} files (maxFiles set)",
+        logger.info(
+            f"     [Config Loader] Limiting scan from {len(files_to_scan)} to first {max_files} files (maxFiles set)"
         )
         files_to_scan = files_to_scan[:max_files]
 

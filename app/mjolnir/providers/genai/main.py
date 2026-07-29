@@ -80,7 +80,7 @@ def phase_2_initial_review(
     batch_size: int,
 ) -> list[Vulnerability]:
     """Runs Phase 2: Initial Review (Adversarial Review) in parallel for OPEN vulnerabilities."""
-    logger.write("Pipeline: Adversarial Review.")
+    logger.info("Pipeline: Adversarial Review.")
 
     reviewer_executor = ThreadPoolExecutor(max_workers=batch_size)
     reviewer_futures = {}
@@ -88,7 +88,7 @@ def phase_2_initial_review(
     # Only review OPEN vulnerabilities
     open_vulns = [v for v in vulnerabilities if v.status == Status.OPEN]
     if not open_vulns:
-        logger.write("No open vulnerabilities to review.")
+        logger.info("No open vulnerabilities to review.")
         return vulnerabilities
 
     try:

@@ -10,7 +10,7 @@ from utilities.logger import logger
 @node
 async def initialize(ctx: Context, node_input: str) -> Union[list[str], str]:
     """Saves global execution configs to session state and returns target files or ingest path."""
-    logger.write("Initializing ADK execution parameters...", stdout=True)
+    logger.info("Initializing ADK execution parameters...")
     input_data = json.loads(node_input)
 
     ctx.state["model"] = input_data["model"]

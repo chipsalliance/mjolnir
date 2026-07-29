@@ -32,8 +32,8 @@ def run_analysis(
         ext = os.path.splitext(f_path)[1].lstrip(".").lower()
         prompt_name = "rust_auditor.txt" if ext == "rs" else "c_auditor.txt"
 
-        logger.write(f"Scanning {f_path} (Mock)...", stdout=False)
-        logger.write(f"Loaded prompt for .{ext} from: {prompt_name}", stdout=False)
+        logger.debug(f"Scanning {f_path} (Mock)...")
+        logger.debug(f"Loaded prompt for .{ext} from: {prompt_name}")
 
         fid = str(uuid.uuid4())
 

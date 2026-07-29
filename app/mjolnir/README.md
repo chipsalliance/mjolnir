@@ -57,3 +57,14 @@ def run_analysis(
     # ... analysis logic ...
     return vulnerabilities
 ```
+
+## Logging & Observability
+
+Mjolnir uses a dual-destination logging architecture configured in `utilities/logger.py`:
+
+- **Console Output**:
+  - `sys.stdout`: Receives `INFO` level events (standard progress updates, `logger.header(...)` gold stage titles, `logger.success(...)` green completion notices).
+  - `sys.stderr`: Receives `WARNING`, `ERROR`, and `CRITICAL` log events.
+- **Run Log File (`<run_dir>/job.log`)**:
+  - Captures `DEBUG` level and above with ISO timestamps (`%(asctime)s [%(levelname)s]`).
+  - Includes detailed tool call execution logs, low-level traces, and full exception stack traces for deep troubleshooting.
