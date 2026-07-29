@@ -484,20 +484,17 @@ def generate_dashboard(output_dir: str):
         logger.write("No scan reports found. Local dashboard not compiled.")
         return
 
+
+def render_all_dashboard_pages(runs_data: dict) -> dict[str, tuple[str, str]]:
+    """Compiles all static MPA dashboard pages and returns dict of rel_path -> (content, mime_type)."""
     templates_dir = Path(__file__).parent / "templates"
+    pages = {}
 
-    # Move all files into web/ subfolder
-    output_root = output_root / "web"
-    output_root.mkdir(parents=True, exist_ok=True)
-
-    # Write CSS & JS assets directly to output root
+    # Assets
     with open(templates_dir / "dashboard.css", "r", encoding="utf-8") as f:
-        with open(output_root / "dashboard.css", "w", encoding="utf-8") as out:
-            out.write(f.read())
-
+        pages["dashboard.css"] = (f.read(), "text/css")
     with open(templates_dir / "dashboard.js", "r", encoding="utf-8") as f:
-        with open(output_root / "dashboard.js", "w", encoding="utf-8") as out:
-            out.write(f.read())
+        pages["dashboard.js"] = (f.read(), "application/javascript")
 
     # Pre-compute sidebar listings
     project_stats = compute_project_stats(runs_data)
@@ -521,20 +518,36 @@ def generate_dashboard(output_dir: str):
         "sankeyRowsNoTests": sankey_no_tests,
     }
 
-    dashboard_file_path = output_root / "dashboard.html"
-    base_url = compute_base_url(output_root, dashboard_file_path)
-    html = compile_page(
+    output_root = Path(".")
+
+    # 1. COMPILE OVERVIEW PAGE (dashboard.html)
+    overview_path = Path("dashboard.html")
+    global_html = compile_page(
         sidebar_html,
         global_content,
         global_page_data,
         "menu-overview",
         templates_dir,
-        base_url,
+        base_url=compute_base_url(output_root, overview_path),
     )
-    with open(dashboard_file_path, "w", encoding="utf-8") as f:
-        f.write(html)
+    pages[str(overview_path)] = (global_html, "text/html")
 
-    # 2. COMPILE PROJECTS PAGES (project_[name].html)
+    # 2. COMPILE PROJECTS PAGES (project/[name].html)
+    project_vulns = {}
+    for r in runs_data.values():
+        proj_name = r["project"]
+        if proj_name not in project_vulns:
+            project_vulns[proj_name] = []
+        run_id_key = f"{r['project']}-{r['job_folder']}-{r['run_folder']}"
+        formatted_for_project = format_findings(
+            r["findings"],
+            run_id_key=run_id_key,
+            timestamp=r.get("timestamp"),
+            model=r.get("model"),
+            run_folder=r.get("run_folder"),
+        )
+        project_vulns[proj_name].extend(formatted_for_project)
+
     with open(templates_dir / "view_project.html.tpl", "r", encoding="utf-8") as f:
         project_tpl = f.read()
 
@@ -551,24 +564,18 @@ def generate_dashboard(output_dir: str):
             "runs": proj_runs,
         }
 
-        project_dir_path = output_root / "project"
-        project_dir_path.mkdir(exist_ok=True)
-        project_file_path = project_dir_path / f"{proj_name}.html"
-        base_url = compute_base_url(output_root, project_file_path)
-
-        html = compile_page(
+        proj_path = Path(f"project/{proj_name}.html")
+        proj_html = compile_page(
             sidebar_html,
             proj_content,
             proj_page_data,
             f"menu-project-{proj_name}",
             templates_dir,
-            base_url,
+            base_url=compute_base_url(output_root, proj_path),
         )
+        pages[str(proj_path)] = (proj_html, "text/html")
 
-        with open(project_file_path, "w", encoding="utf-8") as f:
-            f.write(html)
-
-    # 3. COMPILE RUNS PAGES (run_[id].html)
+    # 3. COMPILE RUNS PAGES (run/[project]/[job]/[run].html)
     with open(templates_dir / "view_job.html.tpl", "r", encoding="utf-8") as f:
         run_tpl = f.read()
 
@@ -609,23 +616,19 @@ def generate_dashboard(output_dir: str):
             "findings": r["findings"],
         }
 
-        run_file_path = (
-            output_root / "run" / r["project"] / r["job_folder"] / f"{r['run_folder']}.html"
-        )
-        run_file_path.parent.mkdir(parents=True, exist_ok=True)
-        base_url = compute_base_url(output_root, run_file_path)
-
-        html = compile_page(
+        run_path = Path(f"run/{r['project']}/{r['job_folder']}/{r['run_folder']}.html")
+        run_html = compile_page(
             sidebar_html,
             run_content,
             run_page_data,
             f"menu-run-{run_id}",
             templates_dir,
-            base_url,
+            base_url=compute_base_url(output_root, run_path),
         )
-
-        with open(run_file_path, "w", encoding="utf-8") as f:
-            f.write(html)
+        pages[str(run_path)] = (
+            run_html,
+            "text/html",
+        )
 
     # 4. COMPILE USAGE PAGE (usage.html)
     usage_tpl_path = templates_dir / "view_usage.html.tpl"
@@ -636,17 +639,103 @@ def generate_dashboard(output_dir: str):
             "type": "usage",
             "runs": list(runs_data.values()),
         }
-        usage_file_path = output_root / "usage.html"
-        base_url = compute_base_url(output_root, usage_file_path)
-        html = compile_page(
+        usage_path = Path("usage.html")
+        usage_html = compile_page(
             sidebar_html,
             usage_content,
             usage_page_data,
             "menu-usage",
             templates_dir,
-            base_url,
+            base_url=compute_base_url(output_root, usage_path),
         )
-        with open(usage_file_path, "w", encoding="utf-8") as f:
-            f.write(html)
+        pages[str(usage_path)] = (usage_html, "text/html")
+
+    return pages
+
+
+def generate_dashboard(output_dir: str):
+    """Compiles structured static MPA dashboard pages (overview, projects, and runs)."""
+    path = Path(output_dir).resolve()
+    runs_path = None
+    if path.name == "runs":
+        runs_path = path
+    else:
+        for parent in [path] + list(path.parents):
+            if parent.name == "runs":
+                runs_path = parent
+                break
+            if (parent / "runs").exists() and (parent / "runs").is_dir():
+                runs_path = parent / "runs"
+                break
+
+    if not runs_path or not runs_path.exists():
+        logger.write(f"Error: Could not locate 'runs' directory starting from {output_dir}")
+        return
+
+    output_root = runs_path.parent
+    logger.write(f"Compiling static MPA dashboard into {output_root}")
+
+    # Gather data
+    runs_data = {}
+
+    for project_dir in sorted(runs_path.iterdir()):
+        if not project_dir.is_dir():
+            continue
+
+        for job_dir in sorted(project_dir.iterdir()):
+            if not job_dir.is_dir() or job_dir.name == "vulnerabilities":
+                continue
+            for run_dir in sorted(job_dir.iterdir()):
+                if not run_dir.is_dir() or not run_dir.name.startswith("run_"):
+                    continue
+
+                history_json = run_dir / "vulnerabilities.json"
+                metadata_json = run_dir / "metadata.json"
+
+                if not history_json.exists():
+                    continue
+
+                try:
+                    with open(history_json, "r") as f:
+                        history_data = json.load(f)
+                    metadata = {}
+                    if metadata_json.exists():
+                        with open(metadata_json, "r") as f:
+                            metadata = json.load(f)
+
+                    usage = {}
+                    usage_json = run_dir / "usage.json"
+                    if usage_json.exists():
+                        with open(usage_json, "r") as f:
+                            usage = json.load(f)
+
+                    open_findings = [v for v in history_data if v.get("status") == "Open"]
+                    report_data = {"vulnerabilities": open_findings}
+
+                    run_id_key = f"{project_dir.name}-{job_dir.name}-{run_dir.name}"
+                    runs_data[run_id_key] = format_scan_data(
+                        project_dir.name,
+                        job_dir.name,
+                        run_dir.name,
+                        report_data,
+                        metadata,
+                        history_data,
+                        usage,
+                    )
+                except Exception as e:
+                    logger.write(f"Warning: Failed to load findings for run {run_dir.name}: {e}")
+
+    if not runs_data:
+        logger.write("No scan reports found. Local dashboard not compiled.")
+        return
+
+    web_root = output_root / "web"
+    pages = render_all_dashboard_pages(runs_data)
+
+    for rel_path, (content, _) in pages.items():
+        target_path = web_root / rel_path
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(target_path, "w", encoding="utf-8") as f:
+            f.write(content)
 
     logger.success(f"Dashboard compilation finished successfully.")

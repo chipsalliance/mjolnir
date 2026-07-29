@@ -9,6 +9,8 @@ from google.cloud import storage
 from utilities.logger import logger
 from utilities import dashboard
 
+GCS_VERSION_PREFIX = "v0"
+
 
 def _upload_to_gcs(bucket_name: str, run_dir: str, destination_prefix: str):
     """Uploads the files in the scan run directory to Google Cloud Storage."""
@@ -42,7 +44,9 @@ def upload_run_to_gcs(run_dir: str, repo_name: str, job_name: str, run_id_dir: s
         )
         sys.exit(1)
 
-    destination_prefix = f"v0/{repo_name}/{job_name.replace(' ', '_')}/run_{run_id_dir}"
+    destination_prefix = (
+        f"{GCS_VERSION_PREFIX}/runs/{repo_name}/{job_name.replace(' ', '_')}/run_{run_id_dir}"
+    )
 
     try:
         _upload_to_gcs(gcs_bucket, run_dir, destination_prefix)
@@ -66,7 +70,7 @@ def upload_dashboard_to_gcs():
     try:
         client = storage.Client()
         bucket = client.bucket(gcs_bucket)
-        blobs = bucket.list_blobs(prefix="v0/")
+        blobs = bucket.list_blobs(prefix=f"{GCS_VERSION_PREFIX}/runs/")
 
         # Structure remote runs
         remote_runs = {}
@@ -75,14 +79,14 @@ def upload_dashboard_to_gcs():
             if not blob.name.endswith("vulnerabilities.json"):
                 continue
 
-            # Extract path hierarchy: v0/{project}/{job}/run_{run_id}/vulnerabilities.json
+            # Extract path hierarchy: v0/runs/{project}/{job}/run_{run_id}/vulnerabilities.json
             parts = blob.name.split("/")
-            if len(parts) < 5:
+            if len(parts) < 6:
                 continue
 
-            project_name = parts[1]
-            job_name = parts[2]
-            run_name = parts[3]
+            project_name = parts[2]
+            job_name = parts[3]
+            run_name = parts[4]
 
             run_key = f"{project_name}-{job_name}-{run_name}"
             remote_runs[run_key] = {
@@ -90,7 +94,7 @@ def upload_dashboard_to_gcs():
                 "job": job_name,
                 "run": run_name,
                 "report_blob": blob,
-                "metadata_blob_name": f"v0/{project_name}/{job_name}/{run_name}/metadata.json",
+                "metadata_blob_name": f"{GCS_VERSION_PREFIX}/runs/{project_name}/{job_name}/{run_name}/metadata.json",
             }
 
         scan_data = {}
@@ -126,112 +130,11 @@ def upload_dashboard_to_gcs():
             logger.write("No valid GCS scan reports found. GCS dashboard not compiled.")
             return
 
-        # 4. Compile HTML pages and upload to GCS (MPA)
-        templates_dir = Path(__file__).parent / "templates"
-
-        # Upload CSS & JS assets
-        with open(templates_dir / "dashboard.css", "r", encoding="utf-8") as f:
-            bucket.blob("v0/dashboard.css").upload_from_string(f.read(), content_type="text/css")
-        with open(templates_dir / "dashboard.js", "r", encoding="utf-8") as f:
-            bucket.blob("v0/dashboard.js").upload_from_string(
-                f.read(), content_type="application/javascript"
-            )
-
-        # Compile listings
-        project_stats = dashboard.compute_project_stats(scan_data)
-        projects_list = sorted(list(project_stats.items()))
-        runs_list = sorted(list(scan_data.values()), key=lambda x: x["timestamp"], reverse=True)
-        sidebar_html = dashboard.render_sidebar(projects_list, runs_list)
-
-        # Upload Global Overview
-        with open(templates_dir / "view_global.html.tpl", "r", encoding="utf-8") as f:
-            global_content = f.read()
-        summary_rows = dashboard.render_projects_summary_table(projects_list)
-        global_content = global_content.replace("{{projects_summary_rows}}", summary_rows)
-
-        sankey_all = dashboard.get_sankey_rows(list(scan_data.values()))
-        sankey_no_tests = dashboard.get_sankey_rows(
-            [r for r in scan_data.values() if r["project"] != "tests"]
-        )
-        global_page_data = {
-            "type": "global",
-            "sankeyRowsAll": sankey_all,
-            "sankeyRowsNoTests": sankey_no_tests,
-        }
-        global_html = dashboard.compile_page(
-            sidebar_html,
-            global_content,
-            global_page_data,
-            "menu-overview",
-            templates_dir,
-        )
-        bucket.blob("v0/dashboard.html").upload_from_string(global_html, content_type="text/html")
-
-        # Upload Projects
-        project_vulns = {}
-        for r in scan_data.values():
-            proj_name = r["project"]
-            if proj_name not in project_vulns:
-                project_vulns[proj_name] = []
-            run_id_key = f"{r['project']}-{r['job_folder']}-{r['run_folder']}"
-            formatted_for_project = dashboard.format_findings(
-                r["findings"], run_id_key, r["timestamp"]
-            )
-            project_vulns[proj_name].extend(formatted_for_project)
-
-        with open(templates_dir / "view_project.html.tpl", "r", encoding="utf-8") as f:
-            project_tpl = f.read()
-
-        for proj_name, findings in project_vulns.items():
-            proj_content = project_tpl.replace("{{project_name}}", proj_name)
-            proj_runs = [r for r in scan_data.values() if r["project"] == proj_name]
-            proj_sankey = dashboard.get_sankey_rows(proj_runs)
-
-            proj_page_data = {
-                "type": "project",
-                "sankeyRows": proj_sankey,
-                "findings": findings,
-            }
-            proj_html = dashboard.compile_page(
-                sidebar_html,
-                proj_content,
-                proj_page_data,
-                f"menu-project-{proj_name}",
-                templates_dir,
-            )
-            bucket.blob(f"v0/project_{proj_name}.html").upload_from_string(
-                proj_html, content_type="text/html"
-            )
-
-        # Upload Runs
-        with open(templates_dir / "view_job.html.tpl", "r", encoding="utf-8") as f:
-            run_tpl = f.read()
-
-        for run_id, r in scan_data.items():
-            run_content = run_tpl
-            run_content = run_content.replace("{{job_name}}", r["name"])
-            run_content = run_content.replace("{{project_name}}", r["project"])
-            run_content = run_content.replace("{{model_name}}", r["model"])
-            run_content = run_content.replace("{{commit_hash_short}}", r["commit"][:8])
-            run_content = run_content.replace("{{run_folder}}", r["run_folder"])
-            run_content = run_content.replace("{{timestamp}}", r["timestamp"])
-
-            run_sankey = dashboard.get_sankey_rows([r])
-            run_page_data = {
-                "type": "run",
-                "sankeyRows": run_sankey,
-                "findings": r["findings"],
-            }
-            run_html = dashboard.compile_page(
-                sidebar_html,
-                run_content,
-                run_page_data,
-                f"menu-run-{run_id}",
-                templates_dir,
-            )
-            bucket.blob(f"v0/run_{run_id}.html").upload_from_string(
-                run_html, content_type="text/html"
-            )
+        # 4. Compile HTML pages using shared renderer and upload to GCS under v0/web/ (MPA)
+        pages = dashboard.render_all_dashboard_pages(scan_data)
+        for rel_path, (content, content_type) in pages.items():
+            blob_name = f"{GCS_VERSION_PREFIX}/web/{rel_path}"
+            bucket.blob(blob_name).upload_from_string(content, content_type=content_type)
 
         logger.success(f"GCS dashboard uploaded successfully (MPA).")
     except Exception as e:
