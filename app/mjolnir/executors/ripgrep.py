@@ -86,8 +86,8 @@ class RipgrepRunner:
             cmd.extend(["-g", f"!{exclude_pattern}"])
         cmd.extend([pattern, target_path])
 
-        cmd_runner = CommandRunner(cmd, cwd=cwd_path, timeout=self.timeout)
-        _, stdout_content = cmd_runner.execute(tool_name="ripgrep")
+        cmd_runner = CommandRunner(cmd, cwd=cwd_path, timeout_sec=self.timeout)
+        _, stdout_content = cmd_runner.execute()
         return format_grep_output(
             stdout_content or "No matches found.", pattern, dir_path, include_pattern
         )

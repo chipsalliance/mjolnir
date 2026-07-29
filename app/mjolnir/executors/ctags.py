@@ -22,8 +22,8 @@ class CtagsRunner:
         else:
             cmd = ["ctags", "-x", "--_xformat=%K %f:%n %S", "-R", str(search_path)]
 
-        cmd_runner = CommandRunner(cmd, cwd=search_path, timeout=self.timeout)
-        success, output = cmd_runner.execute(tool_name="ctags")
+        cmd_runner = CommandRunner(cmd, cwd=search_path, timeout_sec=self.timeout)
+        success, output = cmd_runner.execute()
         if not success and "readtags" not in cmd[0]:
             return output
 

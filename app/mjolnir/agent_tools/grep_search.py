@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Grep search tool."""
 
+from google.adk.tools import ToolContext
+
 from executors.ripgrep import RipgrepRunner
 from security.path_sanitizer import resolve_workspace_path
 from utilities.decorators import limit_tool_output
@@ -15,13 +17,14 @@ def grep_search(
     include_pattern: str | None = None,
     exclude_pattern: str | None = None,
     case_sensitive: bool = True,
-    tool_context=None,
+    tool_context: ToolContext | None = None,
 ) -> str:
     """Searches for a regular expression pattern within file contents."""
     code_dir = tool_context.state.get("code_dir", ".") if tool_context else "."
-    search_path, err = resolve_workspace_path(dir_path, base_dir=code_dir)
-    if err or search_path is None:
-        return err or "Error: Invalid path."
+    try:
+        search_path = resolve_workspace_path(dir_path, base_dir=code_dir)
+    except ValueError as err:
+        return f"Error: {err}"
 
     if not search_path.exists():
         return f"Error: Path '{dir_path}' does not exist."

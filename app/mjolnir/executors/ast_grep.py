@@ -22,9 +22,9 @@ class AstGrepRunner:
         cmd_runner = CommandRunner(
             args=["sg", "--pattern", pattern, "--lang", lang, str(target_path)],
             cwd=target_path,
-            timeout=self.timeout,
+            timeout_sec=self.timeout,
         )
-        success, output = cmd_runner.execute(tool_name="ast-grep (sg)")
+        success, output = cmd_runner.execute()
         if not success:
             return output
 

@@ -137,7 +137,13 @@ class CommandRunner:
 
     def execute(self) -> tuple[bool, str]:
         """Executes CLI command and returns (success_flag, output_or_error_string)."""
-        res = run_command_capture(self.args, cwd=self.cwd, env=self.env, timeout=self.timeout_sec)
+        try:
+            res = run_command_capture(
+                self.args, cwd=self.cwd, env=self.env, timeout=self.timeout_sec
+            )
+        except Exception as e:
+            return False, f"Error executing {self.args[0]}: {e}"
+
         if res.returncode != 0 and not res.stdout:
             err_msg = res.stderr.strip() or f"Process exited with code {res.returncode}"
             return False, f"Error executing {self.args[0]}: {err_msg}"
