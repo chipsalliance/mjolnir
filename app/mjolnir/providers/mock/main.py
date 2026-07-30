@@ -1,16 +1,18 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
-import os
 import json
+import os
 import uuid
-from utilities.logger import logger
-from data.vulnerability import Vulnerability
+
+from tqdm import tqdm
+
 from data.audit_finding import AuditFinding
 from data.review_finding import ReviewFinding
 from data.severity import Severity
-from data.verdict import Verdict
 from data.status import Status
-from tqdm import tqdm
+from data.verdict import Verdict
+from data.vulnerability import Vulnerability
+from utilities.logger import logger
 
 
 def run_analysis(

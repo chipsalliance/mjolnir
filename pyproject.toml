@@ -24,7 +24,7 @@ ignore = [
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
-known-first-party = ["mjolnir", "app"]
+known-first-party = ["agent_tools", "config", "data", "executors", "providers", "security", "utilities"]
 
 [tool.ruff.format]
 quote-style = "double"

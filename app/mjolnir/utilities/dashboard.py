@@ -1,9 +1,10 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
-import os
 import json
+import os
 import re
 from pathlib import Path
+
 from utilities.logger import logger
 
 

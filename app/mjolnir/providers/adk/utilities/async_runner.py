@@ -5,10 +5,11 @@ import asyncio
 import random
 import re
 from typing import Any, Optional
+
 from tqdm import tqdm
-from utilities.logger import logger
 
 from providers.adk.utilities.aimd_controller import AIMDConcurrencyController
+from utilities.logger import logger
 
 DEFAULT_MAX_RETRIES = 6
 DEFAULT_BASE_DELAY = 2.0

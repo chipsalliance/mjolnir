@@ -5,16 +5,18 @@ import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from providers.genai.client import get_client
-from providers.genai.agents.auditor import AuditorAgent
-from providers.genai.agents.adversarial_reviewer import AdversarialReviewerAgent
-from data.vulnerability import Vulnerability
+
+from tqdm import tqdm
+
 from data.audit_finding import AuditFinding
 from data.review_finding import ReviewFinding
-from data.verdict import Verdict
 from data.status import Status
+from data.verdict import Verdict
+from data.vulnerability import Vulnerability
+from providers.genai.agents.adversarial_reviewer import AdversarialReviewerAgent
+from providers.genai.agents.auditor import AuditorAgent
+from providers.genai.client import get_client
 from utilities.logger import logger
-from tqdm import tqdm
 
 
 def phase_1_source_file_exploration(

@@ -1,13 +1,14 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 import json
-from pathlib import Path
 import os
 import sys
+from pathlib import Path
+
 from google.cloud import storage
 
-from utilities.logger import logger
 from utilities import dashboard
+from utilities.logger import logger
 
 GCS_VERSION_PREFIX = "v0"
 
