@@ -3,6 +3,7 @@
 from typing import List
 from pydantic import BaseModel, Field
 from data.audit_finding import AuditFinding
+from data.vulnerability import Vulnerability
 
 
 class SecurityReport(BaseModel):
@@ -10,10 +11,8 @@ class SecurityReport(BaseModel):
         description="List of detected security vulnerabilities"
     )
 
-    def to_vulnerabilities(self, fallback_file_path: str = "unknown_file") -> List["Vulnerability"]:
+    def to_vulnerabilities(self, fallback_file_path: str = "unknown_file") -> List[Vulnerability]:
         """Converts SecurityReport audit findings to Vulnerability model instances."""
-        from data.vulnerability import Vulnerability
-
         vulns: List[Vulnerability] = []
         for af in self.vulnerabilities:
             target_file = af.file if af.file and af.file != "unknown_file" else fallback_file_path

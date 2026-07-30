@@ -38,6 +38,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Check license headers in source files.")
     parser.add_argument("--extensions", nargs="*", default=[], help="File extensions to check")
     parser.add_argument("--filenames", nargs="*", default=[], help="Exact filenames to check")
+    parser.add_argument(
+        "--ignore-filenames", nargs="*", default=[], help="Exact filenames to ignore"
+    )
     args = parser.parse_args()
 
     current = Path(__file__).resolve().parent
@@ -45,11 +48,14 @@ def main() -> None:
 
     extensions = set(args.extensions)
     filenames = set(args.filenames)
+    ignore_filenames = set(args.ignore_filenames)
 
     tracked_files = get_tracked_files(root_dir)
     missing_license_files = []
 
     for file_path in tracked_files:
+        if file_path.name in ignore_filenames:
+            continue
         if file_path.suffix in extensions or file_path.name in filenames:
             if not check_file_license(file_path):
                 try:

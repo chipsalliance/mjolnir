@@ -10,6 +10,7 @@ from data.audit_finding import AuditFinding
 from data.security_report import SecurityReport
 from data.vulnerability import Vulnerability
 from providers.adk.agents.ingestion import get_ingestion_agent
+from providers.adk.phases.audit import checkpoint_audit_findings
 from providers.adk.utilities.async_runner import run_agent_with_backoff
 from utilities.logger import logger
 
@@ -92,8 +93,6 @@ async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerabili
         vulns = report.to_vulnerabilities(fallback_file_path=report_file_path)
 
     if run_dir:
-        from providers.adk.phases.audit import checkpoint_audit_findings
-
         await checkpoint_audit_findings(vulns, run_dir, phase_id="1")
 
     logger.write(f"Ingestion complete. Extracted {len(vulns)} vulnerabilities.", stdout=True)

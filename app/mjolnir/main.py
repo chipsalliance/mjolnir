@@ -9,6 +9,7 @@ from pathlib import Path
 from config import AppConfig
 import providers.genai.main as genai
 import providers.mock.main as mock
+import providers.adk.main as adk
 from data.status import Status
 from utilities import upload
 from utilities.command import run_command
@@ -193,8 +194,6 @@ def _run_orchestrator():
             ingest_path=ingest_path,
         )
     elif provider_name == "adk":
-        import providers.adk.main as adk
-
         vulnerabilities, status = adk.run_analysis(
             model_name,
             code_dir,
