@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Runner abstraction for Glob file search."""
 
+import asyncio
 import fnmatch
 from typing import Callable
 from pathlib import Path
@@ -71,3 +72,7 @@ class GlobRunner:
             f"Found {len(absolute_matches)} file(s) matching '{pattern}' within '{dir_path}':\n"
             + "\n".join(absolute_matches)
         )
+
+    async def search_async(self, pattern: str, dir_path: str = ".") -> str:
+        """Finds files matching pattern within search_path asynchronously."""
+        return await asyncio.to_thread(self.search, pattern, dir_path=dir_path)

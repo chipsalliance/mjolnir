@@ -11,7 +11,7 @@ from utilities.logger import logger
 
 
 @limit_tool_output(max_chars=40000)
-def read_file(
+async def read_file(
     file_path: str,
     start_line: int = 1,
     end_line: int | None = None,
@@ -31,4 +31,4 @@ def read_file(
         f"[Tool Execution] read_file: {file_path} (lines {start_line} to {end_line if end_line else 'end'})"
     )
     reader = FileReader(safe_path)
-    return reader.read(file_path, start_line=start_line, end_line=end_line)
+    return await reader.read_async(file_path, start_line=start_line, end_line=end_line)

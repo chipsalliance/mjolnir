@@ -1,5 +1,6 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
+import asyncio
 from pathlib import Path
 import subprocess
 import sys
@@ -148,3 +149,7 @@ class CommandRunner:
             err_msg = res.stderr.strip() or f"Process exited with code {res.returncode}"
             return False, f"Error executing {self.args[0]}: {err_msg}"
         return True, res.stdout.strip()
+
+    async def execute_async(self) -> tuple[bool, str]:
+        """Asynchronously executes CLI command and returns (success_flag, output_or_error_string)."""
+        return await asyncio.to_thread(self.execute)

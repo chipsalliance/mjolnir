@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Centralized prompt registry and loader for ADK agents."""
 
+import asyncio
 from pathlib import Path
 
 
@@ -25,6 +26,10 @@ class PromptRegistry:
             return prompt_path.read_text(encoding="utf-8").strip()
 
         return fallback
+
+    async def load_prompt_async(self, prompt_name: str, fallback: str = "") -> str:
+        """Loads prompt template markdown file asynchronously by name."""
+        return await asyncio.to_thread(self.load_prompt, prompt_name, fallback=fallback)
 
 
 prompt_registry = PromptRegistry()

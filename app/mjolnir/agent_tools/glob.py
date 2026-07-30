@@ -11,7 +11,7 @@ from utilities.logger import logger
 
 
 @limit_tool_output(max_chars=40000)
-def glob(
+async def glob(
     pattern: str,
     dir_path: str = ".",
     case_sensitive: bool = False,
@@ -35,4 +35,4 @@ def glob(
         case_sensitive=case_sensitive,
         respect_git_ignore=respect_git_ignore,
     )
-    return runner.search(pattern, dir_path=dir_path)
+    return await runner.search_async(pattern, dir_path=dir_path)

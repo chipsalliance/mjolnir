@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Runner abstraction for ast-grep (sg) CLI tool."""
 
+import asyncio
 from pathlib import Path
 from utilities.command import CommandRunner
 
@@ -32,3 +33,7 @@ class AstGrepRunner:
             return f"No structural matches found for pattern '{pattern}' in {lang}."
 
         return output
+
+    async def search_async(self, pattern: str, lang: str, search_path: Path | None = None) -> str:
+        """Executes sg CLI on search_path asynchronously."""
+        return await asyncio.to_thread(self.search, pattern, lang, search_path=search_path)

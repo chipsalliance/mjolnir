@@ -1,5 +1,6 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
+import asyncio
 from pathlib import Path
 
 from utilities.logger import logger
@@ -17,3 +18,8 @@ def load_threat_model(threat_model_path: str) -> str:
     except Exception as e:
         logger.error(f"Could not read threat model file {threat_model_path}: {e}.")
         return ""
+
+
+async def load_threat_model_async(threat_model_path: str) -> str:
+    """Reads project threat model context asynchronously if defined."""
+    return await asyncio.to_thread(load_threat_model, threat_model_path)

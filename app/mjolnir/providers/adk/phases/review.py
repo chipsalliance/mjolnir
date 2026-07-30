@@ -13,6 +13,7 @@ from providers.adk.utilities.async_runner import (
     run_batch_with_concurrency,
 )
 from providers.adk.agents.reviewer import get_reviewer_agent
+from providers.adk.phases.audit import checkpoint_audit_findings
 
 
 @node(rerun_on_resume=True)
@@ -85,6 +86,10 @@ async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vu
         )
         for exc in exceptions:
             logger.error(f"Phase 2 error: {exc}", exc_info=exc)
+
+    run_dir = ctx.state.get("run_dir")
+
+    await checkpoint_audit_findings(results, run_dir, phase_id="2")
 
     logger.write("Phase 2 complete.", stdout=True)
     return results

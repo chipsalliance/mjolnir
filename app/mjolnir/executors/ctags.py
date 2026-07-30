@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Runner abstraction for Universal Ctags CLI tool."""
 
+import asyncio
 from pathlib import Path
 import re
 from utilities.command import CommandRunner
@@ -38,3 +39,7 @@ class CtagsRunner:
             return f"Definitions for '{symbol}':\n{output}"
         else:
             return f"No definitions found for '{symbol}'."
+
+    async def search_async(self, symbol: str, search_path: Path) -> str:
+        """Executes readtags or ctags on search_path asynchronously."""
+        return await asyncio.to_thread(self.search, symbol, search_path)

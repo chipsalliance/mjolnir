@@ -11,7 +11,7 @@ from utilities.logger import logger
 
 
 @limit_tool_output(max_chars=40000)
-def grep_search(
+async def grep_search(
     pattern: str,
     dir_path: str = ".",
     include_pattern: str | None = None,
@@ -35,7 +35,7 @@ def grep_search(
     )
 
     runner = RipgrepRunner(case_sensitive=case_sensitive)
-    return runner.search(
+    return await runner.search_async(
         pattern,
         search_path,
         dir_path=dir_path,

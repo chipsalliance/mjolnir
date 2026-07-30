@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Runner abstraction for Ripgrep (rg) CLI tool."""
 
+import asyncio
 from pathlib import Path
 from utilities.command import CommandRunner
 
@@ -90,4 +91,22 @@ class RipgrepRunner:
         _, stdout_content = cmd_runner.execute()
         return format_grep_output(
             stdout_content or "No matches found.", pattern, dir_path, include_pattern
+        )
+
+    async def search_async(
+        self,
+        pattern: str,
+        search_path: Path,
+        dir_path: str = ".",
+        include_pattern: str | None = None,
+        exclude_pattern: str | None = None,
+    ) -> str:
+        """Executes ripgrep CLI on search_path asynchronously and formats output."""
+        return await asyncio.to_thread(
+            self.search,
+            pattern,
+            search_path,
+            dir_path=dir_path,
+            include_pattern=include_pattern,
+            exclude_pattern=exclude_pattern,
         )

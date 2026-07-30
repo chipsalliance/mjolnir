@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Runner abstraction for reading local workspace files."""
 
+import asyncio
 from pathlib import Path
 
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB safety limit
@@ -40,3 +41,11 @@ class FileReader:
             return "".join(output_lines)
         except Exception as e:
             return f"Error reading file: {str(e)}"
+
+    async def read_async(
+        self, file_path: str, start_line: int = 1, end_line: int | None = None
+    ) -> str:
+        """Asynchronously reads file contents and returns formatted line range string."""
+        return await asyncio.to_thread(
+            self.read, file_path, start_line=start_line, end_line=end_line
+        )

@@ -9,7 +9,7 @@ from utilities.logger import logger
 
 
 @limit_tool_output(max_chars=40000)
-def ast_search(
+async def ast_search(
     pattern: str,
     lang: str,
     dir_path: str = ".",
@@ -29,4 +29,4 @@ def ast_search(
         f"[Tool Execution] ast_search: pattern='{pattern}', lang='{lang}', dir_path='{dir_path}'"
     )
     runner = AstGrepRunner()
-    return runner.search(pattern, lang, search_path)
+    return await runner.search_async(pattern, lang, search_path)
