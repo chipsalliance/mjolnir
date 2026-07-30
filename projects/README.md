@@ -40,7 +40,7 @@ The `project.nix` file defines the repository and global settings for the projec
 - **`repoUrl`** (String, Required): HTTPS git URL of the target repository.
 - **`srcExtensions`** (List of Strings, Required): File extensions relevant to this project (e.g., `["rs", "c", "h"]`).
 - **`threatModel`** (Path, Optional): Path to a pre-generated threat model Markdown file (`THREAT_MODEL.md`) containing context and security requirements.
-- **`model`** (String, Optional): Default Gemini model to use for this project (defaults to `gemini-2.5-flash`).
+- **`model`** (String, Optional): Default Gemini model to use for this project (defaults to `gemini-3.6-flash`).
 - **`provider`** (String, Optional): Default provider (e.g. `genai` or `mock`).
 - **`requireGcsUpload`** (Boolean, Optional): Set to `true` to require uploading scan results to GCS (defaults to `false`).
 

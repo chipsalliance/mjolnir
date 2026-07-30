@@ -10,7 +10,7 @@ let
 
     job = {
       inherit (job) name;
-      model = job.model or project.model or "gemini-3.5-flash";
+      model = job.model or project.model or "gemini-3.6-flash";
       provider = job.provider or project.provider or "adk";
       batchSize = job.batchSize or 64;
       branch = job.branch or null;

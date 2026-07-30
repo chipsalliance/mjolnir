@@ -160,7 +160,7 @@ nix run .#mock-gcs-test
 
 ### Live LLM Testing
 
-To verify your credentials or `GEMINI_API_KEY` against a real Gemini model (runs on a small subset of files using `gemini-2.5-flash`):
+To verify your credentials or `GEMINI_API_KEY` against a real Gemini model (runs on a small subset of files using `gemini-3.6-flash`):
 
 ```bash
 # Set credentials (either API key or GCP Vertex AI):

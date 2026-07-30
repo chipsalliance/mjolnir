@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 {
   name = "genai-gemini-gcs-test";
-  model = "gemini-2.5-flash";
+  model = "gemini-3.6-flash";
   maxFiles = 5;
   srcDirs = [ "src" ];
   extensions = [ "rs" ];
