@@ -33,25 +33,6 @@ format_test(
 py_test(
     name = "license_check",
     srcs = ["license_check.py"],
-    args = [
-        "--extensions",
-        ".py",
-        ".sh",
-        ".nix",
-        ".bzl",
-        ".bazel",
-        ".yml",
-        ".yaml",
-        ".toml",
-        "--filenames",
-        "BUILD",
-        "BUILD.bazel",
-        "MODULE.bazel",
-        "--ignore-filenames",
-        "pnpm-lock.yaml",
-        "flake.lock",
-        "MODULE.bazel.lock",
-    ],
     data = ["//:MODULE.bazel"],
 )
 
