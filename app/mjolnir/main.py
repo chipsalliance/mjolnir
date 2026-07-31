@@ -16,7 +16,7 @@ from utilities import upload
 from utilities.command import run_command
 from utilities.dashboard import generate_dashboard
 from utilities.discovery import discover_source_files
-from utilities.git import setup_repository
+from utilities.git import get_diff_files, setup_repository
 from utilities.logger import logger, setup_logger
 from utilities.metadata import write_metadata
 from utilities.threat_model import load_threat_model
@@ -47,6 +47,15 @@ def _run_orchestrator():
     parser.add_argument(
         "--ingest",
         help="Path to report file to ingest. Implicitly triggers report ingestion mode.",
+    )
+    parser.add_argument(
+        "--diff-base",
+        help="Base git ref for PR diff mode (e.g. origin/main or commit SHA)",
+    )
+    parser.add_argument(
+        "--diff-head",
+        default="HEAD",
+        help="Head git ref for PR diff mode (default: HEAD)",
     )
     args, unknown_args = parser.parse_known_args()
 
@@ -133,9 +142,20 @@ def _run_orchestrator():
 
     # File discovery & Ingestion routing
     ingest_path = args.ingest or job.get("ingestionReport")
+    diff_base = args.diff_base or job.get("diffBase")
+    diff_head = args.diff_head or job.get("diffHead", "HEAD")
 
     logger.info(f"Writing project metadata.")
-    write_metadata(run_dir, repo_url, model_name, repo_ref, code_dir, timestamp_pretty, ingest_path)
+    write_metadata(
+        run_dir,
+        repo_url,
+        model_name,
+        repo_ref,
+        code_dir,
+        timestamp_pretty,
+        ingest_path=ingest_path,
+        diff_base=diff_base,
+    )
 
     # Execute command, if one is provided
 
@@ -152,13 +172,36 @@ def _run_orchestrator():
         )
 
     # Ingestion check and File discovery
+    allowed_exts = set(job["extensions"])
 
     if ingest_path:
         logger.info(f"Ingestion Mode enabled. Ingesting report path: {ingest_path}")
         files_to_scan = []
+    elif diff_base:
+        logger.info(
+            f"PR Diff Mode enabled. Fetching changed text files between {diff_base} and {diff_head}."
+        )
+        raw_diff_files = get_diff_files(code_dir, diff_base, diff_head)
+        files_to_scan = [
+            f for f in raw_diff_files if Path(f).suffix.lstrip(".").lower() in allowed_exts
+        ]
+        if files_to_scan:
+            logger.info(
+                f"Discovered {len(files_to_scan)} changed text files in PR diff to analyze."
+            )
+        else:
+            logger.info(
+                f"No changed text files found in PR diff between {diff_base} and {diff_head}. Exiting."
+            )
+            sys.exit(0)
     else:
-        logger.info(f"Discovery Mode enabled. Looking for files to analyze.")
-        files_to_scan = discover_source_files(code_dir, job)
+        logger.info("Discovery Mode enabled. Looking for files to analyze.")
+        files_to_scan = discover_source_files(
+            code_dir=code_dir,
+            src_dirs=job["srcDirs"],
+            extensions=allowed_exts,
+            max_files=job.get("maxFiles"),
+        )
 
         if files_to_scan:
             logger.info(f"Discovered {len(files_to_scan)} files to analyze.")
@@ -214,7 +257,7 @@ def _run_orchestrator():
         with open(metadata_path, "r") as f:
             metadata = json.load(f)
         metadata["status"] = status
-        metadata["mode"] = "Ingestion" if ingest_path else "Discovery"
+        metadata["mode"] = "Ingestion" if ingest_path else ("PR Diff" if diff_base else "Discovery")
         with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
 

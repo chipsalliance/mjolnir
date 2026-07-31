@@ -62,6 +62,7 @@ graph TD
 
 ## Directory Structure
 
+- **[INTEGRATION_GUIDE.md](./INTEGRATION_GUIDE.md)**: Guide for integrating Mjolnir security audits into repositories (GitHub Actions, GCS export, PR diff mode).
 - **[app/mjolnir/](./app/mjolnir/)**: Core Python application engine, including agent tools, data models, and providers (mock, genai). See [Application Engine README](./app/mjolnir/README.md).
 - **[nix/](./nix/)**: Nix infrastructure for job packaging, auto-discovery, and orchestration. See [Nix README](./nix/README.md).
 - **[projects/](./projects/)**: Supported project definitions and job configurations. See [Projects README](./projects/README.md).
@@ -69,7 +70,7 @@ graph TD
 
 ## Supported Projects
 
-All project definitions, job configurations, and nix setups are located under [projects/](./projects/). See the [Projects README](./projects/README.md) for more details on how to register new targets.
+All project definitions, job configurations, and nix setups are located under [projects/](./projects/). See the [Projects README](./projects/README.md) for more details on how to register new targets, or read the [Integration Guide](./INTEGRATION_GUIDE.md) for step-by-step onboarding instructions.
 
 ## Getting Started
 

@@ -177,9 +177,12 @@
               description = "All tests";
               jobs = [
                 discovered.mock-smoke-test
+                discovered.mock-ci-test
                 discovered.mock-gcs-test
+                discovered.genai-ci-test
                 discovered.genai-gemini-test
                 discovered.genai-gemini-gcs-test
+                discovered.adk-ci-test
                 discovered.adk-gemini-test
                 discovered.adk-gemini-gcs-test
                 discovered.adk-gemini-ingest-test

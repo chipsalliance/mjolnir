@@ -6,12 +6,13 @@ from pathlib import Path
 from utilities.logger import logger
 
 
-def discover_source_files(code_dir: str, job) -> list:
+def discover_source_files(
+    code_dir: str,
+    src_dirs: list[str],
+    extensions: set[str],
+    max_files: int | None = None,
+) -> list[str]:
     """Finds all source files under the target directory matching the requested extensions, optionally limiting count."""
-
-    extensions = set(job.get("extensions") or ["rs", "c", "h"])
-    src_dirs = job.get("srcDirs") or ["."]
-    max_files = job.get("maxFiles")
 
     code_path = Path(code_dir).resolve()
     files_to_scan = []

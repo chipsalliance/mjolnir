@@ -4,6 +4,7 @@ import os
 import shutil
 from pathlib import Path
 
+from security.path_sanitizer import resolve_workspace_path
 from utilities.command import CommandRunner, run_command
 from utilities.logger import logger
 
@@ -20,6 +21,7 @@ def setup_repository(repo_url: str, code_dir: str, ref: str, workspace_dir: str)
             shutil.rmtree(code_path)
         run_command(["git", "clone", "--recurse-submodules", repo_url, code_dir])
     else:
+        run_command(["git", "fetch", "--all"], cwd=code_dir)
         run_command(["git", "reset", "--hard"], cwd=code_dir)
         run_command(["git", "clean", "-fdx"], cwd=code_dir)
         run_command(
@@ -57,6 +59,59 @@ def get_head_commit(code_dir: str) -> str:
             f"Check if git is installed and '{code_dir}' exists."
         )
         return "unknown"
+
+
+def is_binary_file(file_path: str) -> bool:
+    """Returns True if the file contains binary data (e.g. NUL bytes), False if text."""
+    try:
+        with open(file_path, "rb") as f:
+            chunk = f.read(8192)
+            return b"\x00" in chunk
+    except Exception:
+        return True
+
+
+def get_diff_files(code_dir: str, base_ref: str, head_ref: str = "HEAD") -> list[str]:
+    """Returns a list of relative paths for modified/added text files between base_ref and head_ref."""
+    try:
+        # Exclude deleted files using --diff-filter=d
+        cmd = [
+            "git",
+            "diff",
+            "--name-only",
+            "--diff-filter=d",
+            base_ref,
+            head_ref,
+        ]
+        success, output = CommandRunner(cmd, cwd=code_dir, timeout_sec=10.0).execute()
+        if not success or not output.strip():
+            # Fallback to single base_ref comparison if two-ref fails
+            cmd_fallback = [
+                "git",
+                "diff",
+                "--name-only",
+                "--diff-filter=d",
+                base_ref,
+            ]
+            success, output = CommandRunner(cmd_fallback, cwd=code_dir, timeout_sec=10.0).execute()
+
+        if not success or not output.strip():
+            return []
+
+        candidates = [line.strip() for line in output.splitlines() if line.strip()]
+        valid_text_files = []
+
+        for rel_path in candidates:
+            try:
+                safe_path = resolve_workspace_path(rel_path, base_dir=code_dir)
+                if safe_path.is_file() and not is_binary_file(str(safe_path)):
+                    valid_text_files.append(rel_path)
+            except ValueError:
+                continue
+        return valid_text_files
+    except Exception as e:
+        logger.error(f"Error executing git diff between '{base_ref}' and '{head_ref}': {e}")
+        return []
 
 
 class GitOperation:

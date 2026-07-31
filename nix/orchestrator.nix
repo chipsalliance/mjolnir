@@ -22,6 +22,8 @@ let
       requireGcsUpload = job.requireGcsUpload or project.requireGcsUpload or false;
       cmd = job.cmd or null;
       ingestionReport = job.ingestionReport or null;
+      diffBase = job.diffBase or null;
+      diffHead = job.diffHead or null;
     };
 
     config = {

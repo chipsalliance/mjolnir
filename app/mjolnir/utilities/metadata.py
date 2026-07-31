@@ -14,10 +14,18 @@ def write_metadata(
     code_dir: str,
     timestamp_pretty: str,
     ingest_path: str = None,
+    diff_base: str = None,
 ):
     """Resolves HEAD commit hash and dumps run metadata.json."""
     metadata_file = Path(run_dir) / "metadata.json"
     resolved_commit = get_head_commit(code_dir)
+
+    if ingest_path:
+        mode = "Ingestion"
+    elif diff_base:
+        mode = "PR Diff"
+    else:
+        mode = "Discovery"
 
     metadata = {
         "repo": repo_url,
@@ -25,7 +33,7 @@ def write_metadata(
         "ref": ref or "HEAD",
         "target_commit": resolved_commit,
         "timestamp": timestamp_pretty,
-        "mode": "Ingestion" if ingest_path else "Discovery",
+        "mode": mode,
     }
     with open(metadata_file, "w") as f:
         json.dump(metadata, f, indent=2)
