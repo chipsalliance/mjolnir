@@ -1,3 +1,6 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 ## 1. System Architecture & Trust Boundaries
 
 - **Component Analyzed:** `sw/device/silicon_creator/rom/sigverify_otp_keys.c`

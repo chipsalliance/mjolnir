@@ -1,3 +1,5 @@
+// Licensed under the Apache-2.0 license
+// SPDX-License-Identifier: Apache-2.0
 // Shared Mjolnir Dashboard Logic (MPA Version)
 
 const safeStorage = {

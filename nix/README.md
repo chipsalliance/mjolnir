@@ -1,3 +1,6 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Nix Infrastructure
 
 This directory contains the Nix expressions that define the build and execution environment for Mjolnir, as well as job orchestration.

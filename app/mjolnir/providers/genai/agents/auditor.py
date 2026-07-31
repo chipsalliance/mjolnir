@@ -8,13 +8,13 @@ from data.security_report import SecurityReport
 from providers.genai.agents.base import MjolnirAgent
 
 EXTENSION_TO_PROMPT = {
-    "c": "c_auditor.txt",
-    "h": "c_auditor.txt",
-    "cpp": "c_auditor.txt",
-    "cc": "c_auditor.txt",
-    "rs": "rust_auditor.txt",
+    "c": "c_auditor.md",
+    "h": "c_auditor.md",
+    "cpp": "c_auditor.md",
+    "cc": "c_auditor.md",
+    "rs": "rust_auditor.md",
 }
-DEFAULT_PROMPT = "c_auditor.txt"
+DEFAULT_PROMPT = "c_auditor.md"
 
 
 class AuditorAgent(MjolnirAgent):

@@ -1,3 +1,5 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 <section id="view-usage" class="view-section">
     <div class="view-header">
         <h1>Token Usage Tracking</h1>

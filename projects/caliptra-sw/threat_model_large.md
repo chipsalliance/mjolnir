@@ -1,3 +1,6 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 ## 1. System Architecture & Trust Boundaries
 
 - **Component Analyzed:** `caliptra-ss/src/riscv_core/veer_el2/rtl/design/ifu/css_mcu0_el2_ifu_aln_ctl.sv` (Instruction Fetch Unit Aligner Control)

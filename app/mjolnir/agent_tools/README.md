@@ -1,3 +1,6 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Agent Tools
 
 Python-based tools which can be used by agents to analyze code.

@@ -1,3 +1,6 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # OpenTitan Firmware Threat Model (Distilled)
 
 This document provides a distilled, firmware-focused view of the threats identified in the comprehensive OpenTitan Earlgrey component-level threat model. It aggregates systemic vulnerabilities across the hardware/software boundary, eliminating module-by-module repetition to focus on actionable risks, architectural assumptions, and required mitigations for the firmware execution phases (ROM, ROM_EXT, and Manufacturing) and the `otcrypto` library.

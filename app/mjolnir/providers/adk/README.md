@@ -1,3 +1,6 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # ADK 2.0 Execution Backend (`providers/adk`)
 
 This package implements the core multi-phase security auditing graph using Google's **Agent Development Kit (ADK 2.0)** framework.

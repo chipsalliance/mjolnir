@@ -1,3 +1,6 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Caliptra DPE configurations
 
 Audit targets and job specifications for the Caliptra DPE (Dice Protection Environment) repository.

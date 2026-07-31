@@ -1,3 +1,6 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Caliptra MCU SW configurations
 
 Audit targets and job specifications for the Caliptra MCU Software repository.

@@ -1,3 +1,6 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Caliptra Firmware Threat Model (Distilled)
 
 This document provides a distilled, firmware-focused view of the threats identified in the comprehensive component-level threat model. It removes duplication across hundreds of components and focuses on the implications for firmware security, assumptions, and required mitigations.

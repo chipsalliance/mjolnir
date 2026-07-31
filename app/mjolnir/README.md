@@ -1,3 +1,6 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Mjolnir Application Engine
 
 This directory contains the core Python application engine for Mjolnir. It handles the orchestration of the security analysis, interacting with AI providers, and generating reports/dashboards.

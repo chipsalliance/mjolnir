@@ -1,3 +1,5 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 <aside class="sidebar">
     <div class="sidebar-header">
         <div style="display: flex; justify-content: space-between; align-items: center;">

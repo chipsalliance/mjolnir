@@ -1,3 +1,6 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Data Models
 
 Pydantic schemas governing data structures throughout the pipeline lifecycle.

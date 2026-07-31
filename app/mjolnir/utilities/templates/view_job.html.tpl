@@ -1,3 +1,5 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 <section id="view-job" class="view-section">
     <div class="view-header">
         <h1 id="active-job-title">{{job_name}}</h1>

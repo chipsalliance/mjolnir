@@ -1,3 +1,6 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Mjolnir
 
 Mjolnir is an AI-driven security auditing framework designed for open-source Root-of-Trust (RoT) projects.

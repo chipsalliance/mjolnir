@@ -32,7 +32,7 @@ def run_analysis(
     for idx, f_path in enumerate(pbar):
         pbar.set_description(f"\tScanning {f_path} (Mock)")
         ext = os.path.splitext(f_path)[1].lstrip(".").lower()
-        prompt_name = "rust_auditor.txt" if ext == "rs" else "c_auditor.txt"
+        prompt_name = "rust_auditor.md" if ext == "rs" else "c_auditor.md"
 
         logger.debug(f"Scanning {f_path} (Mock)...")
         logger.debug(f"Loaded prompt for .{ext} from: {prompt_name}")

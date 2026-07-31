@@ -1,3 +1,5 @@
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
 <section id="view-overview" class="view-section">
     <div class="view-header" style="display: flex; align-items: center; justify-content: space-between;">
         <div>

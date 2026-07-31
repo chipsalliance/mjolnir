@@ -163,7 +163,7 @@ def run_analysis(
     auditor = AuditorAgent(client, model, threat_model_context)
 
     current_dir = Path(__file__).resolve().parent
-    adv_prompt_path = current_dir / "prompts" / "adversarial_reviewer.txt"
+    adv_prompt_path = current_dir / "prompts" / "adversarial_reviewer.md"
     adv_instruction = "Verify and filter the listed codebase vulnerability findings. Mark false positives as 'False Positive'."
     if adv_prompt_path.exists():
         with open(adv_prompt_path, "r", encoding="utf-8") as f:
