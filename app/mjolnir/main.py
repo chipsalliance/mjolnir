@@ -14,7 +14,6 @@ import providers.genai.main as genai
 import providers.mock.main as mock
 from utilities import upload
 from utilities.command import run_command
-from utilities.dashboard import generate_dashboard
 from utilities.discovery import discover_source_files
 from utilities.git import get_diff_files, setup_repository
 from utilities.logger import logger, setup_logger
@@ -35,16 +34,6 @@ def _run_orchestrator():
     parser = argparse.ArgumentParser()
     parser.add_argument("--spec", required=False, help="Path to job spec JSON")
     parser.add_argument(
-        "--gen-dashboard",
-        action="store_true",
-        help="Only regenerate dashboard from existing runs without scanning",
-    )
-    parser.add_argument(
-        "--output-dir",
-        default="./output/runs",
-        help="Default runs directory to compile if spec is missing",
-    )
-    parser.add_argument(
         "--ingest",
         help="Path to report file to ingest. Implicitly triggers report ingestion mode.",
     )
@@ -59,28 +48,8 @@ def _run_orchestrator():
     )
     args, unknown_args = parser.parse_known_args()
 
-    if args.gen_dashboard:
-        output_dir = "./output/runs"
-        if args.spec:
-            if not Path(args.spec).exists():
-                logger.error(f"Error: Spec file {args.spec} not found!")
-                sys.exit(1)
-            with open(args.spec, "r") as f:
-                spec = json.load(f)
-            config = spec.get("config", {})
-            raw_output = config.get("outputDir")
-            if raw_output:
-                output_dir = str(Path(raw_output).expanduser().resolve())
-        else:
-            output_dir = str(Path(args.output_dir).expanduser().resolve())
-
-        logger.info(f"Compiling dashboard from existing runs in {output_dir}...")
-        generate_dashboard(output_dir)
-        logger.info("Dashboard generated successfully.")
-        return
-
     if not args.spec:
-        logger.error("Error: The --spec argument is required when not in --gen-dashboard mode.")
+        logger.error("Error: The --spec argument is required.")
         sys.exit(1)
 
     if not Path(args.spec).exists():
@@ -280,12 +249,6 @@ def _run_orchestrator():
             indent=2,
         )
 
-    # Dashboard generation
-
-    logger.info(f"Generating dashboards.")
-
-    generate_dashboard(output_dir)
-
     # Upload results to Google Cloud Storage
 
     require_gcs = job.get("requireGcsUpload")
@@ -293,7 +256,6 @@ def _run_orchestrator():
     if require_gcs:
         logger.info(f"Uploading results to GCS.")
         upload.upload_run_to_gcs(run_dir, repo_name, job.get("name"), timestamp_dir)
-        upload.upload_dashboard_to_gcs()
 
     logger.header("Exiting Mjolnir!")
     if status == "Failed":

@@ -15,6 +15,7 @@ DEFAULT_IGNORE_FILENAMES = [
     "pnpm-lock.yaml",
     "flake.lock",
     "MODULE.bazel.lock",
+    "Cargo.lock",
     "package.json",
     ".gitignore",
     ".bazelignore",

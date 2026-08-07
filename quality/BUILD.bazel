@@ -43,12 +43,20 @@ sh_test(
     data = ["//:MODULE.bazel"],
 )
 
+# Check Rust code formatting (bazel test //quality:rustfmt_check).
+sh_test(
+    name = "rustfmt_check",
+    srcs = ["run_rustfmt.sh"],
+    data = ["//:MODULE.bazel"],
+)
+
 # Run all quality checks at once (bazel test //quality).
 test_suite(
     name = "quality",
     tests = [
         ":format_check",
         ":license_check",
+        ":rustfmt_check",
         ":shellcheck",
     ],
 )

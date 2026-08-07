@@ -28,8 +28,8 @@ let
 
     config = {
       workspaceDir = "./workspace/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
-      outputDir = "./output/runs/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
-      projectOutputDir = "./output/runs/${project.repoName}";
+      outputDir = "./output/v1/runs/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
+      projectOutputDir = "./output/v1/runs/${project.repoName}";
     };
   };
 

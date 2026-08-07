@@ -154,18 +154,36 @@
             runner = runners.opentitan;
           };
 
-          gen-dashboard = pkgs.writeShellApplication {
-            name = "mjolnir-gen-dashboard";
-            runtimeInputs = [ mjolnir-app ];
+          web-viewer = pkgs.writeShellApplication {
+            name = "mjolnir-web-viewer";
+            runtimeInputs = [ pkgs.cargo pkgs.rustc pkgs.wasm-bindgen-cli pkgs.lld ];
             text = ''
-              mjolnir-run --gen-dashboard "$@"
+              cargo xtask web --serve "$@"
+            '';
+          };
+
+          deploy-gcs-web = pkgs.writeShellApplication {
+            name = "mjolnir-deploy-gcs-web";
+            runtimeInputs = [ pkgs.cargo pkgs.rustc pkgs.wasm-bindgen-cli pkgs.lld pythonEnv ];
+            text = ''
+              cargo xtask deploy-gcs-web "$@"
+            '';
+          };
+
+          deploy-gcs-runs = pkgs.writeShellApplication {
+            name = "mjolnir-deploy-gcs-runs";
+            runtimeInputs = [ pythonEnv ];
+            text = ''
+              python3 scripts/deploy_gcs.py --runs "$@"
             '';
           };
         in
           discovered // {
             inherit
               mjolnir-app
-              gen-dashboard
+              web-viewer
+              deploy-gcs-web
+              deploy-gcs-runs
               caliptra-sw-runner-test
               caliptra-mcu-sw-runner-test
               caliptra-dpe-runner-test

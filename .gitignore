@@ -20,3 +20,9 @@ output/
 .env
 .envrc
 !sample.env
+
+# Rust / WASM build artifacts
+target/
+dist/
+**/target/
+**/dist/

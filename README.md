@@ -97,18 +97,30 @@ nix run .#<project-runner-target>
 
 ---
 
-## Compiling Dashboards
+## WebAssembly Dashboard & Local Viewer
 
-To aggregate the results of existing runs and regenerate the dashboard, you can use the `gen-dashboard` target:
+Mjolnir features a WebAssembly (WASM) dashboard for browsing security audit runs, filtering findings, and visualizing vulnerability flow telemetry.
+
+### Launching Local Web Viewer
+
+To compile the WASM engine and start the local development server (default: `http://localhost:8080`):
 
 ```bash
-nix run .#gen-dashboard
+nix run .#web-viewer
 ```
 
-By default, this looks for runs in `./output/runs`. You can override the target directory using the `--` separator to pass arguments to the underlying application engine:
+### Deploying Dashboard & Runs to GCS
+
+Deploy static WebAssembly dashboard assets to Google Cloud Storage:
 
 ```bash
-nix run .#gen-dashboard -- --output-dir /path/to/custom/runs
+nix run .#deploy-gcs-web
+```
+
+Sync local analysis runs from `output/v1/runs/` to Google Cloud Storage:
+
+```bash
+nix run .#deploy-gcs-runs
 ```
 
 ---

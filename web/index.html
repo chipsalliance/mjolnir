@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<!-- Licensed under the Apache-2.0 license -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mjolnir Security Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>M</text></svg>">
+  <link rel="stylesheet" href="style.css">
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">Mjolnir Security</div>
+        <div class="subtitle">AI Audit Platform</div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">NAVIGATION</div>
+        <a href="#/" class="nav-item active" id="nav-global">
+          <span>Overview</span>
+        </a>
+        <a href="#/projects" class="nav-item" id="nav-all-projects">
+          <span>All Projects</span>
+        </a>
+        <a href="#/runs" class="nav-item" id="nav-all-runs">
+          <span>All Runs</span>
+        </a>
+        
+        <div class="nav-section-label">PROJECTS</div>
+        <div id="project-nav-list" class="nav-list">
+          <div class="nav-subitem">No Projects Yet</div>
+        </div>
+
+        <div class="nav-section-label">RECENT RUNS</div>
+        <div id="recent-runs-nav-list" class="nav-list">
+          <div class="nav-subitem">No Runs Yet</div>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <header class="top-header">
+        <div class="header-title" id="page-title">Global Security Overview</div>
+        <div class="header-controls">
+          <label class="toggle-container">
+            <input type="checkbox" id="toggle-hide-tests">
+            <span class="toggle-label">Hide Test Projects</span>
+          </label>
+          <button id="btn-refresh" class="btn btn-secondary">Refresh</button>
+        </div>
+      </header>
+
+      <div class="content-body" id="app-viewport">
+        <div class="empty-state">
+          <h3>No Runs Yet</h3>
+          <p>Run a Mjolnir analysis CLI locally to generate scan output under output/v1/runs/.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Detail Modal -->
+  <div id="vulnerability-modal" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Finding Detail</h3>
+        <button id="modal-close" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <!-- Content dynamically injected -->
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
