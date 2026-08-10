@@ -3,7 +3,7 @@
 {
   name = "adk-ci-test";
   provider = "adk";
-  model = "gemini-2.5-flash";
+  model = "gemini-3.6-flash";
   diffBase = "HEAD~1";
   diffHead = "HEAD";
 }

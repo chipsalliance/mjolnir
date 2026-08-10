@@ -46,7 +46,7 @@ Create job profile files under `projects/X/jobs/`:
   ```nix
   {
     name = "repo-x-ci";
-    model = "gemini-2.5-flash";
+    model = "gemini-3.6-flash";
     provider = "adk";
     batchSize = 10;
   }
@@ -56,7 +56,7 @@ Create job profile files under `projects/X/jobs/`:
   ```nix
   {
     name = "repo-x-full-audit";
-    model = "gemini-2.5-pro";
+    model = "gemini-3.6-flash";
     provider = "adk";
     batchSize = 5;
     requireGcsUpload = true;

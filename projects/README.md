@@ -69,7 +69,7 @@ Each file under `jobs/` defines a specific audit task (e.g., scanning ROM firmwa
 #### Schema
 
 - **`name`** (String, Required): Human-readable name of the job.
-- **`model`** (String, Optional): Override the model to use (e.g., `gemini-1.5-pro` for deeper analysis, defaults to project default).
+- **`model`** (String, Optional): Override the model to use (e.g., `gemini-3.6-flash` for deeper analysis, defaults to project default).
 - **`provider`** (String, Optional): Override the analysis provider (`genai` or `mock`).
 - **`batchSize`** (Integer, Optional): Number of files to process per batch (defaults to `20`).
 - **`branch`** (String, Optional): Git branch to checkout (e.g., `main`).
