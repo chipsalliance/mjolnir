@@ -8,7 +8,8 @@ import init, {
   compute_project_sankey_flow,
   compute_run_sankey_flow
 } from './dist/mjolnir_dashboard_wasm.js';
-import { registerUsageModule } from './dist/usage_module.js';
+import { registerTokenUsageModule } from './dist/token_usage_module.js';
+import { registerToolUsageModule } from './dist/tool_usage_module.js';
 import { BUILD_TIMESTAMP } from './dist/build_info.js';
 
 
@@ -136,7 +137,8 @@ async function apiComputeSummary(vulnerabilitiesJson) {
 async function bootstrap() {
   setupEventListeners();
   const navContainer = document.querySelector(".sidebar-nav");
-  registerUsageModule(navContainer, dynamicRoutes, renderEmptyState);
+  registerTokenUsageModule(navContainer, dynamicRoutes, renderEmptyState);
+  registerToolUsageModule(navContainer, dynamicRoutes, renderEmptyState);
 
   // Initialize Web Worker and WASM background fallbacks
   try {
@@ -652,8 +654,9 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
     const vulnsJson = JSON.stringify(data.vulnerabilities || []);
     currentRunVulns = data.vulnerabilities || [];
     const meta = data.metadata || {};
-    const usage = data.usage || {};
-    const errorsGrouped = usage.errors_grouped || {};
+    const tokenUsage = data.token_usage || {};
+    const toolUsage = data.tool_usage || {};
+    const errorsGrouped = tokenUsage.errors_grouped || {};
     const errorKeys = Object.keys(errorsGrouped);
 
     let errorsHtml = "";
@@ -663,6 +666,42 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         <div class="run-errors-card">
           <h4>Run Errors & Telemetry Warnings</h4>
           <ul class="run-errors-list">${errorItems}</ul>
+        </div>`;
+    }
+
+    let toolUsageHtml = "";
+    if (toolUsage.by_tool && Object.keys(toolUsage.by_tool).length > 0) {
+      const tot = toolUsage.total || {};
+      const toolRows = Object.entries(toolUsage.by_tool).map(([toolName, stats]) => `
+        <tr>
+          <td><code>${toolName}</code></td>
+          <td>${stats.calls}</td>
+          <td style="color: var(--status-resolved);">${stats.successes}</td>
+          <td style="color: ${stats.failures > 0 ? 'var(--severity-critical)' : 'inherit'};">${stats.failures}</td>
+          <td><span class="badge ${stats.failures > 0 ? 'badge-critical' : 'badge-low'}">${stats.failure_rate}</span></td>
+        </tr>
+      `).join("");
+
+      toolUsageHtml = `
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Tool Usage Telemetry</span>
+            <span style="font-size: 13px; font-weight: normal;">Total Calls: <strong>${tot.total_calls || 0}</strong> | Failure Rate: <strong>${tot.failure_rate || '0.00%'}</strong></span>
+          </div>
+          <table class="findings-table">
+            <thead>
+              <tr>
+                <th>Tool Name</th>
+                <th>Calls</th>
+                <th>Successes</th>
+                <th>Failures</th>
+                <th>Failure Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${toolRows}
+            </tbody>
+          </table>
         </div>`;
     }
 
@@ -686,6 +725,8 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
       </div>
 
       ${errorsHtml}
+
+      ${toolUsageHtml}
 
       <div class="metrics-grid">
         <div class="metric-card">

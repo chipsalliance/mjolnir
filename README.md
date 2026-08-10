@@ -123,13 +123,12 @@ Sync local analysis runs from `output/v1/runs/` to Google Cloud Storage (test pr
 nix run .#deploy-gcs-runs
 ```
 
-Optional flags:
+Optional flags for run deployment:
 
 - `--include-tests`: Include test and mock benchmark runs.
-- `--include-usage`: Include sensitive token usage telemetry files.
 
 ```bash
-nix run .#deploy-gcs-runs -- --include-tests --include-usage
+nix run .#deploy-gcs-runs -- --include-tests
 ```
 
 ---

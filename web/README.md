@@ -22,6 +22,12 @@ To build the WASM module and start the local development server (default: `http:
 nix run .#web-viewer
 ```
 
+Flags on the web viewer (`--include-token-usage` and `--include-tool-usage`) control whether the telemetry sidebar UI tabs are rendered (both OFF by default):
+
+```bash
+nix run .#web-viewer -- --include-token-usage --include-tool-usage
+```
+
 Or using `cargo xtask`:
 
 ```bash
@@ -42,12 +48,14 @@ nix run .#deploy-gcs-web
 
 ### 4. Sync Scan Runs to GCS
 
+Syncs analysis run findings, metadata, and telemetry output files (`token_usage.json` and `tool_usage.json`) to Google Cloud Storage:
+
 ```bash
 nix run .#deploy-gcs-runs
 ```
 
-By default, test project runs (e.g. `tests` or `test_*`) are excluded. To include test runs or token usage telemetry:
+By default, test project runs are excluded. Use `--include-tests` to include test runs:
 
 ```bash
-nix run .#deploy-gcs-runs -- --include-tests --include-usage
+nix run .#deploy-gcs-runs -- --include-tests
 ```

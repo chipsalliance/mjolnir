@@ -24,7 +24,7 @@ This directory contains the core Python application engine for Mjolnir. It handl
     - **Phase 1 (Audit)**: Scans source files to identify potential vulnerabilities.
     - **Phase 2 (Review)**: Uses an adversarial reviewer agent to filter out false positives.
 5.  It writes the findings to `vulnerabilities.json` and a filtered version to `vulnerabilities_minimal.json` in the run directory.
-6.  It compiles run findings, telemetry, and execution metadata for dashboard ingestion.
+6.  It records telemetry report files (`token_usage.json` and `tool_usage.json`) in the run directory so CI data is never lost.
 7.  Optionally uploads results to Google Cloud Storage.
 
 ## Analysis Providers

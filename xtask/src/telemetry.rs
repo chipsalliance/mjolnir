@@ -82,12 +82,13 @@ pub fn get_all_usage(runs_dir: &Path) -> String {
     .to_string()
 }
 
-/// Reads metadata, vulnerabilities, and token usage for a single run
+/// Reads metadata, vulnerabilities, token usage, and tool usage for a single run
 pub fn get_run_detail(run_folder: &Path) -> String {
     let meta_path = run_folder.join("metadata.json");
     let vuln_path =
         locate_findings_file(run_folder).unwrap_or_else(|| run_folder.join("vulnerabilities.json"));
-    let usage_path = run_folder.join("usage.json");
+    let token_usage_path = run_folder.join("token_usage.json");
+    let tool_usage_path = run_folder.join("tool_usage.json");
 
     let meta: serde_json::Value = fs::read_to_string(meta_path)
         .ok()
@@ -99,7 +100,12 @@ pub fn get_run_detail(run_folder: &Path) -> String {
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or(serde_json::json!([]));
 
-    let usage: serde_json::Value = fs::read_to_string(usage_path)
+    let token_usage: serde_json::Value = fs::read_to_string(token_usage_path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or(serde_json::json!({}));
+
+    let tool_usage: serde_json::Value = fs::read_to_string(tool_usage_path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or(serde_json::json!({}));
@@ -107,7 +113,8 @@ pub fn get_run_detail(run_folder: &Path) -> String {
     serde_json::json!({
         "metadata": meta,
         "vulnerabilities": vulns,
-        "usage": usage,
+        "token_usage": token_usage,
+        "tool_usage": tool_usage,
     })
     .to_string()
 }

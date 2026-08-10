@@ -6,12 +6,13 @@ use std::path::Path;
 use std::process::Command;
 
 /// Compiles the Rust WebAssembly module and generates JS bindings via wasm-bindgen
-pub fn build_wasm(root_dir: &Path, include_usage: bool) {
+pub fn build_wasm(root_dir: &Path, include_token_usage: bool, include_tool_usage: bool) {
     let web_dir = root_dir.join("web");
     println!(
-        "Building WebAssembly dashboard in {} (Include usage telemetry: {})...",
+        "Building WebAssembly dashboard in {} (Token Usage: {}, Tool Usage: {})...",
         web_dir.display(),
-        include_usage
+        include_token_usage,
+        include_tool_usage
     );
 
     let status = Command::new("cargo")
@@ -60,17 +61,32 @@ pub fn build_wasm(root_dir: &Path, include_usage: bool) {
         std::process::exit(1);
     }
 
-    // Build-time conditional usage module generation
-    let dist_usage_file = dist_dir.join("usage_module.js");
-    if include_usage {
-        let src_usage_file = web_dir.join("src/usage_module.js");
-        if src_usage_file.exists() {
-            fs::copy(src_usage_file, &dist_usage_file)
-                .expect("Failed to copy usage_module.js into dist/");
+    // Build-time conditional token usage module generation
+    let dist_token_usage_file = dist_dir.join("token_usage_module.js");
+    if include_token_usage {
+        let src_token_usage_file = web_dir.join("src/token_usage_module.js");
+        if src_token_usage_file.exists() {
+            fs::copy(src_token_usage_file, &dist_token_usage_file)
+                .expect("Failed to copy token_usage_module.js into dist/");
         }
     } else {
-        let stub_content = "// Licensed under the Apache-2.0 license\n// SPDX-License-Identifier: Apache-2.0\nexport function registerUsageModule() {}\n";
-        fs::write(dist_usage_file, stub_content).expect("Failed to write stub usage_module.js");
+        let stub_content = "// Licensed under the Apache-2.0 license\n// SPDX-License-Identifier: Apache-2.0\nexport function registerTokenUsageModule() {}\n";
+        fs::write(dist_token_usage_file, stub_content)
+            .expect("Failed to write stub token_usage_module.js");
+    }
+
+    // Build-time conditional tool usage module generation
+    let dist_tool_usage_file = dist_dir.join("tool_usage_module.js");
+    if include_tool_usage {
+        let src_tool_usage_file = web_dir.join("src/tool_usage_module.js");
+        if src_tool_usage_file.exists() {
+            fs::copy(src_tool_usage_file, &dist_tool_usage_file)
+                .expect("Failed to copy tool_usage_module.js into dist/");
+        }
+    } else {
+        let stub_content = "// Licensed under the Apache-2.0 license\n// SPDX-License-Identifier: Apache-2.0\nexport function registerToolUsageModule() {}\n";
+        fs::write(dist_tool_usage_file, stub_content)
+            .expect("Failed to write stub tool_usage_module.js");
     }
 
     // Generate build metadata with UTC timestamp

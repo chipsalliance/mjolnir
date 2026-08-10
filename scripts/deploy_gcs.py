@@ -53,7 +53,16 @@ def deploy_web(workspace_root: Path, client: storage.Client, bucket_name: str):
         ("app.js", "web/app.js", "application/javascript"),
         ("wasm-worker.js", "web/wasm-worker.js", "application/javascript"),
         ("dist/build_info.js", "web/dist/build_info.js", "application/javascript"),
-        ("dist/usage_module.js", "web/dist/usage_module.js", "application/javascript"),
+        (
+            "dist/token_usage_module.js",
+            "web/dist/token_usage_module.js",
+            "application/javascript",
+        ),
+        (
+            "dist/tool_usage_module.js",
+            "web/dist/tool_usage_module.js",
+            "application/javascript",
+        ),
         (
             "dist/mjolnir_dashboard_wasm.js",
             "web/dist/mjolnir_dashboard_wasm.js",
@@ -91,11 +100,10 @@ def deploy_runs(
     workspace_root: Path,
     client: storage.Client,
     bucket_name: str,
-    include_usage: bool = False,
     include_tests: bool = False,
 ):
     print(
-        f"Scanning local runs in output/v1/runs/ for deployment to gs://{bucket_name}/v1/runs/ (Include usage telemetry: {include_usage}, Include test runs: {include_tests})..."
+        f"Scanning local runs in output/v1/runs/ for deployment to gs://{bucket_name}/v1/runs/ (Include test runs: {include_tests})..."
     )
     bucket = client.bucket(bucket_name)
 
@@ -144,7 +152,7 @@ def deploy_runs(
                     vuln_file = run_dir / "finding_phase_1.json"
 
                 meta_file = run_dir / "metadata.json"
-                usage_file = run_dir / "usage.json"
+                token_usage_file = run_dir / "token_usage.json"
 
                 vulns = []
                 critical_count = 0
@@ -210,9 +218,9 @@ def deploy_runs(
                     }
                 )
 
-                if include_usage and usage_file.exists():
+                if include_token_usage and token_usage_file.exists():
                     try:
-                        with open(usage_file, "r") as f:
+                        with open(token_usage_file, "r") as f:
                             u_data = json.load(f)
                             tot = u_data.get("total", {})
                             inp = tot.get("input_tokens") or tot.get("prompt_tokens") or 0
@@ -251,21 +259,12 @@ def deploy_runs(
 
                 check_blob_name = f"{gcs_run_prefix}/metadata.json"
                 if check_blob_name in existing_blobs:
-                    if (
-                        include_usage
-                        and usage_file.exists()
-                        and f"{gcs_run_prefix}/usage.json" not in existing_blobs
-                    ):
-                        blob = bucket.blob(f"{gcs_run_prefix}/usage.json")
-                        blob.upload_from_filename(str(usage_file), content_type="application/json")
                     skipped_count += 1
                     continue
 
                 print(f"  Uploading new run: {gcs_run_prefix}...")
                 for file_path in run_dir.rglob("*"):
                     if file_path.is_file():
-                        if not include_usage and file_path.name == "usage.json":
-                            continue
                         rel_file = file_path.relative_to(run_dir)
                         blob_name = f"{gcs_run_prefix}/{rel_file}"
                         mime, _ = mimetypes.guess_type(str(file_path))
@@ -283,7 +282,7 @@ def deploy_runs(
     runs_blob.upload_from_string(json.dumps(runs_index, indent=2), content_type="application/json")
     print(f"  Uploaded static API endpoint -> gs://{bucket_name}/api/runs")
 
-    if include_usage:
+    if usage_runs:
         usage_summary_data = {
             "total_input_tokens": total_input,
             "total_output_tokens": total_output,
@@ -305,11 +304,6 @@ def main():
     parser.add_argument("--web", action="store_true", help="Deploy static WASM web dashboard")
     parser.add_argument("--runs", action="store_true", help="Deploy missing local scan runs to GCS")
     parser.add_argument(
-        "--include-usage",
-        action="store_true",
-        help="Include sensitive token usage telemetry files",
-    )
-    parser.add_argument(
         "--include-tests",
         action="store_true",
         help="Include test and mock benchmark runs",
@@ -329,7 +323,6 @@ def main():
             workspace_root,
             client,
             bucket_name,
-            include_usage=args.include_usage,
             include_tests=args.include_tests,
         )
     else:

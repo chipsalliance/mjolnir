@@ -91,7 +91,12 @@ fn parse_run_directory(
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or(serde_json::json!({}));
 
-    let usage: serde_json::Value = fs::read_to_string(run_path.join("usage.json"))
+    let token_usage: serde_json::Value = fs::read_to_string(run_path.join("token_usage.json"))
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or(serde_json::json!({}));
+
+    let tool_usage: serde_json::Value = fs::read_to_string(run_path.join("tool_usage.json"))
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or(serde_json::json!({}));
@@ -123,7 +128,7 @@ fn parse_run_directory(
         .and_then(|s| s.as_str())
         .unwrap_or("Success")
         .to_string();
-    let total_tokens = usage
+    let total_tokens = token_usage
         .get("total")
         .and_then(|t| t.get("total_tokens"))
         .and_then(|v| v.as_u64())
@@ -147,7 +152,8 @@ fn parse_run_directory(
         "mode": mode,
         "status": status,
         "total_tokens": total_tokens,
-        "usage": usage,
+        "token_usage": token_usage,
+        "tool_usage": tool_usage,
     }))
 }
 

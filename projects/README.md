@@ -71,7 +71,7 @@ Each file under `jobs/` defines a specific audit task (e.g., scanning ROM firmwa
 - **`name`** (String, Required): Human-readable name of the job.
 - **`model`** (String, Optional): Override the model to use (e.g., `gemini-3.6-flash` for deeper analysis, defaults to project default).
 - **`provider`** (String, Optional): Override the analysis provider (`genai` or `mock`).
-- **`batchSize`** (Integer, Optional): Number of files to process per batch (defaults to `20`).
+- **`batchSize`** (Integer, Optional): Number of concurrent tasks / files to process per batch (defaults to `8`).
 - **`branch`** (String, Optional): Git branch to checkout (e.g., `main`).
 - **`tag`** (String, Optional): Git tag to checkout (e.g., `v1.0`).
 - **`commit`** (String, Optional): Git commit hash (SHA-1) to checkout.

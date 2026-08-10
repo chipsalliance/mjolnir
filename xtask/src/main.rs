@@ -19,7 +19,8 @@ fn main() {
     match task {
         "web" => {
             let serve = args.iter().any(|a| a == "--serve");
-            let include_usage = args.iter().any(|a| a == "--include-usage");
+            let include_token_usage = args.iter().any(|a| a == "--include-token-usage");
+            let include_tool_usage = args.iter().any(|a| a == "--include-tool-usage");
             let port = args
                 .iter()
                 .position(|a| a == "--port")
@@ -27,7 +28,7 @@ fn main() {
                 .and_then(|p| p.parse::<u16>().ok())
                 .unwrap_or(8080);
 
-            build::build_wasm(&root, include_usage);
+            build::build_wasm(&root, include_token_usage, include_tool_usage);
 
             if serve {
                 let web_dir = root.join("web");
@@ -36,17 +37,14 @@ fn main() {
             }
         }
         "deploy-gcs-web" => {
-            let include_usage = args.iter().any(|a| a == "--include-usage");
-            build::build_wasm(&root, include_usage);
+            let include_token_usage = args.iter().any(|a| a == "--include-token-usage");
+            let include_tool_usage = args.iter().any(|a| a == "--include-tool-usage");
+            build::build_wasm(&root, include_token_usage, include_tool_usage);
             deploy::deploy_gcs(&root, &["--web"]);
         }
         "deploy-gcs-runs" => {
-            let include_usage = args.iter().any(|a| a == "--include-usage");
             let include_tests = args.iter().any(|a| a == "--include-tests");
             let mut flags = vec!["--runs"];
-            if include_usage {
-                flags.push("--include-usage");
-            }
             if include_tests {
                 flags.push("--include-tests");
             }
