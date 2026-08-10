@@ -9,11 +9,7 @@ from utilities.logger import logger
 
 
 def run_command(args, cwd=None, env=None):
-    """Executes a shell command.
-    While running, it shows a rolling console window of the last 10 lines of output.
-    On success, the rolling window is cleared and "Command succeeded." is printed.
-    On failure, the rolling window is cleared and the full output is dumped to stderr.
-    """
+    """Executes a shell command cleanly without rolling console windows."""
     logger.debug(f"Executing: {' '.join(args)} in {cwd or '.'}")
 
     p = subprocess.Popen(
@@ -27,10 +23,6 @@ def run_command(args, cwd=None, env=None):
     )
 
     output_lines = []
-    window_size = 10
-    rolling_lines = []
-    prev_printed = 0
-    is_tty = sys.__stdout__.isatty()
 
     while True:
         line = p.stdout.readline()
@@ -39,36 +31,15 @@ def run_command(args, cwd=None, env=None):
 
         if line:
             output_lines.append(line)
-            # Log line output to file only
             logger.debug(line.rstrip("\r\n"))
 
-            # Rolling console window
-            if is_tty:
-                # Strip newline for rolling window display
-                rolling_lines.append(line.rstrip("\r\n"))
-                display_lines = rolling_lines[-window_size:]
-
-                # Move cursor up and clear
-                if prev_printed > 0:
-                    sys.__stdout__.write(f"\r\033[{prev_printed}A\033[J")
-
-                # Print rolling lines
-                for l in display_lines:
-                    sys.__stdout__.write(l + "\n")
-                sys.__stdout__.flush()
-                prev_printed = len(display_lines)
-
     rc = p.wait()
-
-    # Clear the rolling window from the terminal
-    if is_tty and prev_printed > 0:
-        sys.__stdout__.write(f"\r\033[{prev_printed}A\033[J")
-        sys.__stdout__.flush()
+    cmd_str = " ".join(args) if isinstance(args, list) else str(args)
 
     if rc == 0:
-        logger.success("Execution succeeded")
+        logger.success(f"Command succeeded: '{cmd_str}'")
     else:
-        logger.error(f"Execution failed with exit code: {rc}")
+        logger.error(f"Command failed with exit code {rc}: '{cmd_str}'")
 
         for line in output_lines:
             sys.__stderr__.write(line)
@@ -104,19 +75,22 @@ def run_command_capture(
             for line in res.stderr.splitlines():
                 logger.debug(line)
 
+        cmd_str = " ".join(args) if isinstance(args, list) else str(args)
         if res.returncode == 0:
-            logger.success("Execution succeeded.")
+            logger.debug(f"Command succeeded: '{cmd_str}'")
         else:
             if check:
-                logger.error(f"Execution failed with exit code: {res.returncode}.")
+                logger.error(f"Command failed with exit code {res.returncode}: '{cmd_str}'")
                 sys.__stderr__.write(res.stderr)
                 sys.__stderr__.flush()
                 sys.exit(res.returncode)
 
         return res
     except Exception as e:
-        logger.error(f"Execution failed with exception: {e}.")
+        cmd_str = " ".join(args) if isinstance(args, list) else str(args)
+        logger.debug(f"Command '{cmd_str}' failed with exception: {e}")
         if check:
+            logger.error(f"Command '{cmd_str}' failed with exception: {e}")
             sys.exit(1)
         raise e
 
