@@ -17,6 +17,7 @@
   --severity-high: #f97316;
   --severity-medium: #eab308;
   --severity-low: #3b82f6;
+  --severity-info: #38bdf8;
   --status-open: #f43f5e;
   --status-resolved: #10b981;
 }
@@ -387,6 +388,12 @@ tr:last-child td {
 .badge-LOW {
   background-color: rgba(59, 130, 246, 0.2);
   color: var(--severity-low);
+}
+
+.badge-INFO,
+.badge-INFORMATIONAL {
+  background-color: rgba(56, 189, 248, 0.2);
+  color: var(--severity-info);
 }
 
 /* Empty & Loading States */

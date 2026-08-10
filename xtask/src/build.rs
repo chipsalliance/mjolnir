@@ -70,7 +70,7 @@ pub fn build_wasm(root_dir: &Path, include_token_usage: bool, include_tool_usage
                 .expect("Failed to copy token_usage_module.js into dist/");
         }
     } else {
-        let stub_content = "// Licensed under the Apache-2.0 license\n// SPDX-License-Identifier: Apache-2.0\nexport function registerTokenUsageModule() {}\n";
+        let stub_content = "// Licensed under the Apache-2.0 license\n// SPDX-License-Identifier: Apache-2.0\nexport function registerTokenUsageModule() {}\nexport function renderRunTokenUsage() { return \"\"; }\n";
         fs::write(dist_token_usage_file, stub_content)
             .expect("Failed to write stub token_usage_module.js");
     }
@@ -84,7 +84,7 @@ pub fn build_wasm(root_dir: &Path, include_token_usage: bool, include_tool_usage
                 .expect("Failed to copy tool_usage_module.js into dist/");
         }
     } else {
-        let stub_content = "// Licensed under the Apache-2.0 license\n// SPDX-License-Identifier: Apache-2.0\nexport function registerToolUsageModule() {}\n";
+        let stub_content = "// Licensed under the Apache-2.0 license\n// SPDX-License-Identifier: Apache-2.0\nexport function registerToolUsageModule() {}\nexport function renderRunToolUsage() { return \"\"; }\n";
         fs::write(dist_tool_usage_file, stub_content)
             .expect("Failed to write stub tool_usage_module.js");
     }

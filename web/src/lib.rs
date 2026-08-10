@@ -26,19 +26,6 @@ pub struct VulnerabilityV1 {
     pub rule_id: Option<String>,
 }
 
-/// Placeholder for future Schema V2 definition
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct VulnerabilityV2 {
-    pub id: Option<String>,
-    pub name: Option<String>,
-    pub severity_level: Option<String>,
-    pub path: Option<String>,
-    pub line_number: Option<usize>,
-    pub summary: Option<String>,
-    pub remediation: Option<String>,
-    pub state: Option<String>,
-}
-
 /// Schema V1 Metadata definition
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RunMetadataV1 {
@@ -91,29 +78,6 @@ impl From<VulnerabilityV1> for NormalizedVulnerability {
     }
 }
 
-impl From<VulnerabilityV2> for NormalizedVulnerability {
-    fn from(v: VulnerabilityV2) -> Self {
-        let loc = v.line_number.map(|l| l.to_string()).unwrap_or_default();
-        Self {
-            title: v
-                .name
-                .or(v.id)
-                .unwrap_or_else(|| "Untitled Finding".to_string()),
-            severity: v
-                .severity_level
-                .unwrap_or_else(|| "LOW".to_string())
-                .to_uppercase(),
-            location: loc,
-            description: v.summary.unwrap_or_default(),
-            recommendation: v.remediation.unwrap_or_default(),
-            file: v.path.unwrap_or_default(),
-            status: v.state.unwrap_or_else(|| "Open".to_string()),
-            rule_id: String::new(),
-            schema_version: "v2".to_string(),
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct RunSummary {
     pub total: usize,
@@ -155,9 +119,8 @@ pub struct RunOverviewItem {
     pub schema_version: String,
 }
 
-/// Parses and normalizes input JSON findings across supported schema versions
+/// Parses and normalizes input JSON findings
 fn parse_vulnerabilities(vulnerabilities_json: &str) -> Vec<NormalizedVulnerability> {
-    // 1. Try V1 parsing
     if let Ok(v1_list) = serde_json::from_str::<Vec<VulnerabilityV1>>(vulnerabilities_json) {
         return v1_list
             .into_iter()
@@ -165,64 +128,42 @@ fn parse_vulnerabilities(vulnerabilities_json: &str) -> Vec<NormalizedVulnerabil
             .collect();
     }
 
-    // 2. Try V2 parsing
-    if let Ok(v2_list) = serde_json::from_str::<Vec<VulnerabilityV2>>(vulnerabilities_json) {
-        return v2_list
-            .into_iter()
-            .map(NormalizedVulnerability::from)
-            .collect();
-    }
-
-    // 3. Generic JSON Fallback parsing
     if let Ok(json_list) = serde_json::from_str::<Vec<serde_json::Value>>(vulnerabilities_json) {
         return json_list
             .into_iter()
             .map(|val| {
                 let title = val
                     .get("title")
-                    .or(val.get("name"))
-                    .or(val.get("id"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("Untitled Security Finding")
                     .to_string();
                 let severity = val
                     .get("severity")
-                    .or(val.get("severity_level"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("LOW")
                     .to_uppercase();
                 let file = val
                     .get("file")
-                    .or(val.get("path"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
                 let location = val
                     .get("location")
                     .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .or_else(|| {
-                        val.get("line_number")
-                            .and_then(|v| v.as_u64())
-                            .map(|n| n.to_string())
-                    })
-                    .unwrap_or_default();
+                    .unwrap_or("")
+                    .to_string();
                 let description = val
                     .get("description")
-                    .or(val.get("summary"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
                 let recommendation = val
                     .get("recommendation")
-                    .or(val.get("remediation"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
                 let status = val
                     .get("status")
-                    .or(val.get("state"))
-                    .or(val.get("verdict"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("Open")
                     .to_string();
@@ -410,14 +351,7 @@ pub fn build_phase_sankey_rows(vulns: &[serde_json::Value]) -> String {
                     .get("severity")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
-                let verdict = s.get("verdict").and_then(|v| v.as_str()).unwrap_or("");
-                let status = s.get("status").and_then(|v| v.as_str()).unwrap_or("");
-
-                let node_name = if verdict == "False Positive"
-                    || verdict == "Not Exploitable"
-                    || status.eq_ignore_ascii_case("Closed")
-                    || status.eq_ignore_ascii_case("Resolved")
-                {
+                let node_name = if is_closed_status(s) {
                     format!("Phase {}: {} - Closed", p_key, phase_name)
                 } else if severity.eq_ignore_ascii_case("Skipped") {
                     format!("Phase {}: {} - Skipped", p_key, phase_name)
@@ -465,9 +399,19 @@ pub fn build_phase_sankey_rows(vulns: &[serde_json::Value]) -> String {
         result_rows.push((src, dst, weight));
     }
 
-    result_rows.sort_by_key(|(src, dst, _)| (sankey_rank(src), sankey_rank(dst)));
+    result_rows.sort_by_key(|(src, dst, _)| (sankey_rank(dst), sankey_rank(src)));
 
     serde_json::to_string(&result_rows).unwrap_or_else(|_| "[]".to_string())
+}
+
+fn is_closed_status(v: &serde_json::Value) -> bool {
+    let status_str = v
+        .get("status")
+        .and_then(|s| s.as_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    status_str == "closed"
 }
 
 fn sankey_rank(node_name: &str) -> usize {
@@ -476,16 +420,13 @@ fn sankey_rank(node_name: &str) -> usize {
         1
     } else if name_upper.contains("LOW") {
         2
-    } else if name_upper.contains("MEDIUM") || name_upper.contains("MED") {
+    } else if name_upper.contains("MEDIUM") {
         3
     } else if name_upper.contains("HIGH") {
         4
-    } else if name_upper.contains("CRITICAL") || name_upper.contains("CRIT") {
+    } else if name_upper.contains("CRITICAL") {
         5
-    } else if name_upper.contains("CLOSED")
-        || name_upper.contains("RESOLVED")
-        || name_upper.contains("FIXED")
-    {
+    } else if name_upper.contains("CLOSED") {
         6
     } else if name_upper.contains("SKIPPED") {
         7
@@ -502,7 +443,6 @@ fn fallback_sankey_rows(vulns: &[serde_json::Value]) -> String {
             .and_then(|f| f.as_str())
             .unwrap_or("Code Unit");
         let sev = v.get("severity").and_then(|s| s.as_str()).unwrap_or("Low");
-        let status = v.get("status").and_then(|s| s.as_str()).unwrap_or("Open");
         let source = if file.contains('/') {
             let parts: Vec<&str> = file.split('/').collect();
             if parts.len() > 2 {
@@ -514,10 +454,10 @@ fn fallback_sankey_rows(vulns: &[serde_json::Value]) -> String {
             file.to_string()
         };
 
-        if status.eq_ignore_ascii_case("Open") {
-            rows.push((source, sev.to_string(), 1));
-        } else {
+        if is_closed_status(v) {
             rows.push((source, "Closed".to_string(), 1));
+        } else {
+            rows.push((source, sev.to_string(), 1));
         }
     }
     serde_json::to_string(&rows).unwrap_or_else(|_| "[]".to_string())

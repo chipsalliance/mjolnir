@@ -8,18 +8,21 @@ import init, {
   compute_project_sankey_flow,
   compute_run_sankey_flow
 } from './dist/mjolnir_dashboard_wasm.js';
-import { registerTokenUsageModule } from './dist/token_usage_module.js';
-import { registerToolUsageModule } from './dist/tool_usage_module.js';
+import { registerTokenUsageModule, renderRunTokenUsage } from './dist/token_usage_module.js';
+import { registerToolUsageModule, renderRunToolUsage } from './dist/tool_usage_module.js';
 import { BUILD_TIMESTAMP } from './dist/build_info.js';
 
 
-export function getApiEndpoint(endpoint) {
+export function getAssetUrl(path) {
   let base = window.location.pathname;
-  if (!base.endsWith("/") && !base.endsWith(".html")) {
+  if (base.endsWith(".html") || base.endsWith(".htm")) {
+    base = base.substring(0, base.lastIndexOf("/") + 1);
+  }
+  if (!base.endsWith("/")) {
     base += "/";
   }
-  const cleanEndpoint = endpoint.replace(/^\//, "");
-  return new URL(cleanEndpoint, window.location.origin + base).href;
+  const cleanPath = path.replace(/^\//, "");
+  return new URL(cleanPath, window.location.origin + base).href;
 }
 
 let dynamicRoutes = {};
@@ -73,7 +76,7 @@ let mainWasmPromise = null;
 
 function ensureMainThreadWasm() {
   if (!mainWasmPromise) {
-    mainWasmPromise = init({ module_or_path: './dist/mjolnir_dashboard_wasm_bg.wasm' }).catch(err => {
+    mainWasmPromise = init({ module_or_path: getAssetUrl('web/dist/mjolnir_dashboard_wasm_bg.wasm') }).catch(err => {
       console.warn("Main thread WebAssembly init warning:", err);
     });
   }
@@ -195,16 +198,104 @@ function closeFindingModal() {
 }
 
 async function fetchRunsData() {
-  try {
-    const res = await fetch(getApiEndpoint("api/runs"));
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    runsState = await res.json();
-  } catch (err) {
-    console.warn("Could not fetch runs data:", err);
-    runsState = [];
-  }
+  runsState = await fetchRunsFromGcsBucket();
   updateFooterTimestamp();
   renderSidebarNavigation();
+}
+
+async function fetchRunsFromGcsBucket() {
+  try {
+    let basePath = window.location.pathname;
+    if (basePath.endsWith(".html") || basePath.endsWith(".htm")) {
+      basePath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
+    }
+    if (!basePath.endsWith("/")) {
+      basePath += "/";
+    }
+    const cleanBasePath = basePath.replace(/^\//, "");
+    const listUrl = new URL(`${cleanBasePath}?prefix=v1/runs/`, window.location.origin).href;
+    const res = await fetch(listUrl);
+    if (!res.ok) return [];
+
+    const text = await res.text();
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(text, "text/xml");
+
+    const keys = Array.from(xml.getElementsByTagNameNS("*", "Key"))
+      .map(node => node.textContent)
+      .filter(key => key && key.endsWith("/metadata.json"));
+
+    if (keys.length === 0) return [];
+
+    const runPromises = keys.map(async (key) => {
+      try {
+        const metaRes = await fetch(getAssetUrl(key));
+        if (!metaRes.ok) return null;
+        const meta = await metaRes.json();
+
+        const vulnKey = key.replace("metadata.json", "vulnerabilities.json");
+        const vulnRes = await fetch(getAssetUrl(vulnKey));
+        const vulns = vulnRes.ok ? await vulnRes.json() : [];
+
+        const parts = key.split("/");
+        const project = meta.project || parts[2] || "default";
+        const job = meta.job || parts[3] || "default";
+        const run_id = meta.run_id || parts[4] || "unknown";
+
+        let critical = 0, high = 0, medium = 0, low = 0, open_count = 0, closed_count = 0;
+        if (Array.isArray(vulns)) {
+          vulns.forEach(v => {
+            const sev = String(v.severity || v.severity_level || "LOW").toUpperCase();
+            if (sev === "CRITICAL") critical++;
+            else if (sev === "HIGH") high++;
+            else if (sev === "MEDIUM") medium++;
+            else low++;
+
+            const st = String(v.status || v.state || "Open").toLowerCase();
+            if (["closed", "fixed", "resolved"].includes(st)) closed_count++;
+            else open_count++;
+          });
+        }
+
+        return {
+          project,
+          job,
+          run_id,
+          timestamp: meta.timestamp || run_id,
+          vuln_count: Array.isArray(vulns) ? vulns.length : 0,
+          critical_count: critical,
+          high_count: high,
+          medium_count: medium,
+          low_count: low,
+          open_count,
+          closed_count,
+          vulnerabilities: Array.isArray(vulns) ? vulns : [],
+          model: meta.model || "Unknown",
+          commit: meta.target_commit || "Unknown",
+          mode: meta.mode || "Discovery",
+          status: meta.status || "Success",
+        };
+      } catch (err) {
+        return null;
+      }
+    });
+
+    const results = await Promise.all(runPromises);
+    return results.filter(Boolean);
+  } catch (err) {
+    console.warn("GCS Bucket list fetch failed:", err);
+    return [];
+  }
+}
+
+function getFilteredRuns() {
+  if (!runsState) return [];
+  if (!hideTests) return runsState;
+  return runsState.filter(r => {
+    const proj = (r.project || "").toLowerCase();
+    const job = (r.job || "").toLowerCase();
+    return !proj.includes("test") && !job.includes("test");
+  });
 }
 
 function updateFooterTimestamp() {
@@ -337,7 +428,8 @@ function renderRunBadge(r) {
   if ((r.critical_count ?? 0) > 0) return `<span class="badge badge-CRITICAL">${count} Findings</span>`;
   if ((r.high_count ?? 0) > 0) return `<span class="badge badge-HIGH">${count} Findings</span>`;
   if ((r.medium_count ?? 0) > 0) return `<span class="badge badge-MEDIUM">${count} Findings</span>`;
-  return `<span class="badge badge-LOW">${count} Findings</span>`;
+  if ((r.low_count ?? 0) > 0) return `<span class="badge badge-LOW">${count} Findings</span>`;
+  return `<span class="badge badge-INFO">${count} Findings</span>`;
 }
 
 async function renderGlobalView(container) {
@@ -360,7 +452,7 @@ async function renderGlobalView(container) {
   filtered.forEach(r => {
     const p = r.project;
     if (!projMap[p]) {
-      projMap[p] = { runs: 0, total: 0, crit: 0, high: 0, med: 0, low: 0 };
+      projMap[p] = { runs: 0, total: 0, crit: 0, high: 0, med: 0, low: 0, info: 0, closed: 0 };
     }
     projMap[p].runs += 1;
     projMap[p].total += (r.vuln_count || 0);
@@ -369,15 +461,23 @@ async function renderGlobalView(container) {
     let high = r.high_count ?? 0;
     let med = r.medium_count ?? 0;
     let low = r.low_count ?? 0;
+    let info = r.info_count ?? 0;
+    let closed = r.closed_count ?? 0;
 
     if (Array.isArray(r.vulnerabilities) && r.vulnerabilities.length > 0) {
-      crit = 0; high = 0; med = 0; low = 0;
+      crit = 0; high = 0; med = 0; low = 0; info = 0; closed = 0;
       r.vulnerabilities.forEach(v => {
+        const st = String(v.status || v.state || "Open").toLowerCase();
+        if (["closed", "fixed", "resolved"].includes(st)) {
+          closed += 1;
+          return;
+        }
         const sev = (v.severity || '').toString().toUpperCase();
         if (sev === 'CRITICAL') crit += 1;
         else if (sev === 'HIGH') high += 1;
         else if (sev === 'MEDIUM') med += 1;
         else if (sev === 'LOW') low += 1;
+        else info += 1;
       });
     }
 
@@ -385,6 +485,8 @@ async function renderGlobalView(container) {
     projMap[p].high += high;
     projMap[p].med += med;
     projMap[p].low += low;
+    projMap[p].info += info;
+    projMap[p].closed += closed;
   });
 
   const projRowsHtml = Object.keys(projMap).sort().map(pName => {
@@ -398,6 +500,8 @@ async function renderGlobalView(container) {
         <td style="color: var(--severity-high); font-weight: 600;">${p.high}</td>
         <td style="color: var(--severity-medium); font-weight: 600;">${p.med}</td>
         <td style="color: var(--severity-low); font-weight: 600;">${p.low}</td>
+        <td style="color: var(--severity-info); font-weight: 600;">${p.info}</td>
+        <td style="color: var(--text-muted); font-weight: 600;">${p.closed}</td>
       </tr>`;
   }).join("");
 
@@ -419,8 +523,8 @@ async function renderGlobalView(container) {
         <span class="metric-value">${totalRuns}</span>
       </div>
       <div class="metric-card">
-        <span class="metric-label">Open Findings</span>
-        <span class="metric-value" style="color: var(--severity-high);">${totalVulns}</span>
+        <span class="metric-label">Total Findings</span>
+        <span class="metric-value">${totalVulns}</span>
       </div>
     </div>
 
@@ -444,6 +548,8 @@ async function renderGlobalView(container) {
               <th style="color: var(--severity-high)">High</th>
               <th style="color: var(--severity-medium)">Med</th>
               <th style="color: var(--severity-low)">Low</th>
+              <th style="color: var(--severity-info)">Info</th>
+              <th style="color: var(--text-muted)">Closed</th>
             </tr>
           </thead>
           <tbody>
@@ -639,6 +745,23 @@ async function renderProjectView(projName, container) {
   renderSankeyChart("project-sankey-chart-container", flowJson);
 }
 
+async function fetchRunDetailsFromGcs(proj, job, runId) {
+  const prefix = `v1/runs/${proj}/${job}/${runId}`;
+  const [metaRes, vulnRes, tokenRes, toolRes] = await Promise.all([
+    fetch(getAssetUrl(`${prefix}/metadata.json`)),
+    fetch(getAssetUrl(`${prefix}/vulnerabilities.json`)),
+    fetch(getAssetUrl(`${prefix}/token_usage.json`)),
+    fetch(getAssetUrl(`${prefix}/tool_usage.json`))
+  ]);
+
+  const metadata = metaRes.ok ? await metaRes.json() : {};
+  const vulnerabilities = vulnRes.ok ? await vulnRes.json() : [];
+  const token_usage = tokenRes.ok ? await tokenRes.json() : {};
+  const tool_usage = toolRes.ok ? await toolRes.json() : {};
+
+  return { metadata, vulnerabilities, token_usage, tool_usage };
+}
+
 async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
   container.innerHTML = `
     <div class="empty-state">
@@ -647,9 +770,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
     </div>`;
 
   try {
-    const res = await fetch(getApiEndpoint(`api/run/${proj}/${job}/${runId}`));
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    const data = await res.json();
+    const data = await fetchRunDetailsFromGcs(proj, job, runId);
 
     const vulnsJson = JSON.stringify(data.vulnerabilities || []);
     currentRunVulns = data.vulnerabilities || [];
@@ -669,49 +790,30 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         </div>`;
     }
 
-    let toolUsageHtml = "";
-    if (toolUsage.by_tool && Object.keys(toolUsage.by_tool).length > 0) {
-      const tot = toolUsage.total || {};
-      const toolRows = Object.entries(toolUsage.by_tool).map(([toolName, stats]) => `
-        <tr>
-          <td><code>${toolName}</code></td>
-          <td>${stats.calls}</td>
-          <td style="color: var(--status-resolved);">${stats.successes}</td>
-          <td style="color: ${stats.failures > 0 ? 'var(--severity-critical)' : 'inherit'};">${stats.failures}</td>
-          <td><span class="badge ${stats.failures > 0 ? 'badge-critical' : 'badge-low'}">${stats.failure_rate}</span></td>
-        </tr>
-      `).join("");
+    const tokenUsageHtml = renderRunTokenUsage(data);
+    const toolUsageHtml = renderRunToolUsage(data);
 
-      toolUsageHtml = `
-        <div class="card" style="margin-bottom: 20px;">
-          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>Tool Usage Telemetry</span>
-            <span style="font-size: 13px; font-weight: normal;">Total Calls: <strong>${tot.total_calls || 0}</strong> | Failure Rate: <strong>${tot.failure_rate || '0.00%'}</strong></span>
-          </div>
-          <table class="findings-table">
-            <thead>
-              <tr>
-                <th>Tool Name</th>
-                <th>Calls</th>
-                <th>Successes</th>
-                <th>Failures</th>
-                <th>Failure Rate</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${toolRows}
-            </tbody>
-          </table>
-        </div>`;
-    }
-
-    const shortCommit = (meta.target_commit || meta.commit || 'N/A').substring(0, 8);
+    const shortCommit = (meta.target_commit || 'Unknown').substring(0, 8);
     const statusStr = meta.status || 'Success';
     const statusColor = statusStr === 'Failed' ? 'var(--severity-critical)' : 'var(--status-resolved)';
 
-    // Strict WASM Summary Calculation via Worker Thread
-    const summaryRaw = await apiComputeSummary(vulnsJson);
-    const summary = JSON.parse(summaryRaw);
+    // Compute consistent severity breakdown matching total findings
+    let critCount = 0, highCount = 0, medCount = 0, lowCount = 0, infoCount = 0, closedCount = 0;
+    currentRunVulns.forEach(v => {
+      const st = String(v.status || "Open").toLowerCase();
+      if (st === "closed") {
+        closedCount++;
+        return;
+      }
+      const sev = String(v.severity || "LOW").toUpperCase();
+      if (sev === "CRITICAL") critCount++;
+      else if (sev === "HIGH") highCount++;
+      else if (sev === "MEDIUM") medCount++;
+      else if (sev === "LOW") lowCount++;
+      else infoCount++;
+    });
+
+    const totalVulns = currentRunVulns.length;
 
     container.innerHTML = `
       <div class="run-meta-grid">
@@ -726,28 +828,38 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
 
       ${errorsHtml}
 
+      ${tokenUsageHtml}
+
       ${toolUsageHtml}
 
       <div class="metrics-grid">
         <div class="metric-card">
           <span class="metric-label">Total Findings</span>
-          <span class="metric-value">${summary.total}</span>
+          <span class="metric-value">${totalVulns}</span>
         </div>
         <div class="metric-card">
           <span class="metric-label">Critical</span>
-          <span class="metric-value" style="color: var(--severity-critical);">${summary.critical}</span>
+          <span class="metric-value" style="color: var(--severity-critical);">${critCount}</span>
         </div>
         <div class="metric-card">
           <span class="metric-label">High</span>
-          <span class="metric-value" style="color: var(--severity-high);">${summary.high}</span>
+          <span class="metric-value" style="color: var(--severity-high);">${highCount}</span>
         </div>
         <div class="metric-card">
           <span class="metric-label">Medium</span>
-          <span class="metric-value" style="color: var(--severity-medium);">${summary.medium}</span>
+          <span class="metric-value" style="color: var(--severity-medium);">${medCount}</span>
         </div>
         <div class="metric-card">
           <span class="metric-label">Low</span>
-          <span class="metric-value" style="color: var(--severity-low);">${summary.low}</span>
+          <span class="metric-value" style="color: var(--severity-low);">${lowCount}</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Info</span>
+          <span class="metric-value" style="color: var(--severity-info);">${infoCount}</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Closed</span>
+          <span class="metric-value" style="color: var(--text-muted);">${closedCount}</span>
         </div>
       </div>
 
@@ -1077,12 +1189,14 @@ function drawGoogleSankey(rows, container) {
 
     // Map severity names to matching theme colors
     const nodeColors = uniqueNodes.map(nodeName => {
-      if (nodeName.includes('Critical')) return '#ef4444';
-      if (nodeName.includes('High')) return '#f97316';
-      if (nodeName.includes('Medium')) return '#eab308';
-      if (nodeName.includes('Low')) return '#3b82f6';
-      if (nodeName.includes('Informational')) return '#38bdf8';
-      if (nodeName.includes('Closed') || nodeName.includes('Skipped') || nodeName.includes('Excluded')) return '#71717a';
+      const u = String(nodeName || '').toUpperCase();
+      if (u.includes('CRITICAL')) return '#ef4444';
+      if (u.includes('HIGH')) return '#f97316';
+      if (u.includes('MEDIUM')) return '#eab308';
+      if (u.includes('LOW')) return '#3b82f6';
+      if (u.includes('INFO')) return '#38bdf8';
+      if (u.includes('CLOSED')) return '#71717a';
+      if (u.includes('SKIPPED')) return '#a1a1aa';
       return '#38bdf8';
     });
 

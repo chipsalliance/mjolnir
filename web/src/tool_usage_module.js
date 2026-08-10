@@ -165,3 +165,44 @@ export function registerToolUsageModule(navContainer, routeHandlers, renderEmpty
     };
   }
 }
+
+export function renderRunToolUsage(data) {
+  const toolUsage = (data && data.tool_usage) || {};
+  if (!toolUsage.by_tool || Object.keys(toolUsage.by_tool).length === 0) {
+    return "";
+  }
+  const tot = toolUsage.total || {};
+  const toolRows = Object.entries(toolUsage.by_tool).map(([toolName, stats]) => `
+    <tr>
+      <td><code>${toolName}</code></td>
+      <td>${stats.calls}</td>
+      <td style="color: var(--status-resolved);">${stats.successes}</td>
+      <td style="color: ${stats.failures > 0 ? 'var(--severity-critical)' : 'inherit'};">${stats.failures}</td>
+      <td><span class="badge ${stats.failures > 0 ? 'badge-critical' : 'badge-low'}">${stats.failure_rate}</span></td>
+    </tr>
+  `).join("");
+
+  return `
+    <details class="card" style="margin-bottom: 20px;">
+      <summary class="card-title" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
+        <span>Tool Usage Telemetry (Click to Expand)</span>
+        <span style="font-size: 13px; font-weight: normal;">Total Calls: <strong>${tot.total_calls || 0}</strong> | Failure Rate: <strong>${tot.failure_rate || '0.00%'}</strong></span>
+      </summary>
+      <div style="margin-top: 15px;">
+        <table class="findings-table">
+          <thead>
+            <tr>
+              <th>Tool Name</th>
+              <th>Calls</th>
+              <th>Successes</th>
+              <th>Failures</th>
+              <th>Failure Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${toolRows}
+          </tbody>
+        </table>
+      </div>
+    </details>`;
+}

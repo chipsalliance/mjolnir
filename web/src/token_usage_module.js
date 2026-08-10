@@ -129,3 +129,42 @@ export function registerTokenUsageModule(navContainer, routeHandlers, renderEmpt
     }
   };
 }
+
+export function renderRunTokenUsage(data) {
+  const tokenUsage = (data && data.token_usage) || {};
+  if (!tokenUsage.by_model || Object.keys(tokenUsage.by_model).length === 0) {
+    return "";
+  }
+  const tot = tokenUsage.total || {};
+  const tokenRows = Object.entries(tokenUsage.by_model).map(([modelName, stats]) => `
+    <tr>
+      <td><code>${modelName}</code></td>
+      <td>${(stats.input_tokens || 0).toLocaleString()}</td>
+      <td>${(stats.output_tokens || 0).toLocaleString()}</td>
+      <td><strong>${(stats.total_tokens || 0).toLocaleString()}</strong></td>
+    </tr>
+  `).join("");
+
+  return `
+    <details class="card" style="margin-bottom: 20px;">
+      <summary class="card-title" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
+        <span>Token Usage Telemetry (Click to Expand)</span>
+        <span style="font-size: 13px; font-weight: normal;">Total Tokens: <strong>${(tot.total_tokens || 0).toLocaleString()}</strong></span>
+      </summary>
+      <div style="margin-top: 15px;">
+        <table class="findings-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Input Tokens</th>
+              <th>Output Tokens</th>
+              <th>Total Tokens</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tokenRows}
+          </tbody>
+        </table>
+      </div>
+    </details>`;
+}
