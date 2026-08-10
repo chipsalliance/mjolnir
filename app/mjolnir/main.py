@@ -112,7 +112,7 @@ def _run_orchestrator():
     # File discovery & Ingestion routing
     ingest_path = args.ingest or job.get("ingestionReport")
     diff_base = args.diff_base or job.get("diffBase")
-    diff_head = args.diff_head or job.get("diffHead", "HEAD")
+    diff_head = args.diff_head or job.get("diffHead")
 
     logger.info(f"Writing project metadata.")
     write_metadata(

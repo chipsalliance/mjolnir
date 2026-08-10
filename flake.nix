@@ -223,7 +223,9 @@
               name = "caliptra-all";
               description = "All Caliptra jobs";
               jobs = [
+                discovered.caliptra-sw-main
                 discovered.caliptra-sw-rom-main
+                discovered.caliptra-sw-caliptra-1x
                 discovered.caliptra-mcu-sw-main
                 discovered.caliptra-dpe-main
                 discovered.caliptra-dpe-runtime-v1

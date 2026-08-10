@@ -12,7 +12,7 @@ let
       inherit (job) name;
       model = job.model or project.model or "gemini-3.6-flash";
       provider = job.provider or project.provider or "adk";
-      batchSize = job.batchSize or 64;
+      batchSize = job.batchSize or 8;
       branch = job.branch or null;
       tag = job.tag or null;
       commit = job.commit or null;
@@ -23,7 +23,7 @@ let
       cmd = job.cmd or null;
       ingestionReport = job.ingestionReport or null;
       diffBase = job.diffBase or null;
-      diffHead = job.diffHead or null;
+      diffHead = job.diffHead or "HEAD";
     };
 
     config = {
