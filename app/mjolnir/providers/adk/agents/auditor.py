@@ -5,8 +5,6 @@ import pathlib
 
 from google.adk import Agent
 from google.adk.agents.run_config import RunConfig
-from google.adk.skills import load_skill_from_dir
-from google.adk.tools.skill_toolset import SkillToolset
 
 from agent_tools.ast_search import ast_search
 from agent_tools.ctags_search import ctags_search
@@ -35,18 +33,18 @@ def get_auditor_agent(model: str, threat_model_context: str = "") -> Agent:
         instruction += threat_model_context
 
     skills_dir = pathlib.Path(current_dir) / "skills"
-    skill_toolset = SkillToolset(
-        skills=[
-            load_skill_from_dir(skills_dir / "c-audit-skill"),
-            load_skill_from_dir(skills_dir / "rust-audit-skill"),
-        ]
-    )
+    c_skill_path = skills_dir / "c-audit-skill" / "SKILL.md"
+    rust_skill_path = skills_dir / "rust-audit-skill" / "SKILL.md"
+    if c_skill_path.exists():
+        instruction += f"\n\n{c_skill_path.read_text()}\n"
+    if rust_skill_path.exists():
+        instruction += f"\n\n{rust_skill_path.read_text()}\n"
 
     return IsolatedAgent(
         name="AuditorAgent",
         model=model,
         instruction=instruction,
-        tools=[skill_toolset, read_file, glob, grep_search, ctags_search, ast_search],
+        tools=[read_file, glob, grep_search, ctags_search, ast_search],
         output_schema=SecurityReport,
         before_tool_callback=make_tool_budget_callback(AUDITOR_MAX_TOOL_CALLS),
         run_config=RunConfig(max_llm_calls=AUDITOR_MAX_LLM_CALLS),

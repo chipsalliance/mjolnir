@@ -4,6 +4,7 @@
 import asyncio
 import random
 import re
+import traceback
 from typing import Any, Optional
 
 from tqdm import tqdm
@@ -11,10 +12,10 @@ from tqdm import tqdm
 from providers.adk.utilities.aimd_controller import AIMDConcurrencyController
 from utilities.logger import logger
 
-DEFAULT_MAX_RETRIES = 6
+DEFAULT_MAX_RETRIES = 10
 DEFAULT_BASE_DELAY = 2.0
 MAX_BACKOFF_DELAY = 60.0  # Cap maximum backoff at 60s
-QUOTA_BACKOFF_MULTIPLIER = 4.0
+QUOTA_BACKOFF_MULTIPLIER = 3.0
 TRANSIENT_BACKOFF_MULTIPLIER = 2.0
 
 
@@ -45,8 +46,6 @@ def extract_agent_output(res: Any, expected_schema: Any) -> Any:
         except Exception as e:
             logger.warning(f"Failed to validate JSON output against {expected_schema}: {e}")
             return None
-
-    return None
 
 
 async def run_agent_with_backoff(
@@ -83,42 +82,49 @@ async def run_agent_with_backoff(
             if tracker:
                 tracker.track_error(e, agent.name)
 
-            root_e = getattr(e, "__cause__", None) or getattr(e, "__context__", None) or e
-            error_str = f"{type(root_e).__name__} {str(root_e)}".lower()
+            # Traverse exception chain to inspect cause and context (ADK wraps model errors in DynamicNodeFailError)
+            chain = [e]
+            curr = e
+            while curr is not None and len(chain) < 10:
+                curr = getattr(curr, "__cause__", None) or getattr(curr, "__context__", None)
+                if curr is not None:
+                    chain.append(curr)
+
+            full_error_str = " ".join(f"{type(x).__name__}: {x} {repr(x)}" for x in chain)
 
             is_quota = any(
-                q in error_str for q in ["429", "quota", "resourceexhausted", "overload", "prefill"]
-            )
-            is_transient = is_quota or any(
-                sig in error_str
-                for sig in ["500", "502", "503", "timeout", "unavailable", "connection"]
+                code in full_error_str
+                for code in [
+                    "RESOURCE_EXHAUSTED",
+                    "PREFILL_QUEUE_OVERLOADED",
+                    "OVERLOADED_TOO_MANY_RETRIES_PER_REQUEST",
+                    "429",
+                ]
             )
 
             await aimd_controller.release(is_quota_hit=is_quota, max_concurrency=max_concurrency)
 
-            if not is_transient:
+            if not is_quota:
+                logger.debug(f"Non-retryable execution error for {run_id}: {e}", exc_info=True)
                 logger.error(
-                    f"FATAL: Non-retryable error during execution for {run_id}: {e}",
-                    exc_info=True,
+                    f"Fatal error during execution for {run_id}: {type(e).__name__}: {str(e)[:120]}"
                 )
                 raise e
 
             attempt += 1
             if attempt >= max_retries:
+                logger.debug(f"Exhausted retries for {run_id}: {e}", exc_info=True)
                 logger.error(
-                    f"FATAL: Agent execution for {run_id} failed after {max_retries} attempts.",
-                    exc_info=True,
+                    f"Fatal: Agent execution for {run_id} failed after {max_retries} attempts."
                 )
                 raise e
 
-            multiplier = QUOTA_BACKOFF_MULTIPLIER if is_quota else TRANSIENT_BACKOFF_MULTIPLIER
-            delay = min(MAX_BACKOFF_DELAY, base_delay * (multiplier ** (attempt - 1)))
+            delay = min(MAX_BACKOFF_DELAY, base_delay * (QUOTA_BACKOFF_MULTIPLIER ** (attempt - 1)))
             jitter = random.uniform(0.1, 2.0)
             total_sleep = delay + jitter
 
-            logger.info(
-                f"Transient/Quota error for {run_id} ({error_str[:30]}...). "
-                f"Local backoff for {total_sleep:.1f}s (Attempt {attempt}/{max_retries})"
+            logger.warning(
+                f"Quota limit reached ({run_id}). Retrying in {total_sleep:.1f}s (Attempt {attempt}/{max_retries})..."
             )
             await asyncio.sleep(total_sleep)
 

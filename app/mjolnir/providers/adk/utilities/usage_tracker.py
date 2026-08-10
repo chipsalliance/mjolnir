@@ -8,7 +8,7 @@ from utilities.logger import logger
 
 
 class UsageTracker:
-    """Tracks token usage and transient errors across ADK agents, generating breakdown reports."""
+    """Tracks token usage, tool executions, and transient errors across ADK agents, generating breakdown reports."""
 
     def __init__(self, run_dir: str = None):
         self.run_dir = run_dir
@@ -24,6 +24,45 @@ class UsageTracker:
             "total_tokens": 0,
             "total_errors": 0,
         }
+        self.tool_usage_by_agent = {}
+        self.tool_usage_by_tool = {}
+        self.total_tool_usage = {
+            "total_calls": 0,
+            "total_successes": 0,
+            "total_failures": 0,
+        }
+
+    def track_tool_call(self, tool_name: str, success: bool, agent_name: str = "AuditorAgent"):
+        """Records a tool invocation, success, and failure stat."""
+        self.total_tool_usage["total_calls"] += 1
+        if success:
+            self.total_tool_usage["total_successes"] += 1
+        else:
+            self.total_tool_usage["total_failures"] += 1
+
+        # Per-tool breakdown
+        if tool_name not in self.tool_usage_by_tool:
+            self.tool_usage_by_tool[tool_name] = {"calls": 0, "successes": 0, "failures": 0}
+        self.tool_usage_by_tool[tool_name]["calls"] += 1
+        if success:
+            self.tool_usage_by_tool[tool_name]["successes"] += 1
+        else:
+            self.tool_usage_by_tool[tool_name]["failures"] += 1
+
+        # Per-agent breakdown
+        if agent_name not in self.tool_usage_by_agent:
+            self.tool_usage_by_agent[agent_name] = {}
+        if tool_name not in self.tool_usage_by_agent[agent_name]:
+            self.tool_usage_by_agent[agent_name][tool_name] = {
+                "calls": 0,
+                "successes": 0,
+                "failures": 0,
+            }
+        self.tool_usage_by_agent[agent_name][tool_name]["calls"] += 1
+        if success:
+            self.tool_usage_by_agent[agent_name][tool_name]["successes"] += 1
+        else:
+            self.tool_usage_by_agent[agent_name][tool_name]["failures"] += 1
 
     def track_error(self, e: Exception, agent_name: str = "system"):
         """Records an encountered error to surface in the final summary."""
@@ -42,9 +81,6 @@ class UsageTracker:
 
         self.usage_by_agent[agent_name]["errors"] += 1
 
-        if self.run_dir:
-            self.write_to_disk(self.run_dir)
-
     def _get_empty_agent_stats(self):
         return {
             "model": "unknown",
@@ -59,15 +95,33 @@ class UsageTracker:
         }
 
     def add(self, ev):
-        """Extracts and aggregates token usage from an ADK event."""
-        if not hasattr(ev, "usage_metadata") or not ev.usage_metadata:
-            return
-
+        """Extracts and aggregates token and tool usage from an ADK event."""
         agent_name = (
             getattr(ev, "author", None)
             or getattr(getattr(ev, "node_info", None), "name", None)
             or "UnknownAgent"
         )
+
+        # Track tool responses if present in event content
+        parts = getattr(getattr(ev, "content", None), "parts", []) or []
+        for part in parts:
+            fn_res = getattr(part, "function_response", None)
+            if fn_res:
+                tool_name = getattr(fn_res, "name", "unknown_tool")
+                response_content = str(getattr(fn_res, "response", ""))
+                success = not any(
+                    err_kw in response_content.lower()
+                    for err_kw in [
+                        "error:",
+                        "failed with exception",
+                        "timed out",
+                        "access denied",
+                    ]
+                )
+                self.track_tool_call(tool_name=tool_name, success=success, agent_name=agent_name)
+
+        if not hasattr(ev, "usage_metadata") or not ev.usage_metadata:
+            return
 
         p_tokens = getattr(ev.usage_metadata, "prompt_token_count", 0) or 0
         o_tokens = getattr(ev.usage_metadata, "candidates_token_count", 0) or 0
@@ -103,14 +157,49 @@ class UsageTracker:
         self.total_usage["total_tokens"] += all_tokens
 
     def write_to_disk(self, run_dir: str):
-        """Writes the usage statistics to a JSON file in the run directory."""
-        if run_dir and Path(run_dir).exists():
-            usage_data = {
-                "total": self.total_usage,
-                "errors_grouped": self.error_counts,
-                "by_agent": self.usage_by_agent,
-            }
-            usage_path = Path(run_dir) / "usage.json"
-            with open(usage_path, "w") as f:
-                json.dump(usage_data, f, indent=2)
-            logger.info(f"Token and error usage breakdown saved to {usage_path}")
+        """Writes token_usage.json and tool_usage.json statistics files to disk."""
+        if not run_dir or not Path(run_dir).exists():
+            return
+
+        token_data = {
+            "total": self.total_usage,
+            "errors_grouped": self.error_counts,
+            "by_agent": self.usage_by_agent,
+        }
+        token_path = Path(run_dir) / "token_usage.json"
+        with open(token_path, "w") as f:
+            json.dump(token_data, f, indent=2)
+        logger.info(f"Token usage breakdown saved to {token_path}")
+
+        tot_calls = self.total_tool_usage["total_calls"]
+        tot_fails = self.total_tool_usage["total_failures"]
+        tot_rate = f"{(tot_fails / tot_calls * 100):.2f}%" if tot_calls > 0 else "0.00%"
+
+        by_tool_formatted = {}
+        for t_name, stats in self.tool_usage_by_tool.items():
+            c = stats["calls"]
+            f_count = stats["failures"]
+            rate = f"{(f_count / c * 100):.2f}%" if c > 0 else "0.00%"
+            by_tool_formatted[t_name] = {**stats, "failure_rate": rate}
+
+        by_agent_formatted = {}
+        for a_name, tools in self.tool_usage_by_agent.items():
+            by_agent_formatted[a_name] = {}
+            for t_name, stats in tools.items():
+                c = stats["calls"]
+                f_count = stats["failures"]
+                rate = f"{(f_count / c * 100):.2f}%" if c > 0 else "0.00%"
+                by_agent_formatted[a_name][t_name] = {**stats, "failure_rate": rate}
+
+        tool_data = {
+            "total": {
+                **self.total_tool_usage,
+                "failure_rate": tot_rate,
+            },
+            "by_tool": by_tool_formatted,
+            "by_agent": by_agent_formatted,
+        }
+        tool_path = Path(run_dir) / "tool_usage.json"
+        with open(tool_path, "w") as f:
+            json.dump(tool_data, f, indent=2)
+        logger.info(f"Tool usage breakdown saved to {tool_path}")
