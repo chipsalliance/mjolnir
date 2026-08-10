@@ -23,6 +23,5 @@ output/
 
 # Rust / WASM build artifacts
 target/
-dist/
 **/target/
 **/dist/

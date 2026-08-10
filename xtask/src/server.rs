@@ -89,7 +89,10 @@ pub fn serve_local(web_dir: &Path, runs_dir: &Path, port: u16) {
         } else {
             path.trim_start_matches('/')
         };
-        let file_path = web_dir.join(rel_path);
+        let mut file_path = web_dir.join(rel_path);
+        if !file_path.is_file() && rel_path.starts_with("web/") {
+            file_path = web_dir.join(rel_path.strip_prefix("web/").unwrap_or(rel_path));
+        }
 
         if file_path.is_file() {
             let content_type = match file_path.extension().and_then(|s| s.to_str()) {

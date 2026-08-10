@@ -48,33 +48,54 @@ def deploy_web(workspace_root: Path, client: storage.Client, bucket_name: str):
         sys.exit(1)
 
     files_to_upload = [
-        ("index.html", "text/html; charset=utf-8"),
-        ("style.css", "text/css; charset=utf-8"),
-        ("app.js", "application/javascript"),
-        ("wasm-worker.js", "application/javascript"),
-        ("dist/usage_module.js", "application/javascript"),
-        ("dist/mjolnir_dashboard_wasm.js", "application/javascript"),
-        ("dist/mjolnir_dashboard_wasm_bg.wasm", "application/wasm"),
+        ("index.html", "index.html", "text/html; charset=utf-8"),
+        ("style.css", "web/style.css", "text/css; charset=utf-8"),
+        ("app.js", "web/app.js", "application/javascript"),
+        ("wasm-worker.js", "web/wasm-worker.js", "application/javascript"),
+        ("dist/build_info.js", "web/dist/build_info.js", "application/javascript"),
+        ("dist/usage_module.js", "web/dist/usage_module.js", "application/javascript"),
+        (
+            "dist/mjolnir_dashboard_wasm.js",
+            "web/dist/mjolnir_dashboard_wasm.js",
+            "application/javascript",
+        ),
+        (
+            "dist/mjolnir_dashboard_wasm_bg.wasm",
+            "web/dist/mjolnir_dashboard_wasm_bg.wasm",
+            "application/wasm",
+        ),
     ]
 
-    for rel_path, content_type in files_to_upload:
-        local_file = web_dir / rel_path
+    for local_rel_path, target_blob_path, content_type in files_to_upload:
+        local_file = web_dir / local_rel_path
         if not local_file.is_file():
             print(f"Warning: File {local_file} not found, skipping.")
             continue
 
-        blob = bucket.blob(rel_path)
+        blob = bucket.blob(target_blob_path)
+        blob.cache_control = "no-cache, no-store, must-revalidate"
         blob.upload_from_filename(str(local_file), content_type=content_type)
-        print(f"  Uploaded {rel_path} -> gs://{bucket_name}/{rel_path} ({content_type})")
+        print(
+            f"  Uploaded {local_rel_path} -> gs://{bucket_name}/{target_blob_path} ({content_type})"
+        )
 
     print(f"Web Dashboard successfully deployed to gs://{bucket_name}/!")
 
 
+def is_test_project(proj_name: str) -> bool:
+    p = proj_name.lower()
+    return p == "tests" or p.startswith("test")
+
+
 def deploy_runs(
-    workspace_root: Path, client: storage.Client, bucket_name: str, include_usage: bool = False
+    workspace_root: Path,
+    client: storage.Client,
+    bucket_name: str,
+    include_usage: bool = False,
+    include_tests: bool = False,
 ):
     print(
-        f"Scanning local runs in output/v1/runs/ for deployment to gs://{bucket_name}/v1/runs/ (Include usage telemetry: {include_usage})..."
+        f"Scanning local runs in output/v1/runs/ for deployment to gs://{bucket_name}/v1/runs/ (Include usage telemetry: {include_usage}, Include test runs: {include_tests})..."
     )
     bucket = client.bucket(bucket_name)
 
@@ -101,6 +122,10 @@ def deploy_runs(
         if not proj_dir.is_dir():
             continue
         proj_name = proj_dir.name
+
+        if not include_tests and is_test_project(proj_name):
+            print(f"  Excluding test project: {proj_name}")
+            continue
 
         for job_dir in sorted(proj_dir.iterdir()):
             if not job_dir.is_dir():
@@ -284,6 +309,11 @@ def main():
         action="store_true",
         help="Include sensitive token usage telemetry files",
     )
+    parser.add_argument(
+        "--include-tests",
+        action="store_true",
+        help="Include test and mock benchmark runs",
+    )
     args = parser.parse_args()
 
     workspace_root = Path(__file__).resolve().parent.parent
@@ -295,7 +325,13 @@ def main():
     if args.web:
         deploy_web(workspace_root, client, bucket_name)
     elif args.runs:
-        deploy_runs(workspace_root, client, bucket_name, include_usage=args.include_usage)
+        deploy_runs(
+            workspace_root,
+            client,
+            bucket_name,
+            include_usage=args.include_usage,
+            include_tests=args.include_tests,
+        )
     else:
         print("Please specify --web or --runs.")
         sys.exit(1)

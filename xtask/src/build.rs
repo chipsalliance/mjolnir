@@ -65,13 +65,28 @@ pub fn build_wasm(root_dir: &Path, include_usage: bool) {
     if include_usage {
         let src_usage_file = web_dir.join("src/usage_module.js");
         if src_usage_file.exists() {
-            fs::copy(src_usage_file, dist_usage_file)
+            fs::copy(src_usage_file, &dist_usage_file)
                 .expect("Failed to copy usage_module.js into dist/");
         }
     } else {
         let stub_content = "// Licensed under the Apache-2.0 license\n// SPDX-License-Identifier: Apache-2.0\nexport function registerUsageModule() {}\n";
         fs::write(dist_usage_file, stub_content).expect("Failed to write stub usage_module.js");
     }
+
+    // Generate build metadata with UTC timestamp
+    let build_info_file = dist_dir.join("build_info.js");
+    let timestamp = match Command::new("date")
+        .args(["-u", "+%Y-%m-%dT%H:%M:%SZ"])
+        .output()
+    {
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim().to_string(),
+        _ => "Unknown".to_string(),
+    };
+    let build_info_content = format!(
+        "// Licensed under the Apache-2.0 license\n// SPDX-License-Identifier: Apache-2.0\nexport const BUILD_TIMESTAMP = \"{}\";\n",
+        timestamp
+    );
+    let _ = fs::write(build_info_file, build_info_content);
 
     println!("WebAssembly module built successfully in dist/");
 }

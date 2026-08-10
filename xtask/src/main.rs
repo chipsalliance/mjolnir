@@ -42,9 +42,13 @@ fn main() {
         }
         "deploy-gcs-runs" => {
             let include_usage = args.iter().any(|a| a == "--include-usage");
+            let include_tests = args.iter().any(|a| a == "--include-tests");
             let mut flags = vec!["--runs"];
             if include_usage {
                 flags.push("--include-usage");
+            }
+            if include_tests {
+                flags.push("--include-tests");
             }
             deploy::deploy_gcs(&root, &flags);
         }

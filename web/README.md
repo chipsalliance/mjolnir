@@ -45,3 +45,9 @@ nix run .#deploy-gcs-web
 ```bash
 nix run .#deploy-gcs-runs
 ```
+
+By default, test project runs (e.g. `tests` or `test_*`) are excluded. To include test runs or token usage telemetry:
+
+```bash
+nix run .#deploy-gcs-runs -- --include-tests --include-usage
+```

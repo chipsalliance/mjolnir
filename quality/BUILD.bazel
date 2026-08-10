@@ -14,6 +14,7 @@ format_multirun(
     name = "format",
     markdown = ":prettier",
     python = "@aspect_rules_lint//format:ruff",
+    rust = "@rules_rust//tools/rustfmt:upstream_rustfmt",
     shell = "@aspect_rules_lint//format:shfmt",
     starlark = "@buildifier_prebuilt//:buildifier",
 )
@@ -24,6 +25,7 @@ format_test(
     markdown = ":prettier",
     no_sandbox = True,
     python = "@aspect_rules_lint//format:ruff",
+    rust = "@rules_rust//tools/rustfmt:upstream_rustfmt",
     shell = "@aspect_rules_lint//format:shfmt",
     starlark = "@buildifier_prebuilt//:buildifier",
     workspace = "//:MODULE.bazel",
@@ -36,17 +38,10 @@ py_test(
     data = ["//:MODULE.bazel"],
 )
 
-# Check shell script quality and bash bug detection (bazel test //quality:shellcheck).
+# Check shell script bug & lint detection (bazel test //quality:shellcheck).
 sh_test(
     name = "shellcheck",
     srcs = ["run_shellcheck.sh"],
-    data = ["//:MODULE.bazel"],
-)
-
-# Check Rust code formatting (bazel test //quality:rustfmt_check).
-sh_test(
-    name = "rustfmt_check",
-    srcs = ["run_rustfmt.sh"],
     data = ["//:MODULE.bazel"],
 )
 
@@ -56,7 +51,6 @@ test_suite(
     tests = [
         ":format_check",
         ":license_check",
-        ":rustfmt_check",
         ":shellcheck",
     ],
 )

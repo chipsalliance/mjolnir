@@ -117,10 +117,19 @@ Deploy static WebAssembly dashboard assets to Google Cloud Storage:
 nix run .#deploy-gcs-web
 ```
 
-Sync local analysis runs from `output/v1/runs/` to Google Cloud Storage:
+Sync local analysis runs from `output/v1/runs/` to Google Cloud Storage (test project runs are excluded by default):
 
 ```bash
 nix run .#deploy-gcs-runs
+```
+
+Optional flags:
+
+- `--include-tests`: Include test and mock benchmark runs.
+- `--include-usage`: Include sensitive token usage telemetry files.
+
+```bash
+nix run .#deploy-gcs-runs -- --include-tests --include-usage
 ```
 
 ---

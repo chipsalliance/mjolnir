@@ -9,6 +9,8 @@ import init, {
   compute_run_sankey_flow
 } from './dist/mjolnir_dashboard_wasm.js';
 import { registerUsageModule } from './dist/usage_module.js';
+import { BUILD_TIMESTAMP } from './dist/build_info.js';
+
 
 export function getApiEndpoint(endpoint) {
   let base = window.location.pathname;
@@ -33,7 +35,7 @@ const workerCallbacks = new Map();
 
 function initWasmWorker() {
   try {
-    worker = new Worker('./wasm-worker.js', { type: 'module' });
+    worker = new Worker('web/wasm-worker.js', { type: 'module' });
 
     worker.onmessage = (e) => {
       const { id, type, result, error } = e.data;
@@ -175,21 +177,6 @@ function setupEventListeners() {
     }
   });
 
-  const hideToggle = document.getElementById("toggle-hide-tests");
-  if (hideToggle) {
-    hideToggle.checked = hideTests;
-    hideToggle.addEventListener("change", (e) => {
-      hideTests = e.target.checked;
-      localStorage.setItem("mjolnir_hide_tests", hideTests);
-      renderSidebarNavigation();
-      handleRoute();
-    });
-  }
-
-  document.getElementById("btn-refresh").addEventListener("click", async () => {
-    await fetchRunsData();
-    handleRoute();
-  });
 
   document.getElementById("modal-close").addEventListener("click", closeFindingModal);
 }
@@ -214,24 +201,31 @@ async function fetchRunsData() {
     console.warn("Could not fetch runs data:", err);
     runsState = [];
   }
+  updateFooterTimestamp();
   renderSidebarNavigation();
 }
 
-function getFilteredRuns() {
-  if (!hideTests) return runsState;
-  const filtered = runsState.filter(r => r.project !== "tests" && !r.project.startsWith("test"));
-  if (filtered.length === 0 && runsState.length > 0) {
-    return runsState;
+function updateFooterTimestamp() {
+  const el = document.getElementById("footer-last-updated");
+  if (!el) return;
+
+  if (typeof BUILD_TIMESTAMP !== "undefined" && BUILD_TIMESTAMP && BUILD_TIMESTAMP !== "Unknown") {
+    const t = new Date(BUILD_TIMESTAMP);
+    if (!isNaN(t.getTime())) {
+      el.textContent = t.toLocaleString();
+      return;
+    }
+    el.textContent = BUILD_TIMESTAMP;
+    return;
   }
-  return filtered;
+  el.textContent = "N/A";
 }
 
 function renderSidebarNavigation() {
   const projContainer = document.getElementById("project-nav-list");
   const runsContainer = document.getElementById("recent-runs-nav-list");
-  const filtered = getFilteredRuns();
 
-  if (!filtered || filtered.length === 0) {
+  if (!runsState || runsState.length === 0) {
     if (projContainer) projContainer.innerHTML = `<div class="nav-subitem">No Projects Yet</div>`;
     if (runsContainer) runsContainer.innerHTML = `<div class="nav-subitem">No Runs Yet</div>`;
     return;
@@ -239,7 +233,7 @@ function renderSidebarNavigation() {
 
   // Projects Nav
   const projectsMap = {};
-  filtered.forEach(r => {
+  runsState.forEach(r => {
     const p = r.project || "default";
     if (!projectsMap[p]) projectsMap[p] = [];
     projectsMap[p].push(r);
@@ -257,7 +251,7 @@ function renderSidebarNavigation() {
   if (projContainer) projContainer.innerHTML = projHtml;
 
   // Recent 10 Runs Nav
-  const recent10 = filtered.slice(0, 10);
+  const recent10 = runsState.slice(0, 10);
   let runsHtml = "";
   recent10.forEach(r => {
     const shortId = r.run_id.length > 18 ? r.run_id.substring(0, 18) : r.run_id;
@@ -298,12 +292,12 @@ function handleRoute() {
 
   if (hash === "#/projects") {
     currentRouteParams = {};
-    titleEl.textContent = "All Projects Overview";
+    titleEl.textContent = "All Projects";
     document.getElementById("nav-all-projects")?.classList.add("active");
     renderAllProjectsView(viewport);
   } else if (hash === "#/runs") {
     currentRouteParams = {};
-    titleEl.textContent = "All Scan Runs";
+    titleEl.textContent = "All Runs";
     document.getElementById("nav-all-runs")?.classList.add("active");
     renderAllRunsView(viewport);
   } else if (hash.startsWith("#/project/")) {
