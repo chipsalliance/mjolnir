@@ -6,5 +6,4 @@
   maxFiles = 5;
   srcDirs = [ "src" ];
   extensions = [ "rs" ];
-  requireGcsUpload = true;
 }

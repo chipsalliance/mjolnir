@@ -19,7 +19,6 @@ let
       srcDirs = job.srcDirs or [ "." ];
       extensions = job.extensions or [ "c" "h" "cpp" "cc" "rs" "go" "py" ];
       maxFiles = job.maxFiles or null;
-      requireGcsUpload = job.requireGcsUpload or project.requireGcsUpload or false;
       cmd = job.cmd or null;
       ingestionReport = job.ingestionReport or null;
       diffBase = job.diffBase or null;

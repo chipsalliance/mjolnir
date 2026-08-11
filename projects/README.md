@@ -45,7 +45,6 @@ The `project.nix` file defines the repository and global settings for the projec
 - **`threatModel`** (Path, Optional): Path to a pre-generated threat model Markdown file (`THREAT_MODEL.md`) containing context and security requirements.
 - **`model`** (String, Optional): Default Gemini model to use for this project (defaults to `gemini-3.6-flash`).
 - **`provider`** (String, Optional): Default provider (e.g. `genai` or `mock`).
-- **`requireGcsUpload`** (Boolean, Optional): Set to `true` to require uploading scan results to GCS (defaults to `false`).
 
 #### Example
 
@@ -54,9 +53,8 @@ The `project.nix` file defines the repository and global settings for the projec
   name = "Caliptra SW";
   repoName = "caliptra-sw";
   repoUrl = "https://github.com/chipsalliance/caliptra-sw.git";
-  requireGcsUpload = true;
   srcExtensions = [ "rs" "c" "h" "sv" ];
-  threatModel = ../../app/mjolnir/providers/genai/threat-models/caliptra/THREAT_MODEL.md;
+  threatModel = ./threat_model.md;
 }
 ```
 
@@ -78,7 +76,6 @@ Each file under `jobs/` defines a specific audit task (e.g., scanning ROM firmwa
 - **`srcDirs`** (List of Strings, Optional): Subdirectories within the repo to scan. Defaults to `[ "." ]` (scans everything).
 - **`extensions`** (List of Strings, Optional): Override file extensions to scan for this job.
 - **`maxFiles`** (Integer, Optional): Cap the maximum number of files to scan.
-- **`requireGcsUpload`** (Boolean, Optional): Override GCS upload requirements.
 - **`cmd`** (String, Optional): Build or verification command to run inside the compilation runner context.
 
 #### Example

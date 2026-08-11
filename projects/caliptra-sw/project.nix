@@ -4,7 +4,6 @@
   name = "Caliptra SW";
   repoName = "caliptra-sw";
   repoUrl = "https://github.com/chipsalliance/caliptra-sw.git";
-  requireGcsUpload = true;
   srcExtensions = [ "rs" "c" "h" "sv" ];
   threatModel = ./threat_model.md;
 }

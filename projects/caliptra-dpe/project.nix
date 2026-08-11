@@ -4,7 +4,6 @@
   name = "Caliptra DPE";
   repoName = "caliptra-dpe";
   repoUrl = "https://github.com/chipsalliance/caliptra-dpe.git";
-  requireGcsUpload = true;
   srcExtensions = [ "rs" "go" ];
   threatModel = ../caliptra-sw/threat_model.md;
 }
