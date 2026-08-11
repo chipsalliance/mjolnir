@@ -59,7 +59,6 @@ Create job profile files under `projects/X/jobs/`:
     model = "gemini-3.6-flash";
     provider = "adk";
     batchSize = 5;
-    requireGcsUpload = true;
   }
   ```
 
@@ -100,24 +99,31 @@ jobs:
           base-ref: "${{ github.event.pull_request.base.sha }}"
           head-ref: "${{ github.event.pull_request.head.sha }}"
           gemini-api-key: "${{ secrets.GEMINI_API_KEY }}"
+          gcs-bucket: "${{ vars.GCS_REPORTS_BUCKET }}"
 ```
 
 ---
 
 ## Environment & Credentials Configuration
 
-### Google Cloud Storage (GCS) Export
+### Google Cloud Storage (GCS) Deployment & Sync
 
-To automatically publish audit reports and dashboards to a centralized GCS bucket, set the following environment variable:
+To publish audit reports and the interactive web dashboard to a centralized GCS bucket, pass the target bucket via the `--bucket <name>` parameter:
 
 ```bash
-export MJOLNIR_GCS_BUCKET="your-gcs-bucket-name"
+# Sync local run outputs to GCS
+nix run .#deploy-gcs-runs -- --bucket my-gcs-bucket-name
+
+# Deploy the static web dashboard
+nix run .#deploy-gcs-web -- --bucket my-gcs-bucket-name
 ```
 
-Job specifications with `requireGcsUpload = true` will upload artifacts to the following GCS hierarchy:
+Artifacts are hosted in GCS under the following hierarchy:
 
 ```text
-gs://<bucket-name>/v0/<repo-name>/<job-name>/run_<timestamp>/
+gs://<bucket-name>/index.html
+gs://<bucket-name>/web/...
+gs://<bucket-name>/v1/runs/<repo-name>/<job-name>/run_<timestamp>/
 ```
 
 ---

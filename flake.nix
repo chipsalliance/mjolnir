@@ -172,9 +172,9 @@
 
           deploy-gcs-runs = pkgs.writeShellApplication {
             name = "mjolnir-deploy-gcs-runs";
-            runtimeInputs = [ pythonEnv ];
+            runtimeInputs = [ pkgs.cargo pkgs.rustc pkgs.lld pythonEnv ];
             text = ''
-              python3 scripts/deploy_gcs.py --runs "$@"
+              cargo xtask deploy-gcs-runs "$@"
             '';
           };
         in

@@ -12,7 +12,6 @@ from data.status import Status
 import providers.adk.main as adk
 import providers.genai.main as genai
 import providers.mock.main as mock
-from utilities import upload
 from utilities.command import run_command
 from utilities.discovery import discover_source_files
 from utilities.git import get_diff_files, setup_repository
@@ -248,14 +247,6 @@ def _run_orchestrator():
             f,
             indent=2,
         )
-
-    # Upload results to Google Cloud Storage
-
-    require_gcs = job.get("requireGcsUpload")
-
-    if require_gcs:
-        logger.info(f"Uploading results to GCS.")
-        upload.upload_run_to_gcs(run_dir, repo_name, job.get("name"), timestamp_dir)
 
     logger.header("Exiting Mjolnir!")
     if status == "Failed":

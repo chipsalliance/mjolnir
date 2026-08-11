@@ -16,9 +16,6 @@ class AppConfig:
     workspace_dir: Optional[Path] = None
     output_dir: Optional[Path] = None
     run_id: Optional[str] = None
-    cloud_storage_bucket: Optional[str] = field(
-        default_factory=lambda: os.environ.get("CLOUD_STORAGE_BUCKET")
-    )
     gemini_api_key: Optional[str] = field(default_factory=lambda: os.environ.get("GEMINI_API_KEY"))
     google_cloud_project: Optional[str] = field(
         default_factory=lambda: os.environ.get("GOOGLE_CLOUD_PROJECT")
