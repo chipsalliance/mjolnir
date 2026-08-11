@@ -18,6 +18,10 @@ inputs:
   gemini-api-key:
     description: 'Gemini API Key for ADK execution'
     required: true
+  gcs-bucket:
+    description: 'Optional Google Cloud Storage bucket to upload audit artifacts to'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -35,3 +39,9 @@ runs:
         nix run .#${{ inputs.job }} -- \
           --diff-base "${{ inputs.base-ref }}" \
           --diff-head "${{ inputs.head-ref }}"
+
+    - name: Sync Audit Artifacts to GCS
+      if: ${{ inputs.gcs-bucket != '' }}
+      shell: bash
+      run: |
+        nix run .#deploy-gcs-runs -- --bucket "${{ inputs.gcs-bucket }}"
