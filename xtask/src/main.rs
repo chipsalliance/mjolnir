@@ -3,9 +3,7 @@
 
 mod build;
 mod deploy;
-mod scanner;
 mod server;
-mod telemetry;
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -18,15 +16,39 @@ fn main() {
 
     match task {
         "web" => {
-            let serve = args.iter().any(|a| a == "--serve");
-            let include_token_usage = args.iter().any(|a| a == "--include-token-usage");
-            let include_tool_usage = args.iter().any(|a| a == "--include-tool-usage");
-            let port = args
-                .iter()
-                .position(|a| a == "--port")
-                .and_then(|i| args.get(i + 1))
-                .and_then(|p| p.parse::<u16>().ok())
-                .unwrap_or(8080);
+            let mut serve = false;
+            let mut include_token_usage = false;
+            let mut include_tool_usage = false;
+            let mut port = 8080u16;
+
+            let mut i = 2;
+            while i < args.len() {
+                let arg = &args[i];
+                match arg.as_str() {
+                    "--serve" => serve = true,
+                    "--include-token-usage" => include_token_usage = true,
+                    "--include-tool-usage" => include_tool_usage = true,
+                    "--port" => {
+                        i += 1;
+                        if i >= args.len() {
+                            eprintln!("Error: --port requires a port number argument.");
+                            std::process::exit(1);
+                        }
+                        port = args[i].parse::<u16>().unwrap_or_else(|_| {
+                            eprintln!("Error: Invalid port number '{}'.", args[i]);
+                            std::process::exit(1);
+                        });
+                    }
+                    _ => {
+                        eprintln!(
+                            "Error: Unrecognized argument '{}' for task 'web'.\nAllowed flags: --serve, --port <PORT>, --include-token-usage, --include-tool-usage",
+                            arg
+                        );
+                        std::process::exit(1);
+                    }
+                }
+                i += 1;
+            }
 
             build::build_wasm(&root, include_token_usage, include_tool_usage);
 
@@ -37,29 +59,63 @@ fn main() {
             }
         }
         "deploy-gcs-web" => {
-            let include_token_usage = args.iter().any(|a| a == "--include-token-usage");
-            let include_tool_usage = args.iter().any(|a| a == "--include-tool-usage");
+            let mut include_token_usage = false;
+            let mut include_tool_usage = false;
+
+            for arg in &args[2..] {
+                match arg.as_str() {
+                    "--include-token-usage" => include_token_usage = true,
+                    "--include-tool-usage" => include_tool_usage = true,
+                    _ => {
+                        eprintln!(
+                            "Error: Unrecognized argument '{}' for task 'deploy-gcs-web'.\nAllowed flags: --include-token-usage, --include-tool-usage",
+                            arg
+                        );
+                        std::process::exit(1);
+                    }
+                }
+            }
+
             build::build_wasm(&root, include_token_usage, include_tool_usage);
             deploy::deploy_gcs(&root, &["--web"]);
         }
         "deploy-gcs-runs" => {
-            let include_tests = args.iter().any(|a| a == "--include-tests");
+            let mut include_tests = false;
+
+            for arg in &args[2..] {
+                match arg.as_str() {
+                    "--include-tests" => include_tests = true,
+                    _ => {
+                        eprintln!(
+                            "Error: Unrecognized argument '{}' for task 'deploy-gcs-runs'.\nAllowed flags: --include-tests",
+                            arg
+                        );
+                        std::process::exit(1);
+                    }
+                }
+            }
+
             let mut flags = vec!["--runs"];
             if include_tests {
                 flags.push("--include-tests");
             }
             deploy::deploy_gcs(&root, &flags);
         }
-        _ => print_help(),
+        "help" | "-h" | "--help" => print_help(),
+        _ => {
+            eprintln!("Error: Unrecognized task '{}'.\n", task);
+            print_help();
+            std::process::exit(1);
+        }
     }
 }
 
 fn print_help() {
     println!("Mjolnir Development Task Runner (xtask)\n");
     println!("USAGE:");
-    println!("    cargo xtask web [--serve] [--port <PORT>]");
-    println!("    cargo xtask deploy-gcs-web");
-    println!("    cargo xtask deploy-gcs-runs\n");
+    println!("    cargo xtask web [--serve] [--port <PORT>] [--include-token-usage] [--include-tool-usage]");
+    println!("    cargo xtask deploy-gcs-web [--include-token-usage] [--include-tool-usage]");
+    println!("    cargo xtask deploy-gcs-runs [--include-tests]\n");
     println!("COMMANDS:");
     println!("    web              Builds the WebAssembly dashboard module");
     println!("    web --serve      Builds and starts a local HTTP viewer server (default: http://localhost:8080)");

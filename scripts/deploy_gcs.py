@@ -119,13 +119,6 @@ def deploy_runs(
     uploaded_count = 0
     skipped_count = 0
 
-    runs_index = []
-    usage_runs = []
-    usage_models = {}
-    total_input = 0
-    total_output = 0
-    total_tokens = 0
-
     for proj_dir in sorted(runs_dir.iterdir()):
         if not proj_dir.is_dir():
             continue
@@ -147,116 +140,6 @@ def deploy_runs(
 
                 gcs_run_prefix = f"v1/runs/{proj_name}/{job_name}/{run_id}"
 
-                vuln_file = run_dir / "vulnerabilities.json"
-                if not vuln_file.exists():
-                    vuln_file = run_dir / "finding_phase_1.json"
-
-                meta_file = run_dir / "metadata.json"
-                token_usage_file = run_dir / "token_usage.json"
-
-                vulns = []
-                critical_count = 0
-                high_count = 0
-                medium_count = 0
-                low_count = 0
-                open_count = 0
-                closed_count = 0
-
-                if vuln_file.exists():
-                    try:
-                        with open(vuln_file, "r") as f:
-                            vulns = json.load(f)
-                            if isinstance(vulns, list):
-                                for v in vulns:
-                                    sev = str(
-                                        v.get("severity") or v.get("severity_level") or "LOW"
-                                    ).upper()
-                                    if sev == "CRITICAL":
-                                        critical_count += 1
-                                    elif sev == "HIGH":
-                                        high_count += 1
-                                    elif sev == "MEDIUM":
-                                        medium_count += 1
-                                    else:
-                                        low_count += 1
-
-                                    st = str(v.get("status") or v.get("state") or "Open").lower()
-                                    if st in ["closed", "fixed", "resolved"]:
-                                        closed_count += 1
-                                    else:
-                                        open_count += 1
-                    except Exception:
-                        pass
-
-                meta = {}
-                if meta_file.exists():
-                    try:
-                        with open(meta_file, "r") as f:
-                            meta = json.load(f)
-                    except Exception:
-                        pass
-
-                runs_index.append(
-                    {
-                        "project": proj_name,
-                        "job": job_name,
-                        "run_id": run_id,
-                        "timestamp": meta.get("timestamp", run_id),
-                        "vuln_count": len(vulns) if isinstance(vulns, list) else 0,
-                        "critical_count": critical_count,
-                        "high_count": high_count,
-                        "medium_count": medium_count,
-                        "low_count": low_count,
-                        "open_count": open_count,
-                        "closed_count": closed_count,
-                        "vulnerabilities": vulns if isinstance(vulns, list) else [],
-                        "model": meta.get("model", "Unknown"),
-                        "commit": meta.get("target_commit") or meta.get("commit") or "N/A",
-                        "mode": meta.get("mode", "Discovery"),
-                        "status": meta.get("status", "Success"),
-                        "schema_version": meta.get("schema_version", "v1"),
-                    }
-                )
-
-                if include_token_usage and token_usage_file.exists():
-                    try:
-                        with open(token_usage_file, "r") as f:
-                            u_data = json.load(f)
-                            tot = u_data.get("total", {})
-                            inp = tot.get("input_tokens") or tot.get("prompt_tokens") or 0
-                            out = tot.get("output_tokens") or tot.get("completion_tokens") or 0
-                            tok = tot.get("total_tokens") or 0
-                            total_input += inp
-                            total_output += out
-                            total_tokens += tok
-
-                            model_name = u_data.get("model") or meta.get("model") or "Unknown"
-                            if model_name not in usage_models:
-                                usage_models[model_name] = {
-                                    "model": model_name,
-                                    "input_tokens": 0,
-                                    "output_tokens": 0,
-                                    "total_tokens": 0,
-                                    "runs_count": 0,
-                                }
-                            usage_models[model_name]["input_tokens"] += inp
-                            usage_models[model_name]["output_tokens"] += out
-                            usage_models[model_name]["total_tokens"] += tok
-                            usage_models[model_name]["runs_count"] += 1
-
-                            usage_runs.append(
-                                {
-                                    "project": proj_name,
-                                    "job": job_name,
-                                    "run_id": run_id,
-                                    "model": model_name,
-                                    "total_tokens": tok,
-                                    "timestamp": meta.get("timestamp", ""),
-                                }
-                            )
-                    except Exception:
-                        pass
-
                 check_blob_name = f"{gcs_run_prefix}/metadata.json"
                 if check_blob_name in existing_blobs:
                     skipped_count += 1
@@ -276,25 +159,6 @@ def deploy_runs(
 
                 uploaded_count += 1
                 print(f"  Uploaded {gcs_run_prefix}")
-
-    # Upload static api/runs endpoint for static GCS bucket hosting
-    runs_blob = bucket.blob("api/runs")
-    runs_blob.upload_from_string(json.dumps(runs_index, indent=2), content_type="application/json")
-    print(f"  Uploaded static API endpoint -> gs://{bucket_name}/api/runs")
-
-    if usage_runs:
-        usage_summary_data = {
-            "total_input_tokens": total_input,
-            "total_output_tokens": total_output,
-            "total_tokens": total_tokens,
-            "by_model": list(usage_models.values()),
-            "runs": usage_runs,
-        }
-        usage_blob = bucket.blob("api/usage")
-        usage_blob.upload_from_string(
-            json.dumps(usage_summary_data, indent=2), content_type="application/json"
-        )
-        print(f"  Uploaded static API endpoint -> gs://{bucket_name}/api/usage")
 
     print(f"\nGCS Runs Deployment Complete: {uploaded_count} uploaded, {skipped_count} skipped.")
 

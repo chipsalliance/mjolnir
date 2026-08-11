@@ -8,8 +8,8 @@ import init, {
   compute_project_sankey_flow,
   compute_run_sankey_flow
 } from './dist/mjolnir_dashboard_wasm.js';
-import { registerTokenUsageModule, renderRunTokenUsage } from './dist/token_usage_module.js';
-import { registerToolUsageModule, renderRunToolUsage } from './dist/tool_usage_module.js';
+import { registerTokenUsageModule, renderProjectTokenUsage, renderRunTokenUsage } from './dist/token_usage_module.js';
+import { registerToolUsageModule, renderProjectToolUsage, renderRunToolUsage } from './dist/tool_usage_module.js';
 import { BUILD_TIMESTAMP } from './dist/build_info.js';
 
 
@@ -117,31 +117,31 @@ async function executeMainThreadWasm(type, payload) {
   throw new Error(`Unknown main thread task type: ${type}`);
 }
 
-async function apiFilterVulnerabilities(vulnerabilitiesJson, query, severityFilter, statusFilter, sortOrder) {
+async function workerFilterVulnerabilities(vulnerabilitiesJson, query, severityFilter, statusFilter, sortOrder) {
   return runWorkerTask('filter_vulnerabilities', { vulnerabilitiesJson, query, severityFilter, statusFilter, sortOrder });
 }
 
-async function apiComputeSankeyFlow(runsJson, hideTests) {
+async function workerComputeSankeyFlow(runsJson, hideTests) {
   return runWorkerTask('compute_sankey_flow', { runsJson, hideTests });
 }
 
-async function apiComputeProjectSankeyFlow(runsJson, targetProject) {
+async function workerComputeProjectSankeyFlow(runsJson, targetProject) {
   return runWorkerTask('compute_project_sankey_flow', { runsJson, targetProject });
 }
 
-async function apiComputeRunSankeyFlow(vulnerabilitiesJson) {
+async function workerComputeRunSankeyFlow(vulnerabilitiesJson) {
   return runWorkerTask('compute_run_sankey_flow', { vulnerabilitiesJson });
 }
 
-async function apiComputeSummary(vulnerabilitiesJson) {
+async function workerComputeSummary(vulnerabilitiesJson) {
   return runWorkerTask('compute_summary', { vulnerabilitiesJson });
 }
 
 async function bootstrap() {
   setupEventListeners();
   const navContainer = document.querySelector(".sidebar-nav");
-  registerTokenUsageModule(navContainer, dynamicRoutes, renderEmptyState);
-  registerToolUsageModule(navContainer, dynamicRoutes, renderEmptyState);
+  registerTokenUsageModule(navContainer, dynamicRoutes, renderEmptyState, getFilteredRuns);
+  registerToolUsageModule(navContainer, dynamicRoutes, renderEmptyState, getFilteredRuns);
 
   // Initialize Web Worker and WASM background fallbacks
   try {
@@ -178,24 +178,41 @@ function setupEventListeners() {
         searchInput.focus();
       }
     } else if (e.key === "Escape") {
-      closeFindingModal();
+      closeModal();
     }
   });
 
-
-  document.getElementById("modal-close").addEventListener("click", closeFindingModal);
+  document.getElementById("modal-close")?.addEventListener("click", closeModal);
+  document.getElementById("vulnerability-modal")?.addEventListener("click", (e) => {
+    if (e.target.id === "vulnerability-modal") {
+      closeModal();
+    }
+  });
 }
 
-function closeFindingModal() {
-  document.getElementById("vulnerability-modal").classList.add("hidden");
+export function openModal(title, bodyHtml) {
+  const modal = document.getElementById("vulnerability-modal");
+  if (!modal) return;
+  document.getElementById("modal-title").textContent = title;
+  document.getElementById("modal-body").innerHTML = bodyHtml;
+  modal.classList.remove("hidden");
+}
+
+export function closeModal() {
+  const modal = document.getElementById("vulnerability-modal");
+  if (!modal) return;
+  modal.classList.add("hidden");
   if (currentRouteParams.proj && currentRouteParams.job && currentRouteParams.runId) {
     // Restore run hash without finding suffix
     const runHash = `#/run/${currentRouteParams.proj}/${currentRouteParams.job}/${currentRouteParams.runId}`;
-    if (window.location.hash !== runHash) {
+    if (window.location.hash !== runHash && window.location.hash.includes("/finding/")) {
       history.replaceState(null, "", runHash);
     }
   }
 }
+
+window.openModal = openModal;
+window.closeModal = closeModal;
 
 async function fetchRunsData() {
   runsState = await fetchRunsFromGcsBucket();
@@ -237,6 +254,14 @@ async function fetchRunsFromGcsBucket() {
         const vulnRes = await fetch(getAssetUrl(vulnKey));
         const vulns = vulnRes.ok ? await vulnRes.json() : [];
 
+        const tokenKey = key.replace("metadata.json", "token_usage.json");
+        const tokenRes = await fetch(getAssetUrl(tokenKey));
+        const token_usage = tokenRes.ok ? await tokenRes.json() : {};
+
+        const toolKey = key.replace("metadata.json", "tool_usage.json");
+        const toolRes = await fetch(getAssetUrl(toolKey));
+        const tool_usage = toolRes.ok ? await toolRes.json() : {};
+
         const parts = key.split("/");
         const project = meta.project || parts[2] || "default";
         const job = meta.job || parts[3] || "default";
@@ -270,6 +295,8 @@ async function fetchRunsFromGcsBucket() {
           open_count,
           closed_count,
           vulnerabilities: Array.isArray(vulns) ? vulns : [],
+          token_usage,
+          tool_usage,
           model: meta.model || "Unknown",
           commit: meta.target_commit || "Unknown",
           mode: meta.mode || "Discovery",
@@ -378,6 +405,11 @@ function handleRoute() {
 
   if (dynamicRoutes[hash]) {
     currentRouteParams = {};
+    if (hash === "#/token-usage") {
+      titleEl.textContent = "Global Token Usage";
+    } else if (hash === "#/tool-usage") {
+      titleEl.textContent = "Global Tool Usage";
+    }
     document.getElementById(hash.replace("#/", "nav-"))?.classList.add("active");
     dynamicRoutes[hash](viewport);
     return;
@@ -528,12 +560,6 @@ async function renderGlobalView(container) {
       </div>
     </div>
 
-    <!-- Vulnerability Flow Sankey Card -->
-    <div class="card">
-      <div class="card-title">Vulnerability Flow Analysis</div>
-      <div id="sankey-chart-container"></div>
-    </div>
-
     <!-- Projects Summary Card -->
     <div class="card">
       <div class="card-title">Projects Summary</div>
@@ -578,9 +604,15 @@ async function renderGlobalView(container) {
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- Vulnerability Flow Sankey Card (Lowest Section) -->
+    <div class="card">
+      <div class="card-title">Vulnerability Flow Analysis</div>
+      <div id="sankey-chart-container"></div>
     </div>`;
 
-  const flowJson = await apiComputeSankeyFlow(JSON.stringify(runsState), hideTests);
+  const flowJson = await workerComputeSankeyFlow(JSON.stringify(runsState), hideTests);
   renderSankeyChart("sankey-chart-container", flowJson);
 }
 
@@ -704,6 +736,9 @@ async function renderProjectView(projName, container) {
       </tr>`;
   }).join("");
 
+  const projectTokenUsageHtml = renderProjectTokenUsage(projRuns);
+  const projectToolUsageHtml = renderProjectToolUsage(projRuns);
+
   container.innerHTML = `
     <div class="metrics-grid">
       <div class="metric-card">
@@ -739,9 +774,13 @@ async function renderProjectView(projName, container) {
           </tbody>
         </table>
       </div>
-    </div>`;
+    </div>
 
-  const flowJson = await apiComputeProjectSankeyFlow(JSON.stringify(runsState), projName);
+    ${projectTokenUsageHtml}
+
+    ${projectToolUsageHtml}`;
+
+  const flowJson = await workerComputeProjectSankeyFlow(JSON.stringify(runsState), projName);
   renderSankeyChart("project-sankey-chart-container", flowJson);
 }
 
@@ -766,7 +805,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
   container.innerHTML = `
     <div class="empty-state">
       <h3>Fetching Run Details</h3>
-      <p>Loading finding telemetry for ${proj} / ${job}</p>
+      <p>Loading findings for ${proj} / ${job}</p>
     </div>`;
 
   try {
@@ -785,7 +824,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
       const errorItems = errorKeys.map(k => `<li><strong>${k}</strong>: ${errorsGrouped[k]} error(s)</li>`).join("");
       errorsHtml = `
         <div class="run-errors-card">
-          <h4>Run Errors & Telemetry Warnings</h4>
+          <h4>Run Errors & Warnings</h4>
           <ul class="run-errors-list">${errorItems}</ul>
         </div>`;
     }
@@ -827,10 +866,6 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
       </div>
 
       ${errorsHtml}
-
-      ${tokenUsageHtml}
-
-      ${toolUsageHtml}
 
       <div class="metrics-grid">
         <div class="metric-card">
@@ -894,6 +929,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
           <option value="tree">View: Tree</option>
         </select>
         <button id="btn-export-json" class="btn btn-secondary">Export JSON</button>
+        <button id="btn-export-csv" class="btn btn-secondary">Export CSV</button>
         <button id="btn-export-md" class="btn btn-secondary">Export Markdown</button>
       </div>
 
@@ -913,9 +949,13 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
             </tbody>
           </table>
         </div>
-      </div>`;
+      </div>
 
-    apiComputeRunSankeyFlow(vulnsJson).then(runFlowJson => {
+      ${tokenUsageHtml}
+
+      ${toolUsageHtml}`;
+
+    workerComputeRunSankeyFlow(vulnsJson).then(runFlowJson => {
       renderSankeyChart("run-sankey-chart-container", runFlowJson);
     });
 
@@ -947,7 +987,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
       const viewMode = viewModeSelect.value;
 
       // Off-thread WASM Filter & Sort Execution via Worker
-      const filteredRaw = await apiFilterVulnerabilities(vulnsJson, query, severity, status, sortOrder);
+      const filteredRaw = await workerFilterVulnerabilities(vulnsJson, query, severity, status, sortOrder);
       if (reqId !== currentFilterReqId) return;
 
       const filtered = JSON.parse(filteredRaw);
@@ -995,6 +1035,11 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
 
     document.getElementById("btn-export-json").addEventListener("click", () => {
       downloadFile(`${proj}_${job}_${runId}_findings.json`, JSON.stringify(window.currentFiltered || currentRunVulns, null, 2), "application/json");
+    });
+
+    document.getElementById("btn-export-csv").addEventListener("click", () => {
+      const csvContent = generateCsvReport(proj, job, runId, window.currentFiltered || currentRunVulns);
+      downloadFile(`${proj}_${job}_${runId}_findings.csv`, csvContent, "text/csv");
     });
 
     document.getElementById("btn-export-md").addEventListener("click", () => {
@@ -1048,7 +1093,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
   } catch (err) {
     container.innerHTML = renderEmptyState(
       "Failed to Load Run",
-      err.message || "Could not retrieve run finding telemetry."
+      err.message || "Could not retrieve run findings."
     );
   }
 }
@@ -1107,6 +1152,36 @@ function downloadFile(filename, text, mimeType) {
   document.body.appendChild(element);
   element.click();
   document.body.removeChild(element);
+}
+
+function escapeCsvField(val) {
+  if (val === null || val === undefined) return '""';
+  const str = String(val);
+  return `"${str.replace(/"/g, '""')}"`;
+}
+
+function generateCsvReport(proj, job, runId, vulns) {
+  const headers = ["Project", "Job", "Run ID", "Finding ID", "Severity", "Title", "File", "Location", "Status", "Description", "Recommendation"];
+  const rows = [headers.map(escapeCsvField).join(",")];
+
+  (vulns || []).forEach((v, idx) => {
+    const row = [
+      proj,
+      job,
+      runId,
+      v.id || String(idx + 1),
+      v.severity || "LOW",
+      v.title || "Untitled Finding",
+      v.file || "",
+      v.location || "",
+      v.status || "Open",
+      v.description || "",
+      v.recommendation || "",
+    ];
+    rows.push(row.map(escapeCsvField).join(","));
+  });
+
+  return rows.join("\r\n");
 }
 
 function generateMarkdownReport(proj, job, runId, vulns) {

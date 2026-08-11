@@ -368,6 +368,30 @@ tr:last-child td {
   font-weight: 600;
   text-transform: uppercase;
   white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.badge-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.badge-btn:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .badge-CRITICAL {
