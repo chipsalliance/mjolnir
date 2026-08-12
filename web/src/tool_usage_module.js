@@ -347,6 +347,95 @@ export function renderProjectToolUsage(projRuns) {
   return renderCollapsibleToolCard(totalCalls, totalSuccesses, totalFailures, rows, true);
 }
 
+export function computeHistogram(counts) {
+  const validCounts = (counts || []).filter(c => typeof c === "number" && !isNaN(c) && c >= 0);
+  const total = validCounts.length;
+  if (total === 0) return { bins: [], total: 0 };
+
+  const min = Math.min(...validCounts);
+  const max = Math.max(...validCounts);
+
+  if (min === max) {
+    const label = `${min} call${min === 1 ? '' : 's'}`;
+    return {
+      bins: [{ label, min, max, count: total, percentage: 100 }],
+      total
+    };
+  }
+
+  const range = max - min + 1;
+  const numBins = range <= 6 ? range : 5;
+  const step = Math.ceil(range / numBins);
+
+  const bins = [];
+  let curMin = min;
+
+  for (let i = 0; i < numBins; i++) {
+    const curMax = (i === numBins - 1) ? max : Math.min(max, curMin + step - 1);
+    if (curMin > max) break;
+
+    const label = curMin === curMax ? `${curMin} call${curMin === 1 ? '' : 's'}` : `${curMin} - ${curMax} calls`;
+
+    let count = 0;
+    validCounts.forEach(c => {
+      if (c >= curMin && c <= curMax) {
+        count++;
+      }
+    });
+
+    bins.push({
+      label,
+      min: curMin,
+      max: curMax,
+      count,
+      percentage: total > 0 ? (count / total) * 100 : 0,
+    });
+
+    curMin = curMax + 1;
+  }
+
+  return { bins, total };
+}
+
+
+function renderHistogramComponent(agentName, counts) {
+  const { bins, total } = computeHistogram(counts);
+  if (total === 0) return "";
+
+  const maxBinCount = Math.max(...bins.map(b => b.count), 1);
+
+  const bars = bins.map(b => {
+    const widthPct = ((b.count / maxBinCount) * 100).toFixed(1);
+    const isFullCeiling = b.min >= 21;
+    const barColor = b.count === 0 ? "transparent" : (isFullCeiling ? "var(--severity-high)" : "var(--accent)");
+
+    return `
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 12px;">
+        <span style="width: 100px; color: var(--text-secondary); text-align: right; font-family: monospace;">${b.label}</span>
+        <div style="flex: 1; height: 18px; background: var(--bg-primary, #1e1e2e); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); position: relative;">
+          <div style="width: ${widthPct}%; height: 100%; background: ${barColor}; border-radius: 3px; transition: width 0.3s ease;"></div>
+        </div>
+        <span style="width: 120px; font-weight: 500; color: var(--text-primary); text-align: left;">
+          ${b.count} item${b.count === 1 ? '' : 's'} <span style="color: var(--text-secondary); font-size: 11px;">(${b.percentage.toFixed(1)}%)</span>
+        </span>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div style="margin-top: 16px; padding: 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h5 style="margin: 0; color: var(--text-primary); font-size: 13px;">📊 Tool Usage Histogram: <strong>${agentName}</strong></h5>
+        <span style="font-size: 11px; color: var(--text-secondary);">${total} Total Target Items</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column;">
+        ${bars}
+      </div>
+    </div>
+  `;
+}
+
 export function renderRunToolUsage(data) {
   const toolUsage = (data && data.tool_usage) || {};
   const sum = toolUsage.summary || toolUsage.total || {};
@@ -411,17 +500,24 @@ export function renderRunToolUsage(data) {
     `;
   }
 
-  // Top files by tool calls
-  let topItemsHtml = "";
+  // Generate per-agent histogram graphs and top files from clean backend data
+  let histogramsHtml = "";
   const allItems = [];
+
   Object.entries(perItem).forEach(([aName, items]) => {
-    if (typeof items === "object") {
+    if (typeof items === "object" && items !== null) {
+      const counts = Object.values(items).map(Number).filter(n => !isNaN(n));
+      histogramsHtml += renderHistogramComponent(aName, counts);
+
       Object.entries(items).forEach(([key, count]) => {
-        allItems.push({ agent: aName, key, count });
+        allItems.push({ agent: aName, key, count: Number(count) });
       });
     }
   });
 
+
+  // Top files by tool calls
+  let topItemsHtml = "";
   if (allItems.length > 0) {
     allItems.sort((a, b) => b.count - a.count);
     const topRows = allItems.slice(0, 10).map((it) => `
@@ -434,8 +530,9 @@ export function renderRunToolUsage(data) {
 
     topItemsHtml = `
       <div style="margin-top: 16px;">
-        <h5 style="margin-bottom: 8px; color: var(--text-primary);">Top Scanned Files by Tool Depth</h5>
+        <h5 style="margin-bottom: 8px; color: var(--text-primary);">Top Scanned Files by Tool Usage</h5>
         <div class="table-container" style="margin-bottom: 0;">
+
           <table>
             <thead>
               <tr>
@@ -453,6 +550,8 @@ export function renderRunToolUsage(data) {
     `;
   }
 
-  return renderCollapsibleToolCard(totalCalls, totalSuccesses, totalFailures, rows, false, `${agentHtml}${topItemsHtml}`);
+
+  return renderCollapsibleToolCard(totalCalls, totalSuccesses, totalFailures, rows, false, `${agentHtml}${histogramsHtml}${topItemsHtml}`);
 }
+
 

@@ -35,23 +35,15 @@ class UsageTracker:
             "total_failures": 0,
         }
 
-    def track_item_start(self, item_key: str, agent_name: str = "AuditorAgent"):
-        """Initializes tool call tracking for a specific file or finding."""
-        if not item_key:
-            return
-        if agent_name not in self.tool_calls_per_item:
-            self.tool_calls_per_item[agent_name] = {}
-        if item_key not in self.tool_calls_per_item[agent_name]:
-            self.tool_calls_per_item[agent_name][item_key] = 0
-
     def track_tool_call(
         self,
         tool_name: str,
         success: bool,
-        agent_name: str = "AuditorAgent",
+        agent_name: str = "UnknownAgent",
         item_key: str | None = None,
     ):
         """Records a tool invocation, success, failure, and per-item stat."""
+
         self.total_tool_usage["total_calls"] += 1
         if success:
             self.total_tool_usage["total_successes"] += 1
@@ -121,12 +113,20 @@ class UsageTracker:
             "errors": 0,
         }
 
-    def add(self, ev: Any, agent_name: str = "AuditorAgent", item_key: str | None = None):
+    def add(self, ev: Any, agent_name: str = "UnknownAgent"):
         """Alias for track_event."""
-        return self.track_event(ev, agent_name=agent_name, item_key=item_key)
+        return self.track_event(ev, agent_name=agent_name)
 
-    def track_event(self, ev: Any, agent_name: str = "AuditorAgent", item_key: str | None = None):
+    def track_event(self, ev: Any, agent_name: str = "UnknownAgent"):
         """Extracts token usage metadata and function calls/responses from an ADK event."""
+        raw_key = getattr(ev, "branch", None)
+        if raw_key and "@" in raw_key:
+            parts = raw_key.split("@", 1)
+            agent_name = getattr(ev, "author", None) or parts[0] or agent_name
+            item_key = parts[1]
+        else:
+            agent_name = getattr(ev, "author", None) or agent_name
+            item_key = raw_key
 
         # Inspect function responses
         if hasattr(ev, "content") and ev.content and hasattr(ev.content, "parts"):

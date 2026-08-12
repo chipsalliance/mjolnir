@@ -82,13 +82,12 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
                 logger.error(f"Could not read {f_path}: {e}")
                 return []
 
-            run_id = f"audit_{f_path.replace('/', '_').replace('.', '_')}"
             report = await run_agent_node(
                 ctx,
                 auditor_agent,
                 node_input=f"Filename: {f_path}\n\nContent:\n{contents}",
                 expected_schema=SecurityReport,
-                run_id=run_id,
+                run_id=f_path,
             )
 
             if not report or not hasattr(report, "vulnerabilities") or not report.vulnerabilities:

@@ -57,15 +57,13 @@ async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vu
                 vuln.add_skipped("2", "Initial Review", f"Skipped: Status is {vuln.status}")
                 return vuln
 
-            run_id = f"review_{vuln.id}"
-
             try:
                 verdict = await run_agent_node(
                     ctx,
                     reviewer_agent,
                     node_input=f"Audit Finding:\n{vuln.model_dump_json(indent=2)}",
                     expected_schema=ReviewFinding,
-                    run_id=f"{run_id}_rev",
+                    run_id=str(vuln.id),
                 )
 
                 if verdict:

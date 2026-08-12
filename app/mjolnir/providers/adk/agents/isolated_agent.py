@@ -74,8 +74,7 @@ class IsolatedAgent(Agent):
 
     async def run_async(self, parent_context: InvocationContext):
         tracker = getattr(parent_context.session, "state", {}).get("usage_tracker")
-        item_key = getattr(parent_context, "isolation_scope", None)
         async for event in super().run_async(parent_context):
             if tracker:
-                tracker.track_event(event, agent_name=self.name, item_key=item_key)
+                tracker.track_event(event, agent_name=self.name)
             yield event
