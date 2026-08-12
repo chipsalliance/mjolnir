@@ -4,6 +4,7 @@
 import json
 import os
 from pathlib import Path
+from typing import Any
 from utilities.logger import logger
 
 
@@ -16,8 +17,9 @@ class UsageTracker:
         self.error_counts = {}
         self.total_usage = {
             "prompt_tokens": 0,
-            "output_tokens": 0,
+            "uncached_tokens": 0,
             "cache_tokens": 0,
+            "output_tokens": 0,
             "thoughts_tokens": 0,
             "total_input_tokens": 0,
             "total_output_tokens": 0,
@@ -85,8 +87,9 @@ class UsageTracker:
         return {
             "model": "unknown",
             "prompt_tokens": 0,
-            "output_tokens": 0,
+            "uncached_tokens": 0,
             "cache_tokens": 0,
+            "output_tokens": 0,
             "thoughts_tokens": 0,
             "total_input_tokens": 0,
             "total_output_tokens": 0,
@@ -94,29 +97,40 @@ class UsageTracker:
             "errors": 0,
         }
 
-    def add(self, ev):
-        """Extracts and aggregates token and tool usage from an ADK event."""
-        agent_name = (
-            getattr(ev, "author", None)
-            or getattr(getattr(ev, "node_info", None), "name", None)
-            or "UnknownAgent"
-        )
+    def add(self, ev: Any, agent_name: str = "AuditorAgent"):
+        """Alias for track_event."""
+        return self.track_event(ev, agent_name=agent_name)
 
-        # Track tool responses if present in event content
-        parts = getattr(getattr(ev, "content", None), "parts", []) or []
-        for part in parts:
-            fn_res = getattr(part, "function_response", None)
-            if fn_res:
-                tool_name = getattr(fn_res, "name", "unknown_tool")
-                resp = getattr(fn_res, "response", "")
-                res_str = resp.get("result", "") if isinstance(resp, dict) else str(resp)
-                clean_str = res_str.strip() if isinstance(res_str, str) else str(res_str)
+    def track_event(self, ev: Any, agent_name: str = "AuditorAgent"):
+        """Extracts token usage metadata and function calls/responses from an ADK event."""
 
-                # Tool failure is an explicit tool-level error prefix, not random substring matches
-                is_error = clean_str.startswith("Error:")
-                self.track_tool_call(
-                    tool_name=tool_name, success=not is_error, agent_name=agent_name
-                )
+        if hasattr(ev, "content") and ev.content and hasattr(ev.content, "parts"):
+            for part in ev.content.parts:
+                fn_call = getattr(part, "function_call", None)
+                if fn_call:
+                    pass
+
+        if hasattr(ev, "actions") and ev.actions:
+            pass
+
+        if hasattr(ev, "tool_response") and ev.tool_response:
+            pass
+
+        # Inspect function responses
+        if hasattr(ev, "content") and ev.content and hasattr(ev.content, "parts"):
+            for part in ev.content.parts:
+                fn_res = getattr(part, "function_response", None)
+                if fn_res:
+                    tool_name = getattr(fn_res, "name", "unknown_tool")
+                    resp = getattr(fn_res, "response", "")
+                    res_str = resp.get("result", "") if isinstance(resp, dict) else str(resp)
+                    clean_str = res_str.strip() if isinstance(res_str, str) else str(res_str)
+
+                    # Tool failure is an explicit tool-level error prefix, not random substring matches
+                    is_error = clean_str.startswith("Error:")
+                    self.track_tool_call(
+                        tool_name=tool_name, success=not is_error, agent_name=agent_name
+                    )
 
         if not hasattr(ev, "usage_metadata") or not ev.usage_metadata:
             return
@@ -125,6 +139,7 @@ class UsageTracker:
         o_tokens = getattr(ev.usage_metadata, "candidates_token_count", 0) or 0
         c_tokens = getattr(ev.usage_metadata, "cached_content_token_count", 0) or 0
         t_tokens = getattr(ev.usage_metadata, "thoughts_token_count", 0) or 0
+        u_tokens = max(0, p_tokens - c_tokens)
 
         if agent_name not in self.usage_by_agent:
             self.usage_by_agent[agent_name] = self._get_empty_agent_stats()
@@ -134,21 +149,23 @@ class UsageTracker:
         ):
             self.usage_by_agent[agent_name]["model"] = ev.model_version
 
-        input_tokens = p_tokens + c_tokens
+        input_tokens = p_tokens
         output_tokens = o_tokens + t_tokens
         all_tokens = input_tokens + output_tokens
 
         self.usage_by_agent[agent_name]["prompt_tokens"] += p_tokens
-        self.usage_by_agent[agent_name]["output_tokens"] += o_tokens
+        self.usage_by_agent[agent_name]["uncached_tokens"] += u_tokens
         self.usage_by_agent[agent_name]["cache_tokens"] += c_tokens
+        self.usage_by_agent[agent_name]["output_tokens"] += o_tokens
         self.usage_by_agent[agent_name]["thoughts_tokens"] += t_tokens
         self.usage_by_agent[agent_name]["total_input_tokens"] += input_tokens
         self.usage_by_agent[agent_name]["total_output_tokens"] += output_tokens
         self.usage_by_agent[agent_name]["total_tokens"] += all_tokens
 
         self.total_usage["prompt_tokens"] += p_tokens
-        self.total_usage["output_tokens"] += o_tokens
+        self.total_usage["uncached_tokens"] += u_tokens
         self.total_usage["cache_tokens"] += c_tokens
+        self.total_usage["output_tokens"] += o_tokens
         self.total_usage["thoughts_tokens"] += t_tokens
         self.total_usage["total_input_tokens"] += input_tokens
         self.total_usage["total_output_tokens"] += output_tokens

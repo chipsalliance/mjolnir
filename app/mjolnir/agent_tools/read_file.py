@@ -31,4 +31,4 @@ async def read_file(
         f"[Tool Execution] read_file: {file_path} (lines {start_line} to {end_line if end_line else 'end'})"
     )
     reader = FileReader(safe_path)
-    return await reader.read_async(file_path, start_line=start_line, end_line=end_line)
+    return reader.read(file_path, start_line=start_line, end_line=end_line)
