@@ -2,21 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import asyncio
-import random
 import re
-import traceback
 from typing import Any, Optional
 
 from tqdm import tqdm
-
-from providers.adk.utilities.aimd_controller import AIMDConcurrencyController
 from utilities.logger import logger
 
-DEFAULT_MAX_RETRIES = 10
-DEFAULT_BASE_DELAY = 2.0
-MAX_BACKOFF_DELAY = 60.0  # Cap maximum backoff at 60s
-QUOTA_BACKOFF_MULTIPLIER = 3.0
-TRANSIENT_BACKOFF_MULTIPLIER = 2.0
+# Default stagger delay between worker launches to prevent concurrent prefill spikes
+DEFAULT_DISPATCH_STAGGER_SECONDS = 0.25
 
 
 def extract_agent_output(res: Any, expected_schema: Any) -> Any:
@@ -48,85 +41,33 @@ def extract_agent_output(res: Any, expected_schema: Any) -> Any:
             return None
 
 
-async def run_agent_with_backoff(
+async def run_agent_node(
     ctx,
     agent,
     node_input: Any,
     run_id: str,
-    max_retries: int = DEFAULT_MAX_RETRIES,
     expected_schema: Any = None,
-    aimd_controller: Optional[AIMDConcurrencyController] = None,
 ) -> Any:
-    """Executes an ADK agent with AIMD Concurrency limits and localized exponential backoff on quota hits."""
-    if aimd_controller is None:
-        aimd_controller = ctx.state.setdefault("aimd_controller", AIMDConcurrencyController())
-    max_concurrency = float(ctx.state["batch_size"])
-    attempt = 0
-    base_delay = DEFAULT_BASE_DELAY
+    """Executes an ADK agent node with automatic SDK-level retry handling and schema extraction."""
+    try:
+        res = await ctx.run_node(
+            agent,
+            node_input=node_input,
+            run_id=run_id,
+            use_sub_branch=True,
+            override_isolation_scope=run_id,
+        )
+        return extract_agent_output(res, expected_schema) if expected_schema else res
+    except Exception as e:
+        tracker = ctx.state.get("usage_tracker")
+        if tracker:
+            tracker.track_error(e, agent.name)
+        logger.error(f"Agent execution failed for {run_id}: {type(e).__name__}: {str(e)[:200]}")
+        raise e
 
-    while True:
-        await aimd_controller.acquire(max_concurrency)
 
-        try:
-            res = await ctx.run_node(
-                agent,
-                node_input=node_input,
-                run_id=run_id,
-                use_sub_branch=True,
-                override_isolation_scope=run_id,
-            )
-            await aimd_controller.release(is_quota_hit=False, max_concurrency=max_concurrency)
-            return extract_agent_output(res, expected_schema) if expected_schema else res
-        except Exception as e:
-            tracker = ctx.state.get("usage_tracker")
-            if tracker:
-                tracker.track_error(e, agent.name)
-
-            # Traverse exception chain to inspect cause and context (ADK wraps model errors in DynamicNodeFailError)
-            chain = [e]
-            curr = e
-            while curr is not None and len(chain) < 10:
-                curr = getattr(curr, "__cause__", None) or getattr(curr, "__context__", None)
-                if curr is not None:
-                    chain.append(curr)
-
-            full_error_str = " ".join(f"{type(x).__name__}: {x} {repr(x)}" for x in chain)
-
-            is_quota = any(
-                code in full_error_str
-                for code in [
-                    "RESOURCE_EXHAUSTED",
-                    "PREFILL_QUEUE_OVERLOADED",
-                    "OVERLOADED_TOO_MANY_RETRIES_PER_REQUEST",
-                    "429",
-                ]
-            )
-
-            await aimd_controller.release(is_quota_hit=is_quota, max_concurrency=max_concurrency)
-
-            if not is_quota:
-                logger.debug(f"Non-retryable execution error for {run_id}: {e}", exc_info=True)
-                logger.error(
-                    f"Fatal error during execution for {run_id}: {type(e).__name__}: {str(e)[:120]}"
-                )
-                raise e
-
-            attempt += 1
-            if attempt >= max_retries:
-                logger.debug(f"Exhausted retries for {run_id}: {e}", exc_info=True)
-                logger.error(
-                    f"Fatal: Agent execution for {run_id} failed after {max_retries} attempts."
-                )
-                raise e
-
-            delay = min(MAX_BACKOFF_DELAY, base_delay * (QUOTA_BACKOFF_MULTIPLIER ** (attempt - 1)))
-            jitter = random.uniform(0.1, 2.0)
-            total_sleep = delay + jitter
-
-            logger.warning(
-                f"Quota limit reached ({run_id}). Retrying in {total_sleep:.1f}s (Attempt {attempt}/{max_retries})..."
-            )
-            await asyncio.sleep(total_sleep)
+# Backward compatibility alias
+run_agent_with_backoff = run_agent_node
 
 
 async def run_batch_with_concurrency(
@@ -136,14 +77,17 @@ async def run_batch_with_concurrency(
     desc: str,
     unit: str,
     usage_tracker: Optional[Any] = None,
+    stagger_seconds: float = DEFAULT_DISPATCH_STAGGER_SECONDS,
 ) -> tuple[list[Any], list[Exception]]:
-    """Runs an async worker function across items with bounded concurrency and progress tracking."""
+    """Runs an async worker function across items with bounded concurrency, staggered start, and progress tracking."""
     sem = asyncio.Semaphore(concurrency_limit)
     pbar = tqdm(total=len(items), desc=desc, unit=unit, leave=True)
     exceptions: list[Exception] = []
     valid_results: list[Any] = []
 
-    async def wrapped_worker(item: Any):
+    async def wrapped_worker(idx: int, item: Any):
+        if stagger_seconds > 0:
+            await asyncio.sleep(min(idx, concurrency_limit) * stagger_seconds)
         async with sem:
             try:
                 res = await worker_fn(item)
@@ -165,7 +109,7 @@ async def run_batch_with_concurrency(
                     )
                 pbar.update(1)
 
-    tasks = [wrapped_worker(item) for item in items]
+    tasks = [wrapped_worker(idx, item) for idx, item in enumerate(items)]
     await asyncio.gather(*tasks, return_exceptions=True)
     pbar.close()
     return valid_results, exceptions
