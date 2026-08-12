@@ -11,11 +11,11 @@ from agent_tools.ctags_search import ctags_search
 from agent_tools.glob import glob
 from agent_tools.grep_search import grep_search
 from agent_tools.read_file import read_file
-from data.security_report import SecurityReport
-from providers.adk.agents.constants import (
+from constants import (
     AUDITOR_MAX_LLM_CALLS,
     AUDITOR_MAX_TOOL_CALLS,
 )
+from data.security_report import SecurityReport
 from providers.adk.agents.isolated_agent import (
     IsolatedAgent,
     make_tool_budget_callback,

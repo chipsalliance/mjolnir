@@ -3,6 +3,8 @@
 import asyncio
 import functools
 
+from constants import DEFAULT_TOOL_OUTPUT_MAX_CHARS
+
 
 def _truncate(result: object, max_chars: int) -> object:
     if isinstance(result, str) and len(result) > max_chars:
@@ -11,23 +13,32 @@ def _truncate(result: object, max_chars: int) -> object:
     return result
 
 
-def limit_tool_output(max_chars=40000):
-    """Decorator to truncate tool output if it exceeds max_chars, supporting both sync and async functions."""
+def limit_tool_output(
+    func=None,
+    *,
+    max_chars: int = DEFAULT_TOOL_OUTPUT_MAX_CHARS,
+):
+    """Decorator to truncate tool output if it exceeds max_chars.
 
-    def decorator(func):
-        if asyncio.iscoroutinefunction(func):
+    Supports both bare decorator `@limit_tool_output` and parametrized `@limit_tool_output(max_chars=...)`.
+    """
 
-            @functools.wraps(func)
+    def decorator(fn):
+        if asyncio.iscoroutinefunction(fn):
+
+            @functools.wraps(fn)
             async def async_wrapper(*args, **kwargs):
-                return _truncate(await func(*args, **kwargs), max_chars)
+                return _truncate(await fn(*args, **kwargs), max_chars)
 
             return async_wrapper
         else:
 
-            @functools.wraps(func)
+            @functools.wraps(fn)
             def sync_wrapper(*args, **kwargs):
-                return _truncate(func(*args, **kwargs), max_chars)
+                return _truncate(fn(*args, **kwargs), max_chars)
 
             return sync_wrapper
 
+    if func is not None:
+        return decorator(func)
     return decorator

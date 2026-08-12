@@ -9,11 +9,11 @@ from agent_tools.ast_search import ast_search
 from agent_tools.ctags_search import ctags_search
 from agent_tools.grep_search import grep_search
 from agent_tools.read_file import read_file
-from data.review_finding import ReviewFinding
-from providers.adk.agents.constants import (
+from constants import (
     REVIEWER_MAX_LLM_CALLS,
     REVIEWER_MAX_TOOL_CALLS,
 )
+from data.review_finding import ReviewFinding
 from providers.adk.agents.isolated_agent import (
     IsolatedAgent,
     make_tool_budget_callback,

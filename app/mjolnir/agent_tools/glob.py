@@ -10,7 +10,7 @@ from utilities.decorators import limit_tool_output
 from utilities.logger import logger
 
 
-@limit_tool_output(max_chars=40000)
+@limit_tool_output
 async def glob(
     pattern: str,
     dir_path: str = ".",
