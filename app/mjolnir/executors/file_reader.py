@@ -4,8 +4,7 @@
 
 import asyncio
 from pathlib import Path
-
-MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB safety limit
+from constants import MAX_FILE_SIZE_BYTES
 
 
 class FileReader:
@@ -40,7 +39,7 @@ class FileReader:
                 output_lines.append(f"{idx}: {line}")
             return "".join(output_lines)
         except Exception as e:
-            return f"Error reading file: {str(e)}"
+            return f"Error: Failed to read file: {str(e)}"
 
     async def read_async(
         self, file_path: str, start_line: int = 1, end_line: int | None = None

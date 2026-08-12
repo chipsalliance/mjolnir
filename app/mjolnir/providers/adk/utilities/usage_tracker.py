@@ -108,17 +108,15 @@ class UsageTracker:
             fn_res = getattr(part, "function_response", None)
             if fn_res:
                 tool_name = getattr(fn_res, "name", "unknown_tool")
-                response_content = str(getattr(fn_res, "response", ""))
-                success = not any(
-                    err_kw in response_content.lower()
-                    for err_kw in [
-                        "error:",
-                        "failed with exception",
-                        "timed out",
-                        "access denied",
-                    ]
+                resp = getattr(fn_res, "response", "")
+                res_str = resp.get("result", "") if isinstance(resp, dict) else str(resp)
+                clean_str = res_str.strip() if isinstance(res_str, str) else str(res_str)
+
+                # Tool failure is an explicit tool-level error prefix, not random substring matches
+                is_error = clean_str.startswith("Error:")
+                self.track_tool_call(
+                    tool_name=tool_name, success=not is_error, agent_name=agent_name
                 )
-                self.track_tool_call(tool_name=tool_name, success=success, agent_name=agent_name)
 
         if not hasattr(ev, "usage_metadata") or not ev.usage_metadata:
             return
