@@ -178,8 +178,8 @@ nix run .#mock-smoke-test
 To verify GCS storage uploads with mock data:
 
 ```bash
-export MJOLNIR_GCS_BUCKET="your-bucket"
-nix run .#mock-gcs-test
+nix run .#mock-smoke-test
+nix run .#deploy-gcs-runs -- --bucket your-bucket --include-tests
 ```
 
 ### Live LLM Testing
@@ -198,15 +198,6 @@ nix run .#adk-gemini-test
 
 # Option C: ADK Ingestion Mode
 nix run .#adk-gemini-ingest-test
-```
-
-To verify end-to-end LLM scanning combined with GCS upload:
-
-```bash
-export MJOLNIR_GCS_BUCKET="your-bucket"
-nix run .#genai-gemini-gcs-test
-# or
-nix run .#adk-gemini-gcs-test
 ```
 
 ### Running All Tests
