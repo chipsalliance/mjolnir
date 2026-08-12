@@ -1,20 +1,25 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
-import hashlib
+from pathlib import Path
 from typing import Union
 
 from google.adk import Context
 from google.adk.workflow import node
 
+from agent_tools.ast_search import ast_search
+from agent_tools.ctags_search import ctags_search
+from agent_tools.grep_search import grep_search
+from agent_tools.read_file import read_file
 from data.review_finding import ReviewFinding
 from data.status import Status
 from data.vulnerability import Vulnerability
-from providers.adk.agents.reviewer import get_reviewer_agent
+from providers.adk.agents.reviewer import build_reviewer_instruction, get_reviewer_agent
 from providers.adk.phases.audit import checkpoint_audit_findings
 from providers.adk.utilities.async_runner import (
     run_agent_with_backoff,
     run_batch_with_concurrency,
 )
+from providers.adk.utilities.cache_manager import PhaseContextCache
 from utilities.logger import logger
 
 
@@ -31,52 +36,63 @@ async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vu
     model = ctx.state["model"]
     threat_model = ctx.state["threat_model_context"]
     batch_size = ctx.state["batch_size"]
-    reviewer_agent = get_reviewer_agent(model, threat_model)
+    code_dir = ctx.state.get("code_dir", "target")
 
-    async def review_single_vuln(vuln: Union[Vulnerability, dict]) -> Vulnerability:
-        if isinstance(vuln, dict):
-            vuln = Vulnerability.model_validate(vuln)
+    reviewer_tools = [read_file, grep_search, ctags_search, ast_search]
+    reviewer_instruction = build_reviewer_instruction(threat_model)
 
-        if getattr(vuln, "status", Status.OPEN) != Status.OPEN:
-            vuln.add_skipped("2", "Initial Review", f"Skipped: Status is {vuln.status}")
-            return vuln
+    with PhaseContextCache(
+        model=model,
+        instruction=reviewer_instruction,
+        tools=reviewer_tools,
+        display_name=f"mjolnir-phase2-{Path(code_dir).name}",
+    ) as cache:
+        reviewer_agent = get_reviewer_agent(model, threat_model, cached_content=cache.cache_name)
 
-        run_id = f"review_{vuln.id}"
+        async def review_single_vuln(vuln: Union[Vulnerability, dict]) -> Vulnerability:
+            if isinstance(vuln, dict):
+                vuln = Vulnerability.model_validate(vuln)
 
-        try:
-            verdict = await run_agent_with_backoff(
-                ctx,
-                reviewer_agent,
-                node_input=f"Audit Finding:\n{vuln.model_dump_json(indent=2)}",
-                expected_schema=ReviewFinding,
-                run_id=f"{run_id}_rev",
-            )
-            if verdict:
-                vuln.add(phase_id="2", phase_name="Initial Review", finding=verdict)
-            else:
+            if getattr(vuln, "status", Status.OPEN) != Status.OPEN:
+                vuln.add_skipped("2", "Initial Review", f"Skipped: Status is {vuln.status}")
+                return vuln
+
+            run_id = f"review_{vuln.id}"
+
+            try:
+                verdict = await run_agent_with_backoff(
+                    ctx,
+                    reviewer_agent,
+                    node_input=f"Audit Finding:\n{vuln.model_dump_json(indent=2)}",
+                    expected_schema=ReviewFinding,
+                    run_id=f"{run_id}_rev",
+                )
+                if verdict:
+                    vuln.add(phase_id="2", phase_name="Initial Review", finding=verdict)
+                else:
+                    vuln.add_skipped(
+                        "2",
+                        "Initial Review",
+                        "Reviewer agent returned empty/unparseable verdict after retries.",
+                    )
+            except Exception as rev_err:
+                logger.error(f" [Reviewer FATAL] Failed {vuln.file} after max retries: {rev_err}")
                 vuln.add_skipped(
                     "2",
                     "Initial Review",
-                    "Reviewer agent returned empty/unparseable verdict after retries.",
+                    f"FATAL ERROR: AI Reviewer agent failed after retries ({type(rev_err).__name__}).",
                 )
-        except Exception as rev_err:
-            logger.error(f" [Reviewer FATAL] Failed {vuln.file} after max retries: {rev_err}")
-            vuln.add_skipped(
-                "2",
-                "Initial Review",
-                f"FATAL ERROR: AI Reviewer agent failed after retries ({type(rev_err).__name__}).",
-            )
 
-        return vuln
+            return vuln
 
-    results, exceptions = await run_batch_with_concurrency(
-        items=vulnerabilities,
-        worker_fn=review_single_vuln,
-        concurrency_limit=batch_size,
-        desc="Reviewing findings",
-        unit="finding",
-        usage_tracker=ctx.state.get("usage_tracker"),
-    )
+        results, exceptions = await run_batch_with_concurrency(
+            items=vulnerabilities,
+            worker_fn=review_single_vuln,
+            concurrency_limit=batch_size,
+            desc="Reviewing findings",
+            unit="finding",
+            usage_tracker=ctx.state.get("usage_tracker"),
+        )
 
     if exceptions:
         logger.warning(f"Phase 2 encountered {len(exceptions)} fatal errors.")

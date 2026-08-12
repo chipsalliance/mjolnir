@@ -6,6 +6,8 @@ import pathlib
 from google.adk import Agent
 from google.adk.agents.run_config import RunConfig
 
+from google.genai import types
+
 from agent_tools.ast_search import ast_search
 from agent_tools.ctags_search import ctags_search
 from agent_tools.glob import glob
@@ -23,8 +25,8 @@ from providers.adk.agents.isolated_agent import (
 from utilities.prompt_loader import prompt_registry
 
 
-def get_auditor_agent(model: str, threat_model_context: str = "") -> Agent:
-    """Factory to create an AuditorAgent with appropriate system prompts."""
+def build_auditor_instruction(threat_model_context: str = "") -> str:
+    """Builds the full, deterministic system instruction for the AuditorAgent."""
     current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     fallback_instruction = "Analyze the codebase for vulnerabilities."
     instruction = prompt_registry.load_prompt("auditor", fallback=fallback_instruction) + "\n\n"
@@ -39,6 +41,17 @@ def get_auditor_agent(model: str, threat_model_context: str = "") -> Agent:
         instruction += f"\n\n{c_skill_path.read_text()}\n"
     if rust_skill_path.exists():
         instruction += f"\n\n{rust_skill_path.read_text()}\n"
+    return instruction
+
+
+def get_auditor_agent(
+    model: str, threat_model_context: str = "", cached_content: str | None = None
+) -> Agent:
+    """Factory to create an AuditorAgent with appropriate system prompts and optional cached content."""
+    instruction = build_auditor_instruction(threat_model_context)
+    generate_content_config = (
+        types.GenerateContentConfig(cached_content=cached_content) if cached_content else None
+    )
 
     return IsolatedAgent(
         name="AuditorAgent",
@@ -46,6 +59,7 @@ def get_auditor_agent(model: str, threat_model_context: str = "") -> Agent:
         instruction=instruction,
         tools=[read_file, glob, grep_search, ctags_search, ast_search],
         output_schema=SecurityReport,
+        generate_content_config=generate_content_config,
         before_tool_callback=make_tool_budget_callback(AUDITOR_MAX_TOOL_CALLS),
         run_config=RunConfig(max_llm_calls=AUDITOR_MAX_LLM_CALLS),
     )

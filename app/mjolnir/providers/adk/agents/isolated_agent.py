@@ -7,7 +7,8 @@ from google.adk.agents.invocation_context import (
     _InvocationCostManager,
 )
 from google.adk.agents.run_config import RunConfig
-from google.adk.models import BaseLlm, LLMRegistry
+from google.adk.models import BaseLlm, LLMRegistry, LlmRequest
+from google.adk.models.google_llm import Gemini
 from google.genai import types
 
 # Default transport-level retry configuration for LLM calls (exponential backoff with jitter)
@@ -22,6 +23,17 @@ DEFAULT_HTTP_RETRY_OPTIONS = types.HttpRetryOptions(
 )
 
 
+class CachedGemini(Gemini):
+    """ADK Gemini model wrapper that correctly handles Vertex AI explicit cached content by not duplicating system instruction/tools in per-request configs."""
+
+    async def _preprocess_request(self, llm_request: LlmRequest) -> None:
+        await super()._preprocess_request(llm_request)
+        if llm_request.config and getattr(llm_request.config, "cached_content", None):
+            llm_request.config.system_instruction = None
+            llm_request.config.tools = None
+            llm_request.config.tool_config = None
+
+
 def resolve_model_with_retries(model: str | BaseLlm) -> BaseLlm:
     """Polymorphically ensures any model (string name or instantiated BaseLlm) has transport-level retry options configured."""
     # 1. If passed an already-instantiated BaseLlm
@@ -32,6 +44,8 @@ def resolve_model_with_retries(model: str | BaseLlm) -> BaseLlm:
 
     # 2. If passed a string model name, resolve class dynamically via ADK registry
     llm_class = LLMRegistry.resolve(model)
+    if issubclass(llm_class, Gemini):
+        return CachedGemini(model=model, retry_options=DEFAULT_HTTP_RETRY_OPTIONS)
 
     # 3. Duck-type check if this provider class accepts `retry_options`
     if "retry_options" in getattr(llm_class, "model_fields", {}):
