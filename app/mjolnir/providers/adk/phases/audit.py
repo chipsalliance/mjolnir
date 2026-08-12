@@ -16,7 +16,7 @@ from data.security_report import SecurityReport
 from data.vulnerability import Vulnerability
 from providers.adk.agents.auditor import build_auditor_instruction, get_auditor_agent
 from providers.adk.utilities.async_runner import (
-    run_agent_with_backoff,
+    run_agent_node,
     run_batch_with_concurrency,
 )
 from providers.adk.utilities.cache_manager import PhaseContextCache
@@ -83,13 +83,14 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
                 return []
 
             run_id = f"audit_{f_path.replace('/', '_').replace('.', '_')}"
-            report = await run_agent_with_backoff(
+            report = await run_agent_node(
                 ctx,
                 auditor_agent,
                 node_input=f"Filename: {f_path}\n\nContent:\n{contents}",
                 expected_schema=SecurityReport,
                 run_id=run_id,
             )
+
             if not report or not hasattr(report, "vulnerabilities") or not report.vulnerabilities:
                 return []
 

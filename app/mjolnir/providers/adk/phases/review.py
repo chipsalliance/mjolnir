@@ -16,7 +16,7 @@ from data.vulnerability import Vulnerability
 from providers.adk.agents.reviewer import build_reviewer_instruction, get_reviewer_agent
 from providers.adk.phases.audit import checkpoint_audit_findings
 from providers.adk.utilities.async_runner import (
-    run_agent_with_backoff,
+    run_agent_node,
     run_batch_with_concurrency,
 )
 from providers.adk.utilities.cache_manager import PhaseContextCache
@@ -60,13 +60,14 @@ async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vu
             run_id = f"review_{vuln.id}"
 
             try:
-                verdict = await run_agent_with_backoff(
+                verdict = await run_agent_node(
                     ctx,
                     reviewer_agent,
                     node_input=f"Audit Finding:\n{vuln.model_dump_json(indent=2)}",
                     expected_schema=ReviewFinding,
                     run_id=f"{run_id}_rev",
                 )
+
                 if verdict:
                     vuln.add(phase_id="2", phase_name="Initial Review", finding=verdict)
                 else:

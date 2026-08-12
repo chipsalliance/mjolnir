@@ -12,7 +12,7 @@ from data.security_report import SecurityReport
 from data.vulnerability import Vulnerability
 from providers.adk.agents.ingestion import get_ingestion_agent
 from providers.adk.phases.audit import checkpoint_audit_findings
-from providers.adk.utilities.async_runner import run_agent_with_backoff
+from providers.adk.utilities.async_runner import run_agent_node
 from utilities.logger import logger
 
 
@@ -80,7 +80,7 @@ async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerabili
         )
 
     ingestion_agent = get_ingestion_agent(model)
-    report = await run_agent_with_backoff(
+    report = await run_agent_node(
         ctx,
         ingestion_agent,
         node_input=document_text,

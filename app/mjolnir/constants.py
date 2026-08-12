@@ -19,19 +19,11 @@ DEFAULT_HTTP_RETRY_OPTIONS = types.HttpRetryOptions(
 DEFAULT_DISPATCH_STAGGER_SECONDS = 0.25
 
 
-# --- Agent Turn & Tool Budget Ceilings ---
-
-# Auditor Agent
-AUDITOR_MAX_TOOL_CALLS = 20
+# --- Agent Turn Ceilings (RunConfig backstop) ---
 AUDITOR_MAX_LLM_CALLS = 25
-
-# Adversarial Reviewer Agent
-REVIEWER_MAX_TOOL_CALLS = 90
 REVIEWER_MAX_LLM_CALLS = 100
-
-# Report Ingestion Agent
-INGESTION_MAX_TOOL_CALLS = 40
 INGESTION_MAX_LLM_CALLS = 50
+
 
 # --- Tool Execution & Output Limits ---
 DEFAULT_TOOL_OUTPUT_MAX_CHARS = 40000

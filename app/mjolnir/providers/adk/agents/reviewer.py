@@ -11,15 +11,9 @@ from agent_tools.ast_search import ast_search
 from agent_tools.ctags_search import ctags_search
 from agent_tools.grep_search import grep_search
 from agent_tools.read_file import read_file
-from constants import (
-    REVIEWER_MAX_LLM_CALLS,
-    REVIEWER_MAX_TOOL_CALLS,
-)
+from constants import REVIEWER_MAX_LLM_CALLS
 from data.review_finding import ReviewFinding
-from providers.adk.agents.isolated_agent import (
-    IsolatedAgent,
-    make_tool_budget_callback,
-)
+from providers.adk.agents.isolated_agent import IsolatedAgent
 from utilities.prompt_loader import prompt_registry
 
 
@@ -49,6 +43,5 @@ def get_reviewer_agent(
         output_schema=ReviewFinding,
         generate_content_config=generate_content_config,
         tools=[read_file, grep_search, ctags_search, ast_search],
-        before_tool_callback=make_tool_budget_callback(REVIEWER_MAX_TOOL_CALLS),
         run_config=RunConfig(max_llm_calls=REVIEWER_MAX_LLM_CALLS),
     )

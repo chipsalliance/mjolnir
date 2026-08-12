@@ -14,16 +14,14 @@ DEFAULT_DISPATCH_STAGGER_SECONDS = 0.25
 
 def extract_agent_output(res: Any, expected_schema: Any) -> Any:
     """Safely extracts and validates a Pydantic model instance from an ADK node execution result."""
-    if res is None or expected_schema is None:
-        return res
-    if isinstance(res, expected_schema):
+    if res is None or expected_schema is None or isinstance(res, expected_schema):
         return res
     if isinstance(res, dict):
         try:
             return expected_schema.model_validate(res)
         except Exception as e:
             logger.warning(f"Failed to validate dict output against {expected_schema}: {e}")
-            return None
+            return
 
     text_val = (
         getattr(res, "output", None)
@@ -38,7 +36,6 @@ def extract_agent_output(res: Any, expected_schema: Any) -> Any:
             return expected_schema.model_validate_json(text_val.strip())
         except Exception as e:
             logger.warning(f"Failed to validate JSON output against {expected_schema}: {e}")
-            return None
 
 
 async def run_agent_node(
@@ -62,12 +59,7 @@ async def run_agent_node(
         tracker = ctx.state.get("usage_tracker")
         if tracker:
             tracker.track_error(e, agent.name)
-        logger.error(f"Agent execution failed for {run_id}: {type(e).__name__}: {str(e)[:200]}")
-        raise e
-
-
-# Backward compatibility alias
-run_agent_with_backoff = run_agent_node
+        logger.error(f"Agent execution failed for {run_id}: {type(e).__name__}: {str(e)[:120]}")
 
 
 async def run_batch_with_concurrency(

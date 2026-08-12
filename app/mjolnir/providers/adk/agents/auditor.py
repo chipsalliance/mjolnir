@@ -13,15 +13,9 @@ from agent_tools.ctags_search import ctags_search
 from agent_tools.glob import glob
 from agent_tools.grep_search import grep_search
 from agent_tools.read_file import read_file
-from constants import (
-    AUDITOR_MAX_LLM_CALLS,
-    AUDITOR_MAX_TOOL_CALLS,
-)
+from constants import AUDITOR_MAX_LLM_CALLS
 from data.security_report import SecurityReport
-from providers.adk.agents.isolated_agent import (
-    IsolatedAgent,
-    make_tool_budget_callback,
-)
+from providers.adk.agents.isolated_agent import IsolatedAgent
 from utilities.prompt_loader import prompt_registry
 
 
@@ -60,6 +54,5 @@ def get_auditor_agent(
         tools=[read_file, glob, grep_search, ctags_search, ast_search],
         output_schema=SecurityReport,
         generate_content_config=generate_content_config,
-        before_tool_callback=make_tool_budget_callback(AUDITOR_MAX_TOOL_CALLS),
         run_config=RunConfig(max_llm_calls=AUDITOR_MAX_LLM_CALLS),
     )
