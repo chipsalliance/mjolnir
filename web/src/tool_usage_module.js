@@ -54,13 +54,17 @@ window.showToolRunsModal = function(encodedToolName) {
 
 export function extractRunToolStats(r) {
   const tu = r.tool_usage || {};
-  const tot = tu.total || {};
-  const totalCalls = tot.total_calls || 0;
-  const totalSuccesses = tot.total_successes || 0;
-  const totalFailures = tot.total_failures || 0;
-  const failureRate = tot.failure_rate || (totalCalls > 0 ? `${((totalFailures / totalCalls) * 100).toFixed(2)}%` : "0.00%");
+  const sum = tu.summary || tu.total || {};
+  const totalCalls = sum.total_calls || 0;
+  const totalSuccesses = sum.total_successes || 0;
+  const totalFailures = sum.total_failures || 0;
+  const failureRate = sum.failure_rate || (totalCalls > 0 ? `${((totalFailures / totalCalls) * 100).toFixed(2)}%` : "0.00%");
+  const avgCallsPerItem = sum.avg_calls_per_item || 0;
+  const p50 = sum.p50 || 0;
+  const p90 = sum.p90 || 0;
+  const totalItems = sum.total_items || 0;
 
-  return { totalCalls, totalSuccesses, totalFailures, failureRate, tu };
+  return { totalCalls, totalSuccesses, totalFailures, failureRate, avgCallsPerItem, p50, p90, totalItems, tu };
 }
 
 function aggregateRunsToolStats(runs) {
@@ -71,7 +75,7 @@ function aggregateRunsToolStats(runs) {
   const runRows = [];
 
   (runs || []).forEach((r) => {
-    const { totalCalls: calls, totalSuccesses: succ, totalFailures: fail, failureRate: rate, tu } = extractRunToolStats(r);
+    const { totalCalls: calls, totalSuccesses: succ, totalFailures: fail, failureRate: rate, avgCallsPerItem, p50, p90, tu } = extractRunToolStats(r);
     totalCalls += calls;
     totalSuccesses += succ;
     totalFailures += fail;
@@ -111,6 +115,7 @@ function aggregateRunsToolStats(runs) {
           <td>${calls}</td>
           <td style="color: var(--status-resolved);">${succ}</td>
           <td style="color: ${fail > 0 ? 'var(--severity-critical)' : 'inherit'};">${fail}</td>
+          <td>${avgCallsPerItem > 0 ? `${avgCallsPerItem} / item` : "N/A"}</td>
           <td><span class="badge ${fail > 0 ? 'badge-critical' : 'badge-low'}">${rate}</span></td>
         </tr>
       `);
@@ -123,19 +128,20 @@ function aggregateRunsToolStats(runs) {
   return { totalCalls, totalSuccesses, totalFailures, toolStats, runRows };
 }
 
-function renderCollapsibleToolCard(totalCalls, totalSuccesses, totalFailures, tableRows, hasAssociatedRunsCol) {
+function renderCollapsibleToolCard(totalCalls, totalSuccesses, totalFailures, tableRows, hasAssociatedRunsCol, extraHtml = "") {
   if (totalCalls === 0 && (!tableRows || tableRows.length === 0)) {
     return "";
   }
 
   const overallFailureRate = totalCalls > 0 ? `${((totalFailures / totalCalls) * 100).toFixed(2)}%` : "0.00%";
+  const successRate = totalCalls > 0 ? `${(((totalCalls - totalFailures) / totalCalls) * 100).toFixed(2)}%` : "100.00%";
   const thExtra = hasAssociatedRunsCol ? `<th>Associated Runs</th>` : "";
 
   return `
     <details class="card" style="margin-top: 20px;">
       <summary class="card-title" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
-        <span>Tool Usage (Click to Expand)</span>
-        <span style="font-size: 13px; font-weight: normal;">Total Calls: <strong>${totalCalls.toLocaleString()}</strong> | Failure Rate: <strong>${overallFailureRate}</strong></span>
+        <span>Tool Usage Breakdown (Click to Expand)</span>
+        <span style="font-size: 13px; font-weight: normal;">Total Calls: <strong>${totalCalls.toLocaleString()}</strong> | Success Rate: <strong>${successRate}</strong></span>
       </summary>
       <div style="margin-top: 15px;">
         <div class="metrics-grid">
@@ -144,19 +150,19 @@ function renderCollapsibleToolCard(totalCalls, totalSuccesses, totalFailures, ta
             <span class="metric-value">${totalCalls.toLocaleString()}</span>
           </div>
           <div class="metric-card">
-            <span class="metric-label">Successful Execution</span>
-            <span class="metric-value" style="color: var(--status-resolved);">${totalSuccesses.toLocaleString()}</span>
+            <span class="metric-label">Execution Success Rate</span>
+            <span class="metric-value" style="color: var(--status-resolved);">${successRate}</span>
           </div>
           <div class="metric-card">
-            <span class="metric-label">Failed / Timed Out</span>
+            <span class="metric-label">Failed Invocations</span>
             <span class="metric-value" style="color: ${totalFailures > 0 ? 'var(--severity-critical)' : 'inherit'};">${totalFailures.toLocaleString()}</span>
           </div>
           <div class="metric-card">
-            <span class="metric-label">Overall Failure Rate</span>
+            <span class="metric-label">Failure Rate</span>
             <span class="metric-value" style="color: var(--accent);">${overallFailureRate}</span>
           </div>
         </div>
-        <div class="table-container" style="margin-bottom: 0;">
+        <div class="table-container" style="margin-bottom: 16px;">
           <table>
             <thead>
               <tr>
@@ -173,6 +179,7 @@ function renderCollapsibleToolCard(totalCalls, totalSuccesses, totalFailures, ta
             </tbody>
           </table>
         </div>
+        ${extraHtml}
       </div>
     </details>`;
 }
@@ -215,6 +222,7 @@ export function registerToolUsageModule(navContainer, routeHandlers, renderEmpty
       }
 
       const overallFailureRate = totalCalls > 0 ? `${((totalFailures / totalCalls) * 100).toFixed(2)}%` : "0.00%";
+      const successRate = totalCalls > 0 ? `${(((totalCalls - totalFailures) / totalCalls) * 100).toFixed(2)}%` : "100.00%";
 
       const byToolRows = Object.entries(toolStats).map(([tName, s]) => {
         const rate = s.calls > 0 ? `${((s.failures / s.calls) * 100).toFixed(2)}%` : "0.00%";
@@ -239,11 +247,11 @@ export function registerToolUsageModule(navContainer, routeHandlers, renderEmpty
             <span class="metric-value">${totalCalls.toLocaleString()}</span>
           </div>
           <div class="metric-card">
-            <span class="metric-label">Successful Execution</span>
-            <span class="metric-value" style="color: var(--status-resolved);">${totalSuccesses.toLocaleString()}</span>
+            <span class="metric-label">Execution Success Rate</span>
+            <span class="metric-value" style="color: var(--status-resolved);">${successRate}</span>
           </div>
           <div class="metric-card">
-            <span class="metric-label">Failed / Timed Out</span>
+            <span class="metric-label">Failed Invocations</span>
             <span class="metric-value" style="color: ${totalFailures > 0 ? 'var(--severity-critical)' : 'inherit'};">${totalFailures.toLocaleString()}</span>
           </div>
           <div class="metric-card">
@@ -285,11 +293,12 @@ export function registerToolUsageModule(navContainer, routeHandlers, renderEmpty
                   <th>Tool Calls</th>
                   <th>Successes</th>
                   <th>Failures</th>
+                  <th>Avg / Item</th>
                   <th>Failure Rate</th>
                 </tr>
               </thead>
               <tbody>
-                ${runRows.join("") || '<tr><td colspan="7" style="text-align:center; padding: 20px;">No runs recorded.</td></tr>'}
+                ${runRows.join("") || '<tr><td colspan="8" style="text-align:center; padding: 20px;">No runs recorded.</td></tr>'}
               </tbody>
             </table>
           </div>
@@ -340,11 +349,13 @@ export function renderProjectToolUsage(projRuns) {
 
 export function renderRunToolUsage(data) {
   const toolUsage = (data && data.tool_usage) || {};
-  const tot = toolUsage.total || {};
-  const totalCalls = tot.total_calls || 0;
-  const totalSuccesses = tot.total_successes || 0;
-  const totalFailures = tot.total_failures || 0;
+  const sum = toolUsage.summary || toolUsage.total || {};
+  const totalCalls = sum.total_calls || 0;
+  const totalSuccesses = sum.total_successes || 0;
+  const totalFailures = sum.total_failures || 0;
   const byTool = toolUsage.by_tool || {};
+  const byAgent = toolUsage.by_agent || {};
+  const perItem = toolUsage.per_item || {};
 
   const rows = Object.entries(byTool).map(([toolName, stats]) => `
     <tr>
@@ -356,5 +367,92 @@ export function renderRunToolUsage(data) {
     </tr>
   `).join("");
 
-  return renderCollapsibleToolCard(totalCalls, totalSuccesses, totalFailures, rows, false);
+  let agentHtml = "";
+  if (Object.keys(byAgent).length > 0) {
+    const agentRows = Object.entries(byAgent).map(([aName, stats]) => {
+      const avgCalls = stats.avg_calls_per_item || 0;
+      const p50 = stats.p50 || 0;
+      const p90 = stats.p90 || 0;
+      const totalItems = stats.total_items || 0;
+      const totalAgentCalls = stats.tools ? Object.values(stats.tools).reduce((acc, t) => acc + (t.calls || 0), 0) : 0;
+      return `
+        <tr>
+          <td><strong>${aName}</strong></td>
+          <td>${totalItems}</td>
+          <td>${totalAgentCalls}</td>
+          <td>${avgCalls}</td>
+          <td>${p50}</td>
+          <td>${p90}</td>
+        </tr>
+      `;
+    }).join("");
+
+    agentHtml = `
+      <div style="margin-top: 16px;">
+        <h5 style="margin-bottom: 8px; color: var(--text-primary);">Agent Workload & Distribution (p50 / p90)</h5>
+        <div class="table-container" style="margin-bottom: 16px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Target Items</th>
+                <th>Total Tool Calls</th>
+                <th>Avg Calls / Item</th>
+                <th>Median (p50)</th>
+                <th>90th % (p90)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${agentRows}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // Top files by tool calls
+  let topItemsHtml = "";
+  const allItems = [];
+  Object.entries(perItem).forEach(([aName, items]) => {
+    if (typeof items === "object") {
+      Object.entries(items).forEach(([key, count]) => {
+        allItems.push({ agent: aName, key, count });
+      });
+    }
+  });
+
+  if (allItems.length > 0) {
+    allItems.sort((a, b) => b.count - a.count);
+    const topRows = allItems.slice(0, 10).map((it) => `
+      <tr>
+        <td><code>${it.key}</code></td>
+        <td>${it.agent}</td>
+        <td><strong>${it.count}</strong></td>
+      </tr>
+    `).join("");
+
+    topItemsHtml = `
+      <div style="margin-top: 16px;">
+        <h5 style="margin-bottom: 8px; color: var(--text-primary);">Top Scanned Files by Tool Depth</h5>
+        <div class="table-container" style="margin-bottom: 0;">
+          <table>
+            <thead>
+              <tr>
+                <th>Target File / Finding</th>
+                <th>Agent</th>
+                <th>Tool Calls</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${topRows}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  return renderCollapsibleToolCard(totalCalls, totalSuccesses, totalFailures, rows, false, `${agentHtml}${topItemsHtml}`);
 }
+
