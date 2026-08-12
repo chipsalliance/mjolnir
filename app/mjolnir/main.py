@@ -105,6 +105,13 @@ def _run_orchestrator():
 
     logger.header("Welcome to Mjolnir!")
 
+    provider_name = job.get("provider")
+
+    # Log execution engine
+    logger.info(
+        f"Engine: {provider_name.upper()} | Model: {model_name} | Target: {repo_name} ({repo_ref or 'HEAD'})"
+    )
+
     logger.info(f"Setting up repository for {repo_name}.")
     setup_repository(repo_url, code_dir, repo_ref, workspace_dir)
 
@@ -123,6 +130,11 @@ def _run_orchestrator():
         timestamp_pretty,
         ingest_path=ingest_path,
         diff_base=diff_base,
+        auth_mode=(
+            "Mock"
+            if provider_name == "mock"
+            else ("Gemini API Key" if app_config.gemini_api_key else "Vertex AI")
+        ),
     )
 
     # Execute command, if one is provided

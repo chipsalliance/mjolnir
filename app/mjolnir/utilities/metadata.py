@@ -15,6 +15,9 @@ def write_metadata(
     timestamp_pretty: str,
     ingest_path: str = None,
     diff_base: str = None,
+    auth_mode: str = None,
+    gcp_project: str = None,
+    gcp_location: str = None,
 ):
     """Resolves HEAD commit hash and dumps run metadata.json."""
     metadata_file = Path(run_dir) / "metadata.json"
@@ -35,5 +38,12 @@ def write_metadata(
         "timestamp": timestamp_pretty,
         "mode": mode,
     }
+    if auth_mode:
+        metadata["auth_mode"] = auth_mode
+    if gcp_project:
+        metadata["gcp_project"] = gcp_project
+    if gcp_location:
+        metadata["gcp_location"] = gcp_location
+
     with open(metadata_file, "w") as f:
         json.dump(metadata, f, indent=2)

@@ -15,9 +15,6 @@ inputs:
     description: 'Head git commit SHA or ref for PR diff comparison'
     required: false
     default: '${{ github.event.pull_request.head.sha || github.sha }}'
-  gemini-api-key:
-    description: 'Gemini API Key for ADK execution'
-    required: true
   gcs-bucket:
     description: 'Optional Google Cloud Storage bucket to upload audit artifacts to'
     required: false
@@ -33,8 +30,6 @@ runs:
 
     - name: Run Mjolnir Audit
       shell: bash
-      env:
-        GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
       run: |
         nix run .#${{ inputs.job }} -- \
           --diff-base "${{ inputs.base-ref }}" \

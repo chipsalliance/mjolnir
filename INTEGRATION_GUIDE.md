@@ -98,7 +98,6 @@ jobs:
           job: "repo-x-ci"
           base-ref: "${{ github.event.pull_request.base.sha }}"
           head-ref: "${{ github.event.pull_request.head.sha }}"
-          gemini-api-key: "${{ secrets.GEMINI_API_KEY }}"
           gcs-bucket: "${{ vars.GCS_REPORTS_BUCKET }}"
 ```
 

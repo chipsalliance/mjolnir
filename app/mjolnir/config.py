@@ -21,8 +21,12 @@ class AppConfig:
         default_factory=lambda: os.environ.get("GOOGLE_CLOUD_PROJECT")
     )
     google_cloud_location: Optional[str] = field(
-        default_factory=lambda: os.environ.get("GOOGLE_CLOUD_LOCATION")
+        default_factory=lambda: os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
     )
+
+    @property
+    def auth_mode(self) -> str:
+        return "Gemini API Key" if self.gemini_api_key else "Vertex AI"
 
     @classmethod
     def from_env(

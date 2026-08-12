@@ -63,5 +63,6 @@ EOF
     --replace-fail "types.AvatarConfig" "Any"
   substituteInPlace src/google/adk/models/google_llm.py \
     --replace-fail "return Client(**kwargs)" \
-                   "import os; vertexai = os.environ.get(\"GOOGLE_GENAI_USE_VERTEXAI\", \"\").lower() in (\"true\", \"1\") or bool(os.environ.get(\"GOOGLE_CLOUD_PROJECT\")); return Client(vertexai=vertexai, **kwargs) if vertexai else Client(**kwargs)"
+                   "import os; vertexai = not bool(os.environ.get(\"GEMINI_API_KEY\")); return Client(vertexai=vertexai, **kwargs) if vertexai else Client(**kwargs)"
 ''
+

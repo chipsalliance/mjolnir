@@ -135,24 +135,27 @@ nix run .#deploy-gcs-runs -- --include-tests
 
 ## Authentication
 
-Mjolnir supports both Google Cloud Vertex AI and the Gemini Developer API.
+Mjolnir uses **Application Default Credentials (ADC)** with **Google Cloud Vertex AI** by default, requiring **zero environment variables or secrets** in production.
 
-### Gemini API Key (Gemini Developer API)
+### Vertex AI (Production & Local Development with ADC)
 
-Set the API key in your environment:
+- **In Production (GCP / Compute Engine / GKE):**
+  Authentication and GCP Project ID resolution are completely automatic via Application Default Credentials (ADC) and the Instance Metadata Server. No environment variables or credentials files are needed.
+
+- **On Local Development Workstations:**
+  Authenticate once with `gcloud`:
+  ```bash
+  gcloud auth application-default login
+  gcloud config set project your-gcp-project-id
+  ```
+  Mjolnir auto-discovers your credentials and project with zero configuration required.
+
+### Gemini API Key (Optional / Non-GCP Fallback)
+
+If running outside Google Cloud without ADC, you can optionally set a Gemini Developer API key:
 
 ```bash
 export GEMINI_API_KEY="AIzaSy..."
-```
-
-### Vertex AI (Google Cloud Platform)
-
-Set up Application Default Credentials (ADC) and project context:
-
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/credentials.json"
-export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
-export GOOGLE_CLOUD_LOCATION="global"
 ```
 
 ---
@@ -178,18 +181,14 @@ nix run .#mock-smoke-test
 To verify GCS storage uploads with mock data:
 
 ```bash
-export MJOLNIR_GCS_BUCKET="your-bucket"
-nix run .#mock-gcs-test
+nix run .#mock-gcs-test -- --bucket your-bucket
 ```
 
 ### Live LLM Testing
 
-To verify your credentials or `GEMINI_API_KEY` against a real Gemini model (runs on a small subset of files using `gemini-3.6-flash`):
+Run live scans on test fixtures using ambient ADC or optional API key:
 
 ```bash
-# Set credentials (either API key or GCP Vertex AI):
-export GEMINI_API_KEY="AIzaSy..."
-
 # Option A: GenAI Provider Target
 nix run .#genai-gemini-test
 

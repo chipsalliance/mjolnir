@@ -63,6 +63,19 @@ def run_analysis(
     """ADK 2.0 provider pipeline: executes a multi-node workflow graph."""
     logger.info("Initializing ADK 2.0 Workflow Engine...")
 
+    try:
+        from google.adk.models.google_llm import Gemini
+
+        client_backend = Gemini(model=model).api_client._api_client
+        if client_backend.vertexai:
+            logger.success(
+                f"Using Vertex AI for ADK engine (project={client_backend.project}, location={client_backend.location})"
+            )
+        else:
+            logger.success("Using Gemini API Key for ADK engine")
+    except Exception as e:
+        logger.warning(f"Could not inspect ADK client metadata: {e}")
+
     # Build the multi-node workflow graph dynamically via workflow builders
     analysis_workflow = build_analysis_workflow(ingest_path=ingest_path)
 

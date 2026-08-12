@@ -19,7 +19,6 @@ output/
 # Environment
 .env
 .envrc
-!sample.env
 
 # Rust / WASM build artifacts
 target/
