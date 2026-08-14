@@ -31,7 +31,7 @@ runs:
     - name: Run Mjolnir Audit
       shell: bash
       run: |
-        nix run .#${{ inputs.job }} -- \
+        nix run ${{ github.action_path }}#${{ inputs.job }} -- \
           --diff-base "${{ inputs.base-ref }}" \
           --diff-head "${{ inputs.head-ref }}"
 
@@ -39,4 +39,5 @@ runs:
       if: ${{ inputs.gcs-bucket != '' }}
       shell: bash
       run: |
-        nix run .#deploy-gcs-runs -- --bucket "${{ inputs.gcs-bucket }}"
+        nix run ${{ github.action_path }}#deploy-gcs-runs -- --bucket "${{ inputs.gcs-bucket }}"
+        
