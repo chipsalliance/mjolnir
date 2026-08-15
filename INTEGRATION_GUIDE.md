@@ -161,23 +161,20 @@ jobs:
 
       - name: Install Nix
         run: |
-          sudo apt-get update
-          sudo apt-get install -y nix-bin
-          sudo mkdir -p /nix
-          sudo chown -R $(whoami) /nix
+          sh <(curl -L https://nixos.org/nix/install) --no-daemon
+          . ~/.nix-profile/etc/profile.d/nix.sh
           mkdir -p ~/.config/nix
-          echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
+          echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+          echo "$HOME/.nix-profile/bin" >> $GITHUB_PATH
 
       - name: Run Mjolnir Security Audit
         run: |
-          export NIX_REMOTE=local
           nix run path:.#ci -- \
             --diff-base "${{ github.event.pull_request.base.sha }}" \
             --diff-head "${{ github.event.pull_request.head.sha }}"
 
       - name: Sync Audit Artifacts to GCS
         run: |
-          export NIX_REMOTE=local
           nix run path:.#deploy-gcs-runs -- \
             --bucket "caliptra-github-ci-caliptra-reports" \
             --output-dir "./mjolnir/results"
@@ -212,16 +209,14 @@ jobs:
 
       - name: Install Nix
         run: |
-          sudo apt-get update
-          sudo apt-get install -y nix-bin
-          sudo mkdir -p /nix
-          sudo chown -R $(whoami) /nix
+          sh <(curl -L https://nixos.org/nix/install) --no-daemon
+          . ~/.nix-profile/etc/profile.d/nix.sh
           mkdir -p ~/.config/nix
-          echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
+          echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+          echo "$HOME/.nix-profile/bin" >> $GITHUB_PATH
 
       - name: Deploy Web Dashboard to GCS
         run: |
-          export NIX_REMOTE=local
           nix run path:.#deploy-gcs-web -- --bucket "caliptra-github-ci-caliptra-reports"
 ```
 

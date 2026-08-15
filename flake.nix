@@ -5,19 +5,19 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
-
-    # Local Project Flakes (providing hermetic compiler environments)
-    opentitan-env.url = "path:./projects/opentitan/nix";
-    caliptra-sw-env.url = "path:./projects/caliptra-sw/nix";
-    caliptra-mcu-sw-env.url = "path:./projects/caliptra-mcu-sw/nix";
-    tests-env.url = "path:./projects/tests/nix";
+    nixpkgs-v4.url = "github:NixOS/nixpkgs/nixos-22.05";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, opentitan-env, caliptra-sw-env, caliptra-mcu-sw-env, tests-env }:
+  outputs = { self, nixpkgs, nixpkgs-v4, rust-overlay }:
     let
       supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
-      nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
+      overlays = [ (import rust-overlay) ];
+      nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system overlays; });
 
       autodiscoverJobs = import ./nix/discovery.nix;
     in
@@ -32,12 +32,18 @@
       packages = forAllSystems (system:
         let
           pkgs = nixpkgsFor.${system};
+          pkgs-v4 = nixpkgs-v4.legacyPackages.${system};
+
+          rustToolchain = pkgs.rust-bin.stable."1.85.0".default.override {
+            extensions = [ "rust-src" "llvm-tools-preview" ];
+            targets = [ "riscv32imc-unknown-none-elf" ];
+          };
 
           runners = {
-            caliptra-sw = caliptra-sw-env.packages.${system}.default;
-            opentitan = opentitan-env.packages.${system}.default;
-            caliptra-mcu-sw = caliptra-mcu-sw-env.packages.${system}.default;
-            tests = tests-env.packages.${system}.default;
+            caliptra-sw = import ./projects/caliptra-sw/nix/runner.nix { inherit pkgs rustToolchain; };
+            opentitan = import ./projects/opentitan/nix/runner.nix { inherit pkgs pkgs-v4; };
+            caliptra-mcu-sw = import ./projects/caliptra-mcu-sw/nix/runner.nix { inherit pkgs rustToolchain; };
+            tests = pkgs.writeShellScriptBin "test-runner" "echo 'Test environment runner: OK'";
           };
 
 

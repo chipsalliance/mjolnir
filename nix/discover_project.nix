@@ -8,7 +8,8 @@
   deployPackages ? {},
 }:
 let
-  project = import (projectDir + "/project.nix");
+  projectImport = import (projectDir + "/project.nix");
+  project = if builtins.isFunction projectImport then projectImport { inherit pkgs; } else projectImport;
   jobsDir = projectDir + "/jobs";
   makeJob = import ./orchestrator.nix;
 
