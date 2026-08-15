@@ -10,11 +10,10 @@
     opentitan-env.url = "path:./projects/opentitan/nix";
     caliptra-sw-env.url = "path:./projects/caliptra-sw/nix";
     caliptra-mcu-sw-env.url = "path:./projects/caliptra-mcu-sw/nix";
-    caliptra-dpe-env.url = "path:./projects/caliptra-dpe/nix";
     tests-env.url = "path:./projects/tests/nix";
   };
 
-  outputs = { self, nixpkgs, opentitan-env, caliptra-sw-env, caliptra-mcu-sw-env, caliptra-dpe-env, tests-env }:
+  outputs = { self, nixpkgs, opentitan-env, caliptra-sw-env, caliptra-mcu-sw-env, tests-env }:
     let
       supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -23,6 +22,13 @@
       autodiscoverJobs = import ./nix/discovery.nix;
     in
     {
+      lib = {
+        discoverProjectJobs = import ./nix/discover_project.nix;
+        makeJob = import ./nix/orchestrator.nix;
+        makeGroup = import ./nix/group.nix;
+      };
+
+
       packages = forAllSystems (system:
         let
           pkgs = nixpkgsFor.${system};
@@ -31,9 +37,9 @@
             caliptra-sw = caliptra-sw-env.packages.${system}.default;
             opentitan = opentitan-env.packages.${system}.default;
             caliptra-mcu-sw = caliptra-mcu-sw-env.packages.${system}.default;
-            caliptra-dpe = caliptra-dpe-env.packages.${system}.default;
             tests = tests-env.packages.${system}.default;
           };
+
 
           google-genai-latest = pkgs.python3Packages.google-genai.overridePythonAttrs (old: rec {
             version = "2.10.0";
@@ -42,8 +48,14 @@
               inherit version;
               hash = "sha256-d5Es1VjNff1bdcJf0cYJ5415VN3lgzMRBAIqRuqQ+e4=";
             };
+            dontCheckRuntimeDeps = true;
+            catchConflicts = false;
+            nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.python3Packages.pythonRelaxDepsHook ];
+            pythonRelaxDeps = [ "google-auth" ];
             doCheck = false;
           });
+
+
 
           google-adk = pkgs.python3Packages.buildPythonPackage {
             pname = "google-adk";
@@ -136,12 +148,6 @@
             runner = runners.caliptra-mcu-sw;
           };
 
-          caliptra-dpe-runner-test = makeJob {
-            project = import ./projects/caliptra-dpe/project.nix;
-            job = import ./projects/caliptra-dpe/nix/runner-test.nix;
-            runner = runners.caliptra-dpe;
-          };
-
           opentitan-runner-host-test = makeJob {
             project = import ./projects/opentitan/project.nix;
             job = import ./projects/opentitan/nix/runner-host-test.nix;
@@ -164,19 +170,23 @@
 
           deploy-gcs-web = pkgs.writeShellApplication {
             name = "mjolnir-deploy-gcs-web";
-            runtimeInputs = [ pkgs.cargo pkgs.rustc pkgs.wasm-bindgen-cli pkgs.lld pythonEnv ];
+            runtimeInputs = [ pythonEnv ];
             text = ''
-              cargo xtask deploy-gcs-web "$@"
+              export PYTHONPATH="${./app}:''${PYTHONPATH:-}"
+              exec python3 "${./scripts/deploy_gcs_web.py}" "$@"
             '';
           };
 
           deploy-gcs-runs = pkgs.writeShellApplication {
             name = "mjolnir-deploy-gcs-runs";
-            runtimeInputs = [ pkgs.cargo pkgs.rustc pkgs.lld pythonEnv ];
+            runtimeInputs = [ pythonEnv ];
             text = ''
-              cargo xtask deploy-gcs-runs "$@"
+              export PYTHONPATH="${./app}:''${PYTHONPATH:-}"
+              exec python3 "${./scripts/deploy_gcs_runs.py}" "$@"
             '';
           };
+
+
         in
           discovered // {
             inherit
@@ -186,7 +196,6 @@
               deploy-gcs-runs
               caliptra-sw-runner-test
               caliptra-mcu-sw-runner-test
-              caliptra-dpe-runner-test
               opentitan-runner-host-test
               opentitan-runner-verilator-test;
 
@@ -213,7 +222,6 @@
               jobs = [
                 caliptra-sw-runner-test
                 caliptra-mcu-sw-runner-test
-                caliptra-dpe-runner-test
                 opentitan-runner-host-test
                 opentitan-runner-verilator-test
               ];
@@ -227,8 +235,6 @@
                 discovered.caliptra-sw-rom-main
                 discovered.caliptra-sw-caliptra-1x
                 discovered.caliptra-mcu-sw-main
-                discovered.caliptra-dpe-main
-                discovered.caliptra-dpe-runtime-v1
               ];
             };
 
@@ -247,3 +253,4 @@
       );
     };
 }
+

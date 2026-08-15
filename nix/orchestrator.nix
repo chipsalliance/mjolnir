@@ -26,10 +26,12 @@ let
     };
 
     config = {
-      workspaceDir = "./workspace/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
-      outputDir = "./output/v1/runs/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
-      projectOutputDir = "./output/v1/runs/${project.repoName}";
+      workspaceDir = "./mjolnir/workspace/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
+      outputDir = "./mjolnir/results/v1/runs/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
+      projectOutputDir = "./mjolnir/results/v1/runs/${project.repoName}";
     };
+
+
   };
 
   # 2. Serialize to JSON in Nix store

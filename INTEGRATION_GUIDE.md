@@ -3,133 +3,212 @@
 
 # Mjolnir Integration Guide
 
-This guide describes how to integrate Mjolnir into software repositories for automated AI-driven security auditing, continuous PR diff scanning, and centralized artifact export.
+This guide describes how to integrate Mjolnir into software repositories for automated AI-driven security auditing, continuous PR diff scanning, and centralized artifact export using a **Local-First, Decentralized** architecture.
 
 ---
 
-## Architecture Overview
+## 1. Architecture Overview
 
-Mjolnir supports two primary integration patterns:
+Mjolnir operates as a **reusable security auditing tool and Nix flake library**:
 
-1. **Continuous PR Security Scanning (GitHub Action)**: Runs on Pull Requests against target repository **X**, restricting analysis to changed text files between the base ref (`base-ref`) and head ref (`head-ref`).
-2. **Scheduled / Full Repository Audits (Nix Target)**: Periodically scans the entire repository against repository-specific threat models to generate comprehensive vulnerability reports.
+- **Decentralized Repository Ownership**: Target repositories maintain their own `./mjolnir/` configuration directory containing project metadata (`project.nix`), threat models (`threat_model.md`), and job definitions (`jobs/*.nix`).
+- **Autodiscovered Nix Jobs**: Target repositories import `mjolnir.lib.discoverProjectJobs` in their `flake.nix`, automatically exposing each job as a native runnable Nix package (`nix run .#ci`, `nix run .#main`, etc.).
+- **Language-Agnostic Local Execution**: Developers run audits directly via `nix run .#<job>`, reproducing exact CI behavior locally across any project language (Rust, C, Go, SystemVerilog).
+- **Self-Contained Outputs**: Local runs output structured audit artifacts to `./mjolnir/results/`.
 
 ---
 
-## Onboarding Repository X
+## 2. Integrating Mjolnir into Repository X
 
-### Step 1: Register Repository Metadata (`projects/X/project.nix`)
+### Step 1: Create the `./mjolnir/` Directory
 
-Create a directory under `projects/X/` with a `project.nix` file defining the target repository:
+In the root of your repository, create the `./mjolnir/` layout:
+
+```text
+your-repo/
+├── mjolnir/
+│   ├── project.nix          # Project metadata, extensions, and threat model
+│   ├── threat_model.md      # Authoritative threat model for the repository
+│   └── jobs/
+│       ├── ci.nix           # PR diff audit job profile
+│       └── main.nix         # Full repository audit job profile
+```
+
+#### `mjolnir/project.nix`
 
 ```nix
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 { pkgs }:
 {
-  name = "Repository X Security Audits";
-  repoUrl = "https://github.com/org/repo-x.git";
-  repoName = "repo-x";
-  commit = "main";
-  threatModel = "projects/X/threat_model.md";
-  srcDirs = [ "src" "firmware" ];
-  srcExtensions = [ "rs" "c" "h" "sv" ];
+  name = "Your Project Name";
+  repoName = "your-repo";
+  repoUrl = "https://github.com/org/your-repo.git";
+  srcExtensions = [ "rs" "c" "h" "go" "sv" "py" ];
+  threatModel = ./threat_model.md;
 }
 ```
 
-### Step 2: Define Audit Job Targets (`projects/X/jobs/`)
+#### `mjolnir/jobs/ci.nix`
 
-Create job profile files under `projects/X/jobs/`:
+```nix
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
+{
+  name = "ci";
+  model = "gemini-3.6-flash";
+  provider = "adk";
+  batchSize = 10;
+  srcDirs = [ "." ];
+}
+```
 
-- **`ci.nix` (PR Diff Mode)**:
+#### `mjolnir/jobs/main.nix`
 
-  ```nix
-  {
-    name = "repo-x-ci";
-    model = "gemini-3.6-flash";
-    provider = "adk";
-    batchSize = 10;
-  }
-  ```
-
-- **`main.nix` (Full Audit Mode)**:
-  ```nix
-  {
-    name = "repo-x-full-audit";
-    model = "gemini-3.6-flash";
-    provider = "adk";
-    batchSize = 5;
-  }
-  ```
-
-### Step 3: Add Threat Model Context
-
-Create a `threat_model.md` file in `projects/X/threat_model.md` detailing:
-
-- High-priority security boundaries (e.g. key management, bootloader, crypto primitives).
-- Known attack vectors and threat actors.
-- Explicit components out of audit scope.
+```nix
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
+{
+  name = "main";
+  model = "gemini-3.6-flash";
+  provider = "adk";
+  batchSize = 10;
+  srcDirs = [ "." ];
+}
+```
 
 ---
 
-## GitHub Actions Integration (PR Scanning)
+### Step 2: Add Mjolnir to `flake.nix`
 
-To enable automatic PR scanning in repository **X**'s GitHub workflow, add a workflow file `.github/workflows/mjolnir_audit.yml`:
+In your repository's `flake.nix`, add Mjolnir as an input and use `mjolnir.lib.discoverProjectJobs`:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+    mjolnir = {
+      url = "github:chipsalliance/mjolnir";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+
+  outputs = { self, nixpkgs, flake-utils, mjolnir, ... }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+
+        mjolnirJobs = mjolnir.lib.discoverProjectJobs {
+          inherit pkgs;
+          mjolnirApp = mjolnir.packages.${system}.mjolnir-app;
+          projectDir = ./mjolnir;
+        };
+      in
+      {
+        packages = mjolnirJobs // {
+          inherit (mjolnir.packages.${system}) deploy-gcs-runs deploy-gcs-web;
+        };
+      }
+    );
+}
+```
+
+---
+
+### Step 3: Run Audits Locally
+
+Any job defined in `./mjolnir/jobs/` is immediately runnable via Nix:
+
+```bash
+# Run PR diff audit against main:
+nix run .#ci -- --diff-base main --diff-head HEAD
+
+# Run full repository audit:
+nix run .#main
+
+# Sync audit artifacts to a Google Cloud Storage bucket:
+nix run .#deploy-gcs-runs -- --bucket my-reports-bucket --output-dir ./mjolnir/results
+```
+
+---
+
+### Step 4: Add GitHub Actions Workflow (`.github/workflows/mjolnir_audit.yml`)
+
+Add a CI workflow in `.github/workflows/mjolnir_audit.yml`:
 
 ```yaml
-name: Mjolnir Security Audit
+name: Mjolnir Security Audit (PR)
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   mjolnir-audit:
-    runs-on: ubuntu-latest
+    name: Mjolnir Security Audit (PR)
+    runs-on: e2-standard-2-AI
+    timeout-minutes: 30
+
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Run Mjolnir PR Audit
-        uses: chipsalliance/mjolnir@main
-        with:
-          job: "repo-x-ci"
-          base-ref: "${{ github.event.pull_request.base.sha }}"
-          head-ref: "${{ github.event.pull_request.head.sha }}"
-          gcs-bucket: "${{ vars.GCS_REPORTS_BUCKET }}"
+      - name: Install Nix
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nix-bin
+          sudo mkdir -p /nix
+          sudo chown -R $(whoami) /nix
+          mkdir -p ~/.config/nix
+          echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
+
+      - name: Run Mjolnir Security Audit
+        run: |
+          export NIX_REMOTE=local
+          nix run path:.#ci -- \
+            --diff-base "${{ github.event.pull_request.base.sha }}" \
+            --diff-head "${{ github.event.pull_request.head.sha }}"
+
+      - name: Sync Audit Artifacts to GCS
+        run: |
+          export NIX_REMOTE=local
+          nix run path:.#deploy-gcs-runs -- \
+            --bucket "caliptra-github-ci-caliptra-reports" \
+            --output-dir "./mjolnir/results"
 ```
 
 ---
 
-## Environment & Credentials Configuration
+### Step 5: Update `.gitignore`
 
-### Google Cloud Storage (GCS) Deployment & Sync
+Add Mjolnir's local results and workspace directories to your `.gitignore`:
 
-To publish audit reports and the interactive web dashboard to a centralized GCS bucket, pass the target bucket via the `--bucket <name>` parameter:
-
-```bash
-# Sync local run outputs to GCS
-nix run .#deploy-gcs-runs -- --bucket my-gcs-bucket-name
-
-# Deploy the static web dashboard
-nix run .#deploy-gcs-web -- --bucket my-gcs-bucket-name
-```
-
-Artifacts are hosted in GCS under the following hierarchy:
-
-```text
-gs://<bucket-name>/index.html
-gs://<bucket-name>/web/...
-gs://<bucket-name>/v1/runs/<repo-name>/<job-name>/run_<timestamp>/
+```gitignore
+# Mjolnir Scan Output and Workspaces
+mjolnir/results/
+mjolnir/workspace/
 ```
 
 ---
 
-## Export Artifacts & Outputs
+## 3. Environment & Credentials Configuration
 
-For every analysis run, Mjolnir exports structured audit artifacts and compiles them into a centralized **Root Dashboard**:
+- **Local Developer Workstations**:
+  - Set `GEMINI_API_KEY=<your-key>` in your environment, OR
+  - Run `gcloud auth application-default login` for Vertex AI ADC access.
+
+---
+
+## 4. Export Artifacts & Outputs
+
+For every analysis run, Mjolnir exports structured audit artifacts under `mjolnir/results/<repo>/<job>/run_<timestamp>/`:
 
 | Artifact                       | Description                                                                                               |
 | :----------------------------- | :-------------------------------------------------------------------------------------------------------- |
@@ -137,27 +216,5 @@ For every analysis run, Mjolnir exports structured audit artifacts and compiles 
 | `vulnerabilities_minimal.json` | Filtered subset containing only active, verified `Status.OPEN` vulnerabilities.                           |
 | `metadata.json`                | Run metadata including execution timestamp, commit SHA, model, provider, and status.                      |
 | `job.log`                      | Raw execution log and turn telemetry.                                                                     |
-| `dashboard/`                   | Compiled interactive Multi-Page Application (MPA) HTML dashboard bundle.                                  |
-
-### Root Dashboard & Multi-Project Aggregation
-
-Mjolnir compiles all local and published audit runs into a unified **Root Dashboard** (`dashboard.html`):
-
-- **Global Security Overview:** Provides high-level metrics across all integrated repositories (vulnerability counts, severity distributions, and cross-component Sankey flow diagrams).
-- **Project Summaries:** Dedicated landing pages for each integrated repository (`project_<repo_name>.html`) summarizing active security posture and historical audit runs.
-- **Interactive Run Inspector:** Detailed per-run inspector (`run_<id>.html`) displaying step-by-step agent histories, code context, and recommended remediation patches.
-- **Dashboard Compilation:** The root dashboard can be regenerated at any time from existing runs using `nix run .#gen-dashboard`.
-
----
-
-## Local Verification & Testing
-
-Before deploying to CI, test the integration locally:
-
-```bash
-# Verify PR diff scanning mode locally
-nix run .#repo-x-ci -- --diff-base HEAD~1 --diff-head HEAD
-
-# Verify full audit mode locally
-nix run .#repo-x-full-audit
-```
+| `token_usage.json`             | LLM token consumption breakdown.                                                                          |
+| `tool_usage.json`              | Detailed agent tool call logs and invocation stats.                                                       |
