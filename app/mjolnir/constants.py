@@ -28,3 +28,9 @@ INGESTION_MAX_LLM_CALLS = 50
 # --- Tool Execution & Output Limits ---
 DEFAULT_TOOL_OUTPUT_MAX_CHARS = 40000
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+# --- Storage & Artifact Versioning ---
+API_VERSION = "v1"
+RUNS_SUBDIR = f"{API_VERSION}/runs"
+WEB_SUBDIR = "web"

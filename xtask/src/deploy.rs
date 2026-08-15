@@ -26,12 +26,19 @@ pub fn deploy_gcs_web(root_dir: &Path, flags: &[&str]) {
 /// Executes the GCS deployment script for scan runs
 pub fn deploy_gcs_runs(root_dir: &Path, flags: &[&str]) {
     let script_path = root_dir.join("scripts/deploy_gcs_runs.py");
+    let app_dir = root_dir.join("app");
 
     let mut args = vec![script_path.to_str().unwrap()];
     args.extend(flags);
 
+    let python_path = match std::env::var("PYTHONPATH") {
+        Ok(existing) => format!("{}:{}", app_dir.display(), existing),
+        Err(_) => app_dir.display().to_string(),
+    };
+
     let status = Command::new("python3")
         .args(&args)
+        .env("PYTHONPATH", python_path)
         .current_dir(root_dir)
         .status()
         .expect("Failed to execute deploy_gcs_runs.py");

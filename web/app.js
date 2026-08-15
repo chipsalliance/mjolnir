@@ -11,6 +11,8 @@ import init, {
 import { registerTokenUsageModule, renderProjectTokenUsage, renderRunTokenUsage } from './dist/token_usage_module.js';
 import { registerToolUsageModule, renderProjectToolUsage, renderRunToolUsage } from './dist/tool_usage_module.js';
 import { BUILD_TIMESTAMP } from './dist/build_info.js';
+import { API_VERSION, RUNS_SUBDIR, WEB_SUBDIR } from './constants.js';
+
 
 
 export function getAssetUrl(path) {
@@ -230,8 +232,9 @@ async function fetchRunsFromGcsBucket() {
       basePath += "/";
     }
     const cleanBasePath = basePath.replace(/^\//, "");
-    const listUrl = new URL(`${cleanBasePath}?prefix=v1/runs/`, window.location.origin).href;
+    const listUrl = new URL(`${cleanBasePath}?prefix=${RUNS_SUBDIR}/`, window.location.origin).href;
     const res = await fetch(listUrl);
+
     if (!res.ok) return [];
 
     const text = await res.text();
@@ -470,10 +473,11 @@ async function renderGlobalView(container) {
   if (!filtered || filtered.length === 0) {
     container.innerHTML = renderEmptyState(
       "No Security Runs Yet",
-      "Run a Mjolnir analysis locally to generate scan output under output/v1/runs/."
+      `Run a Mjolnir analysis locally to generate scan output under output/${RUNS_SUBDIR}/.`
     );
     return;
   }
+
 
   let totalRuns = filtered.length;
   let totalVulns = 0;
@@ -619,9 +623,10 @@ async function renderGlobalView(container) {
 function renderAllProjectsView(container) {
   const filtered = getFilteredRuns();
   if (!filtered || filtered.length === 0) {
-    container.innerHTML = renderEmptyState("No Projects Found", "No active security projects found in output/v1/runs/.");
+    container.innerHTML = renderEmptyState("No Projects Found", `No active security projects found in output/${RUNS_SUBDIR}/.`);
     return;
   }
+
 
   const projMap = {};
   filtered.forEach(r => {
@@ -667,9 +672,10 @@ function renderAllProjectsView(container) {
 function renderAllRunsView(container) {
   const filtered = getFilteredRuns();
   if (!filtered || filtered.length === 0) {
-    container.innerHTML = renderEmptyState("No Runs Found", "No analysis runs found in output/v1/runs/.");
+    container.innerHTML = renderEmptyState("No Runs Found", `No analysis runs found in output/${RUNS_SUBDIR}/.`);
     return;
   }
+
 
   const rowsHtml = filtered.map(r => {
     const count = r.vuln_count ?? 0;
@@ -785,8 +791,9 @@ async function renderProjectView(projName, container) {
 }
 
 async function fetchRunDetailsFromGcs(proj, job, runId) {
-  const prefix = `v1/runs/${proj}/${job}/${runId}`;
+  const prefix = `${RUNS_SUBDIR}/${proj}/${job}/${runId}`;
   const [metaRes, vulnRes, tokenRes, toolRes] = await Promise.all([
+
     fetch(getAssetUrl(`${prefix}/metadata.json`)),
     fetch(getAssetUrl(`${prefix}/vulnerabilities.json`)),
     fetch(getAssetUrl(`${prefix}/token_usage.json`)),

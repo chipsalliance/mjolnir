@@ -8,57 +8,56 @@ from pathlib import Path
 from google.cloud import storage
 
 
-def deploy_web(workspace_root: Path, client: storage.Client, bucket_name: str):
+from mjolnir.constants import WEB_SUBDIR
+
+
+import mimetypes
+
+
+def deploy_web(web_dir: Path, client: storage.Client, bucket_name: str):
     print(f"Deploying WASM Web Dashboard static assets to gs://{bucket_name}/...")
     bucket = client.bucket(bucket_name)
 
-    web_dir = workspace_root / "web"
     dist_dir = web_dir / "dist"
-
     if not dist_dir.exists():
-        print("Error: web/dist/ directory does not exist. Run 'cargo xtask web' first.")
+        print(f"Error: {dist_dir} directory does not exist. Run 'cargo xtask web' first.")
         sys.exit(1)
 
-    files_to_upload = [
-        ("index.html", "index.html", "text/html; charset=utf-8"),
-        ("style.css", "web/style.css", "text/css; charset=utf-8"),
-        ("app.js", "web/app.js", "application/javascript"),
-        ("wasm-worker.js", "web/wasm-worker.js", "application/javascript"),
-        ("dist/build_info.js", "web/dist/build_info.js", "application/javascript"),
-        (
-            "dist/token_usage_module.js",
-            "web/dist/token_usage_module.js",
-            "application/javascript",
-        ),
-        (
-            "dist/tool_usage_module.js",
-            "web/dist/tool_usage_module.js",
-            "application/javascript",
-        ),
-        (
-            "dist/mjolnir_dashboard_wasm.js",
-            "web/dist/mjolnir_dashboard_wasm.js",
-            "application/javascript",
-        ),
-        (
-            "dist/mjolnir_dashboard_wasm_bg.wasm",
-            "web/dist/mjolnir_dashboard_wasm_bg.wasm",
-            "application/wasm",
-        ),
-    ]
+    source_files = [
+        web_dir / "index.html",
+        web_dir / "style.css",
+        web_dir / "app.js",
+        web_dir / "constants.js",
+        web_dir / "wasm-worker.js",
+    ] + [p for p in sorted(dist_dir.iterdir()) if p.is_file() and not p.name.endswith(".d.ts")]
 
-    for local_rel_path, target_blob_path, content_type in files_to_upload:
-        local_file = web_dir / local_rel_path
+    for local_file in source_files:
         if not local_file.is_file():
             print(f"Warning: File {local_file} not found, skipping.")
             continue
 
+        rel_path = local_file.relative_to(web_dir)
+        target_blob_path = (
+            "index.html" if rel_path == Path("index.html") else f"{WEB_SUBDIR}/{rel_path}"
+        )
+
+        if local_file.suffix == ".wasm":
+            mime = "application/wasm"
+        elif local_file.suffix == ".js":
+            mime = "application/javascript"
+        elif local_file.suffix == ".css":
+            mime = "text/css; charset=utf-8"
+        elif local_file.suffix in (".html", ".htm"):
+            mime = "text/html; charset=utf-8"
+        else:
+            mime, _ = mimetypes.guess_type(str(local_file))
+            if not mime:
+                mime = "application/octet-stream"
+
         blob = bucket.blob(target_blob_path)
         blob.cache_control = "no-cache, no-store, must-revalidate"
-        blob.upload_from_filename(str(local_file), content_type=content_type)
-        print(
-            f"  Uploaded {local_rel_path} -> gs://{bucket_name}/{target_blob_path} ({content_type})"
-        )
+        blob.upload_from_filename(str(local_file), content_type=mime)
+        print(f"  Uploaded {rel_path} -> gs://{bucket_name}/{target_blob_path} ({mime})")
 
     print(f"Web Dashboard successfully deployed to gs://{bucket_name}/!")
 
@@ -67,16 +66,21 @@ def main():
     parser = argparse.ArgumentParser(description="Mjolnir Web Dashboard GCS Deployment Utility")
     parser.add_argument(
         "--bucket",
-        "-b",
         type=str,
         required=True,
         help="Target Google Cloud Storage bucket name",
     )
+    parser.add_argument(
+        "--web-dir",
+        type=str,
+        default=str(Path(__file__).resolve().parent.parent / "web"),
+        help="Path to web dashboard directory (default: ./web)",
+    )
     args = parser.parse_args()
 
-    workspace_root = Path(__file__).resolve().parent.parent
+    web_dir = Path(args.web_dir).resolve()
     client = storage.Client()
-    deploy_web(workspace_root, client, args.bucket)
+    deploy_web(web_dir, client, args.bucket)
 
 
 if __name__ == "__main__":

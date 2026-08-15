@@ -1,20 +1,16 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
-{ pkgs, mjolnirApp, projectDir, runner ? null }:
+{
+  pkgs,
+  mjolnirApp,
+  projectDir,
+  runner ? null,
+  deployPackages ? {},
+}:
 let
-  projectNix = projectDir + "/project.nix";
+  project = import (projectDir + "/project.nix");
   jobsDir = projectDir + "/jobs";
-
   makeJob = import ./orchestrator.nix;
-
-  project =
-    if builtins.pathExists projectNix then
-      let
-        projectImport = import projectNix;
-      in
-        if builtins.isFunction projectImport then projectImport { inherit pkgs; } else projectImport
-    else
-      throw "Mjolnir project.nix not found in ${toString projectDir}";
 
   jobFiles =
     if builtins.pathExists jobsDir then
@@ -37,5 +33,9 @@ let
         }
       else
         acc;
+
+  discoveredJobs = builtins.foldl' processJobFile {} jobFiles;
 in
-  builtins.foldl' processJobFile {} jobFiles
+  discoveredJobs // (if runner != null then { inherit runner; } else {}) // deployPackages
+
+

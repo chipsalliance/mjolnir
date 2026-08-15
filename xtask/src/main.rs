@@ -102,13 +102,14 @@ fn main() {
         "deploy-gcs-runs" => {
             let mut include_tests = false;
             let mut bucket: Option<String> = None;
+            let mut output_dir: Option<String> = None;
 
             let mut i = 2;
             while i < args.len() {
                 let arg = &args[i];
                 match arg.as_str() {
                     "--include-tests" => include_tests = true,
-                    "--bucket" | "-b" => {
+                    "--bucket" => {
                         i += 1;
                         if i >= args.len() {
                             eprintln!("Error: --bucket requires a bucket name argument.");
@@ -116,9 +117,17 @@ fn main() {
                         }
                         bucket = Some(args[i].clone());
                     }
+                    "--output-dir" => {
+                        i += 1;
+                        if i >= args.len() {
+                            eprintln!("Error: --output-dir requires a directory argument.");
+                            std::process::exit(1);
+                        }
+                        output_dir = Some(args[i].clone());
+                    }
                     _ => {
                         eprintln!(
-                            "Error: Unrecognized argument '{}' for task 'deploy-gcs-runs'.\nAllowed flags: --bucket <BUCKET>, --include-tests",
+                            "Error: Unrecognized argument '{}' for task 'deploy-gcs-runs'.\nAllowed flags: --bucket <BUCKET>, --output-dir <DIR>, --include-tests",
                             arg
                         );
                         std::process::exit(1);
@@ -132,13 +141,22 @@ fn main() {
                 std::process::exit(1);
             });
 
-            let mut flags = vec![format!("--bucket={}", bucket)];
+            let output_dir = output_dir.unwrap_or_else(|| {
+                eprintln!("Error: Task 'deploy-gcs-runs' requires --output-dir <DIR> (e.g. --output-dir ./mjolnir/results).");
+                std::process::exit(1);
+            });
+
+            let mut flags = vec![
+                format!("--bucket={}", bucket),
+                format!("--output-dir={}", output_dir),
+            ];
             if include_tests {
                 flags.push("--include-tests".to_string());
             }
             let flag_refs: Vec<&str> = flags.iter().map(|s| s.as_str()).collect();
             deploy::deploy_gcs_runs(&root, &flag_refs);
         }
+
         "help" | "-h" | "--help" => print_help(),
         _ => {
             eprintln!("Error: Unrecognized task '{}'.\n", task);

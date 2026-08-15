@@ -10,6 +10,9 @@ from pathlib import Path
 from google.cloud import storage
 
 
+from mjolnir.constants import RUNS_SUBDIR
+
+
 def is_test_project(proj_name: str) -> bool:
     p = proj_name.lower()
     return p == "tests" or p.startswith("test")
@@ -23,7 +26,7 @@ def upload_single_run(
         print(f"  Skipping incomplete run (missing metadata.json): {run_dir}")
         return False
 
-    gcs_run_prefix = f"v1/runs/{proj_name}/{job_name}/{run_id}"
+    gcs_run_prefix = f"{RUNS_SUBDIR}/{proj_name}/{job_name}/{run_id}"
     check_blob_name = f"{gcs_run_prefix}/metadata.json"
 
     if check_blob_name in existing_blobs:
@@ -46,24 +49,24 @@ def upload_single_run(
 
 
 def deploy_runs(
-    workspace_root: Path,
+    output_dir: Path,
     client: storage.Client,
     bucket_name: str,
     include_tests: bool = False,
 ):
     bucket = client.bucket(bucket_name)
 
-    runs_dir = workspace_root / "output" / "v1" / "runs"
+    runs_dir = output_dir / RUNS_SUBDIR
     if not runs_dir.exists():
         print(f"No local runs found under {runs_dir}.")
         return
 
     print(
-        f"Scanning local runs in output/v1/runs/ for deployment to gs://{bucket_name}/v1/runs/ (Include test runs: {include_tests})..."
+        f"Scanning local runs in {runs_dir} for deployment to gs://{bucket_name}/{RUNS_SUBDIR}/ (Include test runs: {include_tests})..."
     )
 
     print("Fetching existing runs in GCS bucket...")
-    existing_blobs = set(b.name for b in client.list_blobs(bucket, prefix="v1/runs/"))
+    existing_blobs = set(b.name for b in client.list_blobs(bucket, prefix=f"{RUNS_SUBDIR}/"))
 
     uploaded_count = 0
     skipped_count = 0
@@ -99,10 +102,15 @@ def main():
     parser = argparse.ArgumentParser(description="Mjolnir Scan Runs GCS Sync Utility")
     parser.add_argument(
         "--bucket",
-        "-b",
         type=str,
         required=True,
         help="Target Google Cloud Storage bucket name",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        required=True,
+        help="Root output directory containing v1/runs (e.g. ./mjolnir/results)",
     )
     parser.add_argument(
         "--include-tests",
@@ -111,11 +119,12 @@ def main():
     )
     args = parser.parse_args()
 
-    workspace_root = Path(__file__).resolve().parent.parent
+    output_dir = Path(args.output_dir).resolve()
+
     client = storage.Client()
 
     deploy_runs(
-        workspace_root,
+        output_dir,
         client,
         args.bucket,
         include_tests=args.include_tests,

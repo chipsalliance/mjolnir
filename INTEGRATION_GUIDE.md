@@ -99,18 +99,17 @@ In your repository's `flake.nix`, add Mjolnir as an input and use `mjolnir.lib.d
       let
         pkgs = import nixpkgs { inherit system; };
 
-        mjolnirJobs = mjolnir.lib.discoverProjectJobs {
+        packages = mjolnir.lib.discoverProjectJobs {
           inherit pkgs;
           mjolnirApp = mjolnir.packages.${system}.mjolnir-app;
           projectDir = ./mjolnir;
-        };
-      in
-      {
-        packages = mjolnirJobs // {
-          inherit (mjolnir.packages.${system}) deploy-gcs-runs deploy-gcs-web;
+          deployPackages = {
+            inherit (mjolnir.packages.${system}) deploy-gcs-runs deploy-gcs-web;
+          };
         };
       }
     );
+
 }
 ```
 
@@ -133,9 +132,9 @@ nix run .#deploy-gcs-runs -- --bucket my-reports-bucket --output-dir ./mjolnir/r
 
 ---
 
-### Step 4: Add GitHub Actions Workflow (`.github/workflows/mjolnir_audit.yml`)
+### Step 4: Add PR Audit CI Workflow (`.github/workflows/mjolnir_audit.yml`)
 
-Add a CI workflow in `.github/workflows/mjolnir_audit.yml`:
+Add an automated CI workflow in `.github/workflows/mjolnir_audit.yml` to audit incoming pull requests and sync artifacts:
 
 ```yaml
 name: Mjolnir Security Audit (PR)
@@ -186,7 +185,49 @@ jobs:
 
 ---
 
-### Step 5: Update `.gitignore`
+### Step 5: Add Manual Web Dashboard Workflow (`.github/workflows/mjolnir_web.yml`)
+
+Add a manual `workflow_dispatch` action in `.github/workflows/mjolnir_web.yml` to compile and deploy the static WASM Web Dashboard to the reports bucket:
+
+```yaml
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
+name: Mjolnir Web Dashboard Deployment
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-web:
+    name: Deploy Mjolnir Web Dashboard
+    runs-on: e2-standard-2-AI
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nix-bin
+          sudo mkdir -p /nix
+          sudo chown -R $(whoami) /nix
+          mkdir -p ~/.config/nix
+          echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
+
+      - name: Deploy Web Dashboard to GCS
+        run: |
+          export NIX_REMOTE=local
+          nix run path:.#deploy-gcs-web -- --bucket "caliptra-github-ci-caliptra-reports"
+```
+
+---
+
+### Step 6: Update `.gitignore`
 
 Add Mjolnir's local results and workspace directories to your `.gitignore`:
 
@@ -198,7 +239,48 @@ mjolnir/workspace/
 
 ---
 
-## 3. Environment & Credentials Configuration
+## 3. Deployment Commands & Storage Layout
+
+Mjolnir provides two distinct deployment commands via Nix:
+
+1. **`deploy-gcs-runs`** (Data Deployment):
+   - **Purpose**: Syncs versioned audit scan runs from `--output-dir` (e.g. `./mjolnir/results`) into `gs://<bucket>/v1/runs/`.
+   - **Usage**: `nix run .#deploy-gcs-runs -- --bucket <BUCKET> --output-dir ./mjolnir/results`
+
+2. **`deploy-gcs-web`** (UI Deployment):
+   - **Purpose**: Uploads the bundled WASM Web Dashboard assets directly to the bucket root.
+   - **Usage**: `nix run .#deploy-gcs-web -- --bucket <BUCKET>`
+
+### Bucket Layout & Dynamic Run Discovery
+
+The Google Cloud Storage bucket uses a standardized, versioned layout where the Web Dashboard automatically discovers all scan runs via the `v1/runs/` prefix:
+
+```text
+gs://<bucket>/
+├── index.html                               # Web dashboard entry point
+├── web/                                     # Static & compiled WASM bundle assets
+│   ├── constants.js                         # API_VERSION, RUNS_SUBDIR, WEB_SUBDIR
+│   ├── app.js                               # Dashboard frontend runtime
+│   ├── style.css
+│   ├── wasm-worker.js
+│   └── dist/
+│       ├── mjolnir_dashboard_wasm.js
+│       └── mjolnir_dashboard_wasm_bg.wasm
+└── v1/
+    └── runs/                                # Versioned scan runs (RUNS_SUBDIR)
+        └── <project>/
+            └── <job>/
+                └── run_<timestamp>/
+                    ├── job.log
+                    ├── metadata.json
+                    ├── vulnerabilities.json
+                    ├── token_usage.json
+                    └── tool_usage.json
+```
+
+---
+
+## 4. Environment & Credentials Configuration
 
 - **Local Developer Workstations**:
   - Set `GEMINI_API_KEY=<your-key>` in your environment, OR
@@ -206,9 +288,9 @@ mjolnir/workspace/
 
 ---
 
-## 4. Export Artifacts & Outputs
+## 5. Export Artifacts & Outputs
 
-For every analysis run, Mjolnir exports structured audit artifacts under `mjolnir/results/<repo>/<job>/run_<timestamp>/`:
+For every analysis run, Mjolnir exports structured audit artifacts under `./mjolnir/results/v1/runs/<repo>/<job>/run_<timestamp>/`:
 
 | Artifact                       | Description                                                                                               |
 | :----------------------------- | :-------------------------------------------------------------------------------------------------------- |
