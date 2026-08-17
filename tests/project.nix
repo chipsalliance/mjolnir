@@ -7,9 +7,14 @@ let
 in
 {
   name = "Integration Tests";
-  repoUrl = "file://${dummyRepo}";
   repoName = "tests";
+  repoUrl = "file://${dummyRepo}";
   commit = "main";
-  srcExtensions = [ "rs" ];
-  provider = "mock";
+  outputDir = "./test-out/results";
+  workspaceDir = "./test-out/workspace";
+
+  defaultModel = "mock";
+  defaultProvider = "mock";
+  defaultBatchSize = 64;
+  defaultExtensions = [ "rs" ];
 }

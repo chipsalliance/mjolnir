@@ -3,56 +3,73 @@
 { pkgs, makeJob, runners }:
 let
   projectsDir = ../projects;
-  projectsList = builtins.attrNames (builtins.readDir projectsDir);
+  testsDir = ../tests;
+
+  scanJobsFolder = folderPath: project: runner: targetNameFn:
+    let
+      filesList =
+        if builtins.pathExists folderPath
+        then builtins.attrNames (builtins.readDir folderPath)
+        else [];
+
+      processFile = fileAcc: fileName:
+        let
+          filePath = folderPath + "/${fileName}";
+          nameWithoutExt = pkgs.lib.strings.removeSuffix ".nix" fileName;
+          targetName = targetNameFn nameWithoutExt;
+        in
+          if pkgs.lib.strings.hasSuffix ".nix" fileName then
+            fileAcc // {
+              "${targetName}" = makeJob {
+                inherit project runner;
+                job = import filePath;
+              };
+            }
+          else
+            fileAcc;
+    in
+      builtins.foldl' processFile {} filesList;
+
+  # 1. Discover standard project jobs under ../projects
+  projectsList =
+    if builtins.pathExists projectsDir
+    then builtins.attrNames (builtins.readDir projectsDir)
+    else [];
 
   processProject = acc: projectDirName:
     let
       projectPath = projectsDir + "/${projectDirName}";
       projectNix = projectPath + "/project.nix";
-      
       jobsPath = projectPath + "/jobs";
-      nixPath = projectPath + "/nix";
     in
       if builtins.pathExists projectNix then
         let
           projectImport = import projectNix;
           project = if builtins.isFunction projectImport then projectImport { inherit pkgs; } else projectImport;
-          
           runner = runners.${project.repoName} or null;
-
-          scanFolder = folderPath: targetNameFn:
-            let
-              filesList = 
-                if builtins.pathExists folderPath 
-                then builtins.attrNames (builtins.readDir folderPath)
-                else [];
-
-              processFile = fileAcc: fileName:
-                let
-                  filePath = folderPath + "/${fileName}";
-                  nameWithoutExt = pkgs.lib.strings.removeSuffix ".nix" fileName;
-                  targetName = targetNameFn nameWithoutExt;
-                in
-                  if pkgs.lib.strings.hasSuffix ".nix" fileName then
-                    fileAcc // {
-                      "${targetName}" = makeJob {
-                        inherit project runner;
-                        job = import filePath;
-                      };
-                    }
-                  else
-                    fileAcc;
-            in
-              builtins.foldl' processFile {} filesList;
-
-          jobsMap = scanFolder jobsPath (name:
-            if project.repoName == "tests"
-            then "${name}-test"
-            else "${project.repoName}-${name}"
-          );
+          jobsMap = scanJobsFolder jobsPath project runner (name: "${project.repoName}-${name}");
         in
           acc // jobsMap
       else
         acc;
+
+  discoveredProjects = builtins.foldl' processProject {} projectsList;
+
+  # 2. Discover test jobs under ../tests
+  testsProjectNix = testsDir + "/project.nix";
+  testsJobsPath = testsDir + "/jobs";
+  discoveredTests =
+    if builtins.pathExists testsProjectNix then
+      let
+        projectImport = import testsProjectNix;
+        project = if builtins.isFunction projectImport then projectImport { inherit pkgs; } else projectImport;
+        runner = null;
+      in
+        scanJobsFolder testsJobsPath project runner (name:
+          if pkgs.lib.strings.hasSuffix "-test" name
+          then name
+          else "${name}-test"
+        )
+    else {};
 in
-  builtins.foldl' processProject {} projectsList
+  discoveredProjects // discoveredTests
