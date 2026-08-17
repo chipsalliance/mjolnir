@@ -30,6 +30,7 @@ your-repo/
 │   ├── project.nix          # Project metadata, extensions, and threat model
 │   ├── threat_model.md      # Authoritative threat model for the repository
 │   └── jobs/
+│       ├── local.nix        # Local working tree audit profile
 │       ├── ci.nix           # PR diff audit job profile
 │       └── main.nix         # Full repository audit job profile
 ```
@@ -54,13 +55,26 @@ your-repo/
 }
 ```
 
-#### `mjolnir/jobs/ci.nix`
+#### `mjolnir/jobs/local.nix`
+
+```nix
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
+{
+  name = "Local";
+  localDir = ".";
+  srcDirs = [ "." ];
+}
+```
+
+#### `tools/mjolnir/jobs/ci.nix`
 
 ```nix
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 {
   name = "CI";
+  localDir = ".";
   srcDirs = [ "." ];
 }
 ```
@@ -99,10 +113,18 @@ In your repository's `flake.nix`, add Mjolnir as an input and use `mjolnir.lib.d
       let
         pkgs = import nixpkgs { inherit system; };
 
+        # Optional: custom devShell/toolchain for the repository
+        devShell = pkgs.mkShell {
+          nativeBuildInputs = with pkgs; [ ... ];
+        };
+      in
+      {
+        devShells.default = devShell;
+
         packages = mjolnir.lib.discoverProjectJobs {
-          inherit pkgs;
+          inherit pkgs devShell;
           mjolnirApp = mjolnir.packages.${system}.mjolnir-app;
-          projectDir = ./mjolnir;
+          projectDir = ./tools/mjolnir;
           deployPackages = {
             inherit (mjolnir.packages.${system}) deploy-gcs-runs;
           };

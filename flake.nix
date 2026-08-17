@@ -142,10 +142,10 @@
 
           deploy-gcs-web = pkgs.writeShellApplication {
             name = "mjolnir-deploy-gcs-web";
-            runtimeInputs = [ pythonEnv ];
+            runtimeInputs = [ pkgs.cargo pkgs.rustc pkgs.wasm-bindgen-cli pkgs.lld pythonEnv ];
             text = ''
               export PYTHONPATH="${./app}:''${PYTHONPATH:-}"
-              exec python3 "${./scripts/deploy_gcs_web.py}" "$@"
+              exec cargo xtask deploy-gcs-web "$@"
             '';
           };
 
