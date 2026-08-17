@@ -3,15 +3,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import argparse
+import mimetypes
 import sys
 from pathlib import Path
+
 from google.cloud import storage
 
-
 from mjolnir.constants import WEB_SUBDIR
-
-
-import mimetypes
 
 
 def deploy_web(web_dir: Path, client: storage.Client, bucket_name: str):
@@ -41,18 +39,19 @@ def deploy_web(web_dir: Path, client: storage.Client, bucket_name: str):
             "index.html" if rel_path == Path("index.html") else f"{WEB_SUBDIR}/{rel_path}"
         )
 
-        if local_file.suffix == ".wasm":
-            mime = "application/wasm"
-        elif local_file.suffix == ".js":
-            mime = "application/javascript"
-        elif local_file.suffix == ".css":
-            mime = "text/css; charset=utf-8"
-        elif local_file.suffix in (".html", ".htm"):
-            mime = "text/html; charset=utf-8"
-        else:
-            mime, _ = mimetypes.guess_type(str(local_file))
-            if not mime:
-                mime = "application/octet-stream"
+        match local_file.suffix:
+            case ".wasm":
+                mime = "application/wasm"
+            case ".js":
+                mime = "application/javascript"
+            case ".css":
+                mime = "text/css; charset=utf-8"
+            case ".html" | ".htm":
+                mime = "text/html; charset=utf-8"
+            case _:
+                mime, _ = mimetypes.guess_type(str(local_file))
+                if not mime:
+                    mime = "application/octet-stream"
 
         blob = bucket.blob(target_blob_path)
         blob.cache_control = "no-cache, no-store, must-revalidate"

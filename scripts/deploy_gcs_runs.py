@@ -4,11 +4,10 @@
 
 import argparse
 import mimetypes
-import os
 import sys
 from pathlib import Path
-from google.cloud import storage
 
+from google.cloud import storage
 
 from mjolnir.constants import RUNS_SUBDIR
 
