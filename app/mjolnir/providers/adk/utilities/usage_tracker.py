@@ -34,6 +34,7 @@ class UsageTracker:
             "total_successes": 0,
             "total_failures": 0,
         }
+        self.reasoning_log = {}
 
     def track_tool_call(
         self,
@@ -128,11 +129,47 @@ class UsageTracker:
             agent_name = getattr(ev, "author", None) or agent_name
             item_key = raw_key
 
-        # Inspect function responses
+        # Inspect and record thoughts, tool calls, and tool responses
         if hasattr(ev, "content") and ev.content and hasattr(ev.content, "parts"):
+            target_key = item_key or agent_name
+            if target_key not in self.reasoning_log:
+                self.reasoning_log[target_key] = []
+
             for part in ev.content.parts:
+                is_thought = getattr(part, "thought", False)
+                text = getattr(part, "text", None)
+                fn_call = getattr(part, "function_call", None)
                 fn_res = getattr(part, "function_response", None)
-                if fn_res:
+
+                if is_thought and text:
+                    self.reasoning_log[target_key].append(
+                        {
+                            "agent": agent_name,
+                            "type": "thought",
+                            "content": text.strip(),
+                        }
+                    )
+                elif text and not is_thought:
+                    self.reasoning_log[target_key].append(
+                        {
+                            "agent": agent_name,
+                            "type": "output",
+                            "content": text.strip(),
+                        }
+                    )
+                elif fn_call:
+                    fn_name = getattr(fn_call, "name", "unknown")
+                    fn_args = getattr(fn_call, "args", {})
+                    serializable_args = fn_args if isinstance(fn_args, dict) else str(fn_args)
+                    self.reasoning_log[target_key].append(
+                        {
+                            "agent": agent_name,
+                            "type": "tool_call",
+                            "tool": fn_name,
+                            "args": serializable_args,
+                        }
+                    )
+                elif fn_res:
                     tool_name = getattr(fn_res, "name", "unknown_tool")
                     resp = getattr(fn_res, "response", "")
                     res_str = resp.get("result", "") if isinstance(resp, dict) else str(resp)
@@ -145,6 +182,14 @@ class UsageTracker:
                         success=not is_error,
                         agent_name=agent_name,
                         item_key=item_key,
+                    )
+                    self.reasoning_log[target_key].append(
+                        {
+                            "agent": agent_name,
+                            "type": "tool_response",
+                            "tool": tool_name,
+                            "response": clean_str[:500] if len(clean_str) > 500 else clean_str,
+                        }
                     )
 
         if not hasattr(ev, "usage_metadata") or not ev.usage_metadata:
@@ -276,3 +321,9 @@ class UsageTracker:
         with open(tool_path, "w") as f:
             json.dump(tool_data, f, indent=2)
         logger.info(f"Tool usage breakdown saved to {tool_path}")
+
+        if self.reasoning_log:
+            reasoning_path = Path(run_dir) / "reasoning_log.json"
+            with open(reasoning_path, "w") as f:
+                json.dump(self.reasoning_log, f, indent=2)
+            logger.info(f"Agent reasoning log saved to {reasoning_path}")
