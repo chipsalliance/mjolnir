@@ -1,23 +1,27 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
-{ pkgs, project, job, mjolnir-app, runner ? null }:
+{ pkgs, project, job, mjolnir-app, runner ? null, ... }:
 let
+  model = job.model or project.defaultModel or (throw "Mjolnir: No model specified for job '${job.name or "unknown"}' (set 'model' in job.nix or 'defaultModel' in project.nix).");
+  provider = job.provider or project.defaultProvider or (throw "Mjolnir: No provider specified for job '${job.name or "unknown"}' (set 'provider' in job.nix or 'defaultProvider' in project.nix).");
+  batchSize = job.batchSize or project.defaultBatchSize or (throw "Mjolnir: No batchSize specified for job '${job.name or "unknown"}' (set 'batchSize' in job.nix or 'defaultBatchSize' in project.nix).");
+  extensions = job.extensions or project.defaultExtensions or (throw "Mjolnir: No extensions specified for job '${job.name or "unknown"}' (set 'extensions' in job.nix or 'defaultExtensions' in project.nix).");
+  outputDir = project.outputDir or (throw "Mjolnir: No 'outputDir' specified for project '${project.name or "unknown"}' (set 'outputDir' in project.nix).");
+  workspaceDir = project.workspaceDir or (throw "Mjolnir: No 'workspaceDir' specified for project '${project.name or "unknown"}' (set 'workspaceDir' in project.nix).");
+
   jobSpec = {
     project = {
-      inherit (project) name repoName repoUrl srcExtensions;
+      inherit (project) name repoName repoUrl;
       threatModel = project.threatModel or null;
     };
 
     job = {
       inherit (job) name;
-      model = job.model or project.model or "gemini-3.6-flash";
-      provider = job.provider or project.provider or "adk";
-      batchSize = job.batchSize or 64;
+      inherit model provider batchSize extensions;
       branch = job.branch or null;
       tag = job.tag or null;
       commit = job.commit or null;
       srcDirs = job.srcDirs or [ "." ];
-      extensions = job.extensions or [ "c" "h" "cpp" "cc" "rs" "go" "py" ];
       maxFiles = job.maxFiles or null;
       cmd = job.cmd or null;
       ingestionReport = job.ingestionReport or null;
@@ -26,12 +30,10 @@ let
     };
 
     config = {
-      workspaceDir = "./mjolnir/workspace/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
-      outputDir = "./mjolnir/results/v1/runs/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
-      projectOutputDir = "./mjolnir/results/v1/runs/${project.repoName}";
+      workspaceDir = "${workspaceDir}/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
+      outputDir = "${outputDir}/v1/runs/${project.repoName}/${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}";
+      projectOutputDir = "${outputDir}/v1/runs/${project.repoName}";
     };
-
-
   };
 
   # 2. Serialize to JSON in Nix store

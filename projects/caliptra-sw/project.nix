@@ -4,6 +4,12 @@
   name = "Caliptra SW";
   repoName = "caliptra-sw";
   repoUrl = "https://github.com/chipsalliance/caliptra-sw.git";
-  srcExtensions = [ "rs" "c" "h" "sv" ];
   threatModel = ./threat_model.md;
+  outputDir = "./test-out/results";
+  workspaceDir = "./test-out/workspace";
+
+  defaultModel = "gemini-3.6-flash";
+  defaultProvider = "adk";
+  defaultBatchSize = 64;
+  defaultExtensions = [ "rs" "c" "h" "sv" ];
 }

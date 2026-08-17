@@ -10,10 +10,9 @@ __pycache__/
 # Linting
 .ruff_cache
 
-# Generated workspace
+# Generated test and run outputs
+test-out/
 workspace/
-
-# Generated reports
 output/
 
 # Environment
