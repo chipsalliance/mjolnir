@@ -22,10 +22,7 @@ projects/
     ├── project.nix
     ├── jobs/
     │   └── my-job.nix
-    └── nix/                   # Optional: For compiling firmware/verification tools
-        ├── flake.nix
-        ├── runner.nix
-        └── runner-test.nix
+    └── shell.nix              # Optional: Nix devShell for firmware/compiler toolchain
 ```
 
 The Nix pipeline uses `discovery.nix` to automatically locate these folders, parse the attributes, and generate the corresponding `nix run .#<project-name>-<job-name>` targets.
@@ -43,6 +40,7 @@ The `project.nix` file defines the repository and global settings for the projec
 - **`repoUrl`** (String, Required): HTTPS git URL of the target repository.
 - **`commit`** (String, Optional): Default git commit hash or branch to checkout.
 - **`threatModel`** (Path, Optional): Path to a threat model Markdown file (`threat_model.md`) containing context and security requirements.
+- **`shell`** (Path, Optional): Path to a Nix development shell file (defaults to `./shell.nix` if present).
 
 - **`outputDir`** (String, Required): Relative path where audit results are stored (e.g. `"./test-out/results"`).
 - **`workspaceDir`** (String, Required): Relative path where temporary analysis workspaces are created (e.g. `"./test-out/workspace"`).
@@ -86,7 +84,7 @@ Each file under `jobs/` defines a specific audit task (e.g., scanning PR diffs, 
 - **`diffHead`** (String, Optional): Git diff head revision (defaults to `"HEAD"`).
 - **`srcDirs`** (List of Strings, Optional): Subdirectories within the repo to scan. Defaults to `[ "." ]` (scans everything).
 - **`maxFiles`** (Integer, Optional): Cap the maximum number of files to scan.
-- **`cmd`** (String, Optional): Build or verification command to run inside the compilation runner context.
+- **`cmd`** (String, Optional): Build or verification command to run inside the development shell context.
 - **`ingestionReport`** (String, Optional): Path to an existing vulnerability report (CSV/JSON/SARIF) to ingest.
 - **`model`** (String, Optional): Override the model to use (defaults to `project.defaultModel`).
 - **`provider`** (String, Optional): Override the analysis provider (defaults to `project.defaultProvider`).
@@ -104,9 +102,8 @@ Each file under `jobs/` defines a specific audit task (e.g., scanning PR diffs, 
 
 ---
 
-### Hermetic Compilation (Optional, `nix/`)
+### Hermetic Compilation (`shell.nix`)
 
-If your project requires compilation for tests, verification, or if the python tool chain needs to invoke build commands, you should provide a local `nix/` structure.
+If your project requires compilation for tests, verification, or if the python toolchain needs to invoke build commands (`cmd`), provide a standard `shell.nix` (`pkgs.mkShell`).
 
-- `nix/flake.nix` exports a `default` package that exposes the compiler toolchain wrapper script (`runner.nix`).
-- The global Mjolnir orchestrator will automatically prepend this package's `/bin` to the `PATH` during job execution if a runner is supplied.
+Mjolnir will automatically inject the development shell's tools into `PATH` and execute any configured `shellHook` during job execution.

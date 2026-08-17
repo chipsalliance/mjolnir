@@ -1,6 +1,6 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
-{ pkgs, project, job, mjolnir-app, runner ? null, ... }:
+{ pkgs, project, job, mjolnir-app, devShell ? null, ... }:
 let
   model = job.model or project.defaultModel or (throw "Mjolnir: No model specified for job '${job.name or "unknown"}' (set 'model' in job.nix or 'defaultModel' in project.nix).");
   provider = job.provider or project.defaultProvider or (throw "Mjolnir: No provider specified for job '${job.name or "unknown"}' (set 'provider' in job.nix or 'defaultProvider' in project.nix).");
@@ -39,13 +39,28 @@ let
   # 2. Serialize to JSON in Nix store
   jobSpecFile = pkgs.writeText "mjolnir-job-spec-${project.repoName}-${job.name}.json" (builtins.toJSON jobSpec);
 
+  # Extract tool PATH and shellHook from devShell if provided
+  shellInputs = if devShell != null then
+    (devShell.nativeBuildInputs or []) ++
+    (devShell.buildInputs or []) ++
+    (devShell.propagatedBuildInputs or []) ++
+    (if devShell ? outPath then [ devShell ] else [])
+  else [];
+
+  shellBinPath = pkgs.lib.makeBinPath shellInputs;
+  shellHook = if devShell != null && devShell ? shellHook then devShell.shellHook else "";
+
   # 5. Assemble execution script
   launcher = pkgs.writeShellScriptBin "mjolnir-orchestrator-${project.repoName}-${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}" ''
     set -e
     
     # Inject project-specific compiler tools into PATH
-    ${pkgs.lib.optionalString (runner != null) ''
-      export PATH="${runner}/bin:$PATH"
+    ${pkgs.lib.optionalString (shellBinPath != "") ''
+      export PATH="${shellBinPath}:$PATH"
+    ''}
+
+    ${pkgs.lib.optionalString (shellHook != "") ''
+      ${shellHook}
     ''}
 
     exec ${mjolnir-app}/bin/mjolnir-run --spec "${jobSpecFile}" "$@"

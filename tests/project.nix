@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 { pkgs }:
 let
-  mockRepoBuilder = import ./nix/mock_repo.nix { inherit pkgs; };
+  mockRepoBuilder = import ./mock_repo.nix { inherit pkgs; };
   dummyRepo = mockRepoBuilder { enablePRDiff = true; };
 in
 {

@@ -11,7 +11,8 @@ This directory contains the Nix expressions that define the build and execution 
   - Accepts project and job definitions.
   - Serializes the job configuration into a JSON spec file in the Nix store.
   - Enforces required configuration (`outputDir`, `workspaceDir`) and merges project-level defaults (`defaultModel`, `defaultProvider`, `defaultBatchSize`, `defaultExtensions`).
-  - Creates a wrapper script (`mjolnir-orchestrator-...`) that runs `mjolnir-run` with the generated spec.
+  - Injects any project development shell (`devShell` / `shell.nix`) into `PATH` and executes its `shellHook`.
+  - Creates a launcher script (`mjolnir-orchestrator-...`) that runs `mjolnir-run` with the generated spec.
 - `discovery.nix`: Automatically scans the `projects/` directory to discover all projects and their jobs, converting them into Nix packages.
 - `group.nix`: A helper to group multiple jobs together (e.g., `test-all` or `caliptra-all`) so they can be run sequentially.
 

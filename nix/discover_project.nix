@@ -4,7 +4,7 @@
   pkgs,
   mjolnirApp,
   projectDir,
-  runner ? null,
+  devShell ? null,
   deployPackages ? {},
 }:
 let
@@ -12,6 +12,15 @@ let
   project = if builtins.isFunction projectImport then projectImport { inherit pkgs; } else projectImport;
   jobsDir = projectDir + "/jobs";
   makeJob = import ./orchestrator.nix;
+
+  projectShellPath = projectDir + "/shell.nix";
+  discoveredShell =
+    if devShell != null then devShell
+    else if project ? shell then
+      (if builtins.isFunction (import project.shell) then (import project.shell) { inherit pkgs; } else import project.shell)
+    else if builtins.pathExists projectShellPath then
+      (if builtins.isFunction (import projectShellPath) then (import projectShellPath) { inherit pkgs; } else import projectShellPath)
+    else null;
 
   jobFiles =
     if builtins.pathExists jobsDir then
@@ -27,7 +36,8 @@ let
       if pkgs.lib.strings.hasSuffix ".nix" fileName then
         acc // {
           "${jobName}" = makeJob {
-            inherit pkgs project runner projectDir;
+            inherit pkgs project projectDir;
+            devShell = discoveredShell;
             job = import filePath;
             mjolnir-app = mjolnirApp;
           };
@@ -37,6 +47,6 @@ let
 
   discoveredJobs = builtins.foldl' processJobFile {} jobFiles;
 in
-  discoveredJobs // (if runner != null then { inherit runner; } else {}) // deployPackages
+  discoveredJobs // (if discoveredShell != null then { devShell = discoveredShell; } else {}) // deployPackages
 
 
