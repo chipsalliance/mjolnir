@@ -1,13 +1,13 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
-{ pkgs, makeJob, runners }:
+{ pkgs, makeJob }:
 let
   projectsDir = ../projects;
   testsDir = ../tests;
 
   # Scans a directory for `.nix` job files and makes each one into a runnable flake.
   # For tests, `-test` is appended to the end of the runnable flake name.
-  scanJobsFolder = folderPath: project: runner: targetNameFn:
+  scanJobsFolder = folderPath: project: devShell: targetNameFn:
     let
       filesList =
         if builtins.pathExists folderPath
@@ -23,7 +23,7 @@ let
           if pkgs.lib.strings.hasSuffix ".nix" fileName then
             fileAcc // {
               "${targetName}" = makeJob {
-                inherit project runner;
+                inherit project devShell;
                 job = import filePath;
               };
             }
@@ -42,13 +42,21 @@ let
       projectPath = projectsDir + "/${projectDirName}";
       projectNix = projectPath + "/project.nix";
       jobsPath = projectPath + "/jobs";
+      shellNixPath = projectPath + "/shell.nix";
     in
       if builtins.pathExists projectNix then
         let
           projectImport = import projectNix;
           project = if builtins.isFunction projectImport then projectImport { inherit pkgs; } else projectImport;
-          runner = runners.${project.repoName} or null;
-          jobsMap = scanJobsFolder jobsPath project runner (name: "${project.repoName}-${name}");
+
+          devShell =
+            if project ? shell then
+              (if builtins.isFunction (import project.shell) then (import project.shell) { inherit pkgs; } else import project.shell)
+            else if builtins.pathExists shellNixPath then
+              (if builtins.isFunction (import shellNixPath) then (import shellNixPath) { inherit pkgs; } else import shellNixPath)
+            else null;
+
+          jobsMap = scanJobsFolder jobsPath project devShell (name: "${project.repoName}-${name}");
         in
           acc // jobsMap
       else
@@ -63,9 +71,9 @@ let
       let
         projectImport = import testsProjectNix;
         project = if builtins.isFunction projectImport then projectImport { inherit pkgs; } else projectImport;
-        runner = null;
+        devShell = null;
       in
-        scanJobsFolder testsJobsPath project runner (name:
+        scanJobsFolder testsJobsPath project devShell (name:
           if pkgs.lib.strings.hasSuffix "-test" name
           then name
           else "${name}-test"

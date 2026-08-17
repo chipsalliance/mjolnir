@@ -78,17 +78,17 @@ Mjolnir requires Nix with flakes enabled.
 
 ### Running an Audit
 
-To run a predefined project audit runner target, execute `nix run`:
+To run a predefined project audit target, execute `nix run`:
 
 ```bash
-nix run .#<project-runner-target>
+nix run .#<project-target>
 ```
 
 #### Examples
 
-- **Run Caliptra SW Mock E2E Audit**:
+- **Run Caliptra SW Audit**:
   ```bash
-  nix run .#caliptra-sw-runner-test
+  nix run .#caliptra-sw-main
   ```
 - **Run OpenTitan ROM Audit**:
   ```bash
@@ -162,7 +162,7 @@ export GEMINI_API_KEY="AIzaSy..."
 
 ## Testing
 
-Mjolnir includes a suite of test targets to verify local pipelines, GCS uploads, and live LLM integration.
+Mjolnir includes a suite of test targets to verify local pipelines, GCS uploads, and live LLM integration. These targets run against a synthetic git repository fixture without requiring a compiler development shell (`devShell = null`).
 
 ### Verification of Nix Infrastructure (Mocks)
 
@@ -172,7 +172,7 @@ To verify that the Nix derivations build cleanly:
 nix build .#mock-smoke-test --no-link
 ```
 
-To run a local mock test (verifies the python runner and local file system hooks):
+To run a local mock test (verifies the python analysis engine and local file system hooks):
 
 ```bash
 nix run .#mock-smoke-test
@@ -210,14 +210,6 @@ nix run .#adk-gemini-gcs-test
 
 ### Running All Tests
 
-To run all mock and live tests in a single command:
-
 ```bash
 nix run .#test-all
-```
-
-To test the project runners (firmware compilation verification) locally:
-
-```bash
-nix run .#test-all-runners
 ```

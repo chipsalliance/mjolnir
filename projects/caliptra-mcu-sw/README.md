@@ -1,16 +1,14 @@
 <!-- Licensed under the Apache-2.0 license -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# Caliptra MCU SW configurations
+# Caliptra MCU SW Configurations
 
 Audit targets and job specifications for the Caliptra MCU Software repository.
 
 ## Components
 
 - **`project.nix`**: Core project definition mapping to `https://github.com/chipsalliance/caliptra-mcu-sw.git`.
-- **`jobs/`**: Job configurations to target specific branches.
+- **`shell.nix`**: Nix development shell providing the RISC-V Rust cross-compiler toolchain.
+- **`jobs/`**: Job configurations to target specific branches:
   - `main.nix`: Scans the `main` branch.
-- **`nix/`**: Nix environment build setups.
-  - `flake.nix`: Packages local compilation toolchains.
-  - `runner.nix`: Helper script to build/test the workspace code locally.
-  - `runner-test.nix`: Wraps the compile-testing logic.
+  - `ci.nix`: PR diff scanning job.

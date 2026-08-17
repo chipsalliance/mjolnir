@@ -34,17 +34,7 @@
           pkgs = nixpkgsFor.${system};
           pkgs-v4 = nixpkgs-v4.legacyPackages.${system};
 
-          rustToolchain = pkgs.rust-bin.stable."1.85.0".default.override {
-            extensions = [ "rust-src" "llvm-tools-preview" ];
-            targets = [ "riscv32imc-unknown-none-elf" ];
-          };
 
-          runners = {
-            caliptra-sw = import ./projects/caliptra-sw/nix/runner.nix { inherit pkgs rustToolchain; };
-            opentitan = import ./projects/opentitan/nix/runner.nix { inherit pkgs pkgs-v4; };
-            caliptra-mcu-sw = import ./projects/caliptra-mcu-sw/nix/runner.nix { inherit pkgs rustToolchain; };
-            tests = pkgs.writeShellScriptBin "test-runner" "echo 'Test environment runner: OK'";
-          };
 
 
           google-genai-latest = pkgs.python3Packages.google-genai.overridePythonAttrs (old: rec {
@@ -130,9 +120,9 @@
             '';
           };
 
-          makeJob = { project, job, runner ? null }: 
+          makeJob = { project, job, devShell ? null }: 
             import ./nix/orchestrator.nix {
-              inherit pkgs project job runner mjolnir-app;
+              inherit pkgs project job devShell mjolnir-app;
             };
 
           makeGroup = { name, description, jobs }:
@@ -140,31 +130,7 @@
               inherit name description jobs;
             };
 
-          discovered = autodiscoverJobs { inherit pkgs makeJob runners; };
-
-          caliptra-sw-runner-test = makeJob {
-            project = import ./projects/caliptra-sw/project.nix;
-            job = import ./projects/caliptra-sw/nix/runner-test.nix;
-            runner = runners.caliptra-sw;
-          };
-
-          caliptra-mcu-sw-runner-test = makeJob {
-            project = import ./projects/caliptra-mcu-sw/project.nix;
-            job = import ./projects/caliptra-mcu-sw/nix/runner-test.nix;
-            runner = runners.caliptra-mcu-sw;
-          };
-
-          opentitan-runner-host-test = makeJob {
-            project = import ./projects/opentitan/project.nix;
-            job = import ./projects/opentitan/nix/runner-host-test.nix;
-            runner = runners.opentitan;
-          };
-
-          opentitan-runner-verilator-test = makeJob {
-            project = import ./projects/opentitan/project.nix;
-            job = import ./projects/opentitan/nix/runner-verilator-test.nix;
-            runner = runners.opentitan;
-          };
+          discovered = autodiscoverJobs { inherit pkgs makeJob; };
 
           web-viewer = pkgs.writeShellApplication {
             name = "mjolnir-web-viewer";
@@ -199,11 +165,7 @@
               mjolnir-app
               web-viewer
               deploy-gcs-web
-              deploy-gcs-runs
-              caliptra-sw-runner-test
-              caliptra-mcu-sw-runner-test
-              opentitan-runner-host-test
-              opentitan-runner-verilator-test;
+              deploy-gcs-runs;
 
             test-all = makeGroup {
               name = "test-all";
@@ -216,17 +178,6 @@
                 discovered.adk-ci-test
                 discovered.adk-gemini-test
                 discovered.adk-gemini-ingest-test
-              ];
-            };
-
-            test-all-runners = makeGroup {
-              name = "test-all-runners";
-              description = "All runner tests";
-              jobs = [
-                caliptra-sw-runner-test
-                caliptra-mcu-sw-runner-test
-                opentitan-runner-host-test
-                opentitan-runner-verilator-test
               ];
             };
 
