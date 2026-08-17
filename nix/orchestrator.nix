@@ -27,6 +27,7 @@ let
       ingestionReport = job.ingestionReport or null;
       diffBase = job.diffBase or null;
       diffHead = job.diffHead or "HEAD";
+      localDir = job.localDir or null;
     };
 
     config = {

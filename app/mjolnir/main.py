@@ -69,12 +69,18 @@ def _run_orchestrator():
 
     model_name = job.get("model")
 
-    # Create workspace directories
-
+    local_dir = job.get("localDir")
     raw_workspace = config.get("workspaceDir")
     workspace_dir = str(Path(raw_workspace).expanduser().resolve())
 
-    code_dir = str(Path(workspace_dir) / repo_name)
+    if local_dir:
+        code_dir = str(Path(local_dir).expanduser().resolve())
+        if not Path(code_dir).exists():
+            logger.error(f"Configured localDir '{local_dir}' does not exist.")
+            sys.exit(1)
+    else:
+        code_dir = str(Path(workspace_dir) / repo_name)
+
     app_config = AppConfig.from_env(
         code_dir=code_dir,
         workspace_dir=workspace_dir,
@@ -111,8 +117,11 @@ def _run_orchestrator():
         f"Engine: {provider_name.upper()} | Model: {model_name} | Target: {repo_name} ({repo_ref or 'HEAD'})"
     )
 
-    logger.info(f"Setting up repository for {repo_name}.")
-    setup_repository(repo_url, code_dir, repo_ref, workspace_dir)
+    if local_dir:
+        logger.info(f"Local audit mode enabled. Targeting: {code_dir}")
+    else:
+        logger.info(f"Setting up repository for {repo_name}.")
+        setup_repository(repo_url, code_dir, repo_ref, workspace_dir)
 
     # File discovery & Ingestion routing
     ingest_path = args.ingest or job.get("ingestionReport")

@@ -80,6 +80,7 @@ Each file under `jobs/` defines a specific audit task (e.g., scanning PR diffs, 
 - **`branch`** (String, Optional): Git branch to checkout (e.g., `main`).
 - **`tag`** (String, Optional): Git tag to checkout (e.g., `v1.0`).
 - **`commit`** (String, Optional): Git commit hash (SHA-1) to checkout.
+- **`localDir`** (String, Optional): Explicit relative path to a local repository directory to audit directly (e.g., `"."`), bypassing remote git cloning and workspace isolation.
 - **`diffBase`** (String, Optional): Git diff base revision (e.g., `main` or `HEAD~1`).
 - **`diffHead`** (String, Optional): Git diff head revision (defaults to `"HEAD"`).
 - **`srcDirs`** (List of Strings, Optional): Subdirectories within the repo to scan. Defaults to `[ "." ]` (scans everything).
