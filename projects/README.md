@@ -41,20 +41,32 @@ The `project.nix` file defines the repository and global settings for the projec
 - **`name`** (String, Required): Human-readable name of the project.
 - **`repoName`** (String, Required): Name of the repository folder when checked out.
 - **`repoUrl`** (String, Required): HTTPS git URL of the target repository.
-- **`srcExtensions`** (List of Strings, Required): File extensions relevant to this project (e.g., `["rs", "c", "h"]`).
-- **`threatModel`** (Path, Optional): Path to a pre-generated threat model Markdown file (`THREAT_MODEL.md`) containing context and security requirements.
-- **`model`** (String, Optional): Default Gemini model to use for this project (defaults to `gemini-3.6-flash`).
-- **`provider`** (String, Optional): Default provider (e.g. `genai` or `mock`).
+- **`commit`** (String, Optional): Default git commit hash or branch to checkout.
+- **`threatModel`** (Path, Optional): Path to a threat model Markdown file (`threat_model.md`) containing context and security requirements.
+
+- **`outputDir`** (String, Required): Relative path where audit results are stored (e.g. `"./test-out/results"`).
+- **`workspaceDir`** (String, Required): Relative path where temporary analysis workspaces are created (e.g. `"./test-out/workspace"`).
+
+- **`defaultModel`** (String, Required unless set in job): Default AI foundation model (e.g. `"gemini-3.6-flash"`).
+- **`defaultProvider`** (String, Required unless set in job): Default backend engine (`"adk"`, `"genai"`, or `"mock"`).
+- **`defaultBatchSize`** (Integer, Required unless set in job): Default batch window size for agent analysis (e.g. `64`).
+- **`defaultExtensions`** (List of Strings, Required unless set in job): Default source file extensions to audit (e.g. `["rs", "c", "h"]`).
 
 #### Example
 
 ```nix
 {
-  name = "Caliptra SW";
-  repoName = "caliptra-sw";
-  repoUrl = "https://github.com/chipsalliance/caliptra-sw.git";
-  srcExtensions = [ "rs" "c" "h" "sv" ];
+  name = "Caliptra DPE";
+  repoName = "caliptra-dpe";
+  repoUrl = "https://github.com/chipsalliance/caliptra-dpe.git";
   threatModel = ./threat_model.md;
+  outputDir = "./test-out/results";
+  workspaceDir = "./test-out/workspace";
+
+  defaultModel = "gemini-3.6-flash";
+  defaultProvider = "adk";
+  defaultBatchSize = 64;
+  defaultExtensions = [ "rs" "go" ];
 }
 ```
 
@@ -62,29 +74,31 @@ The `project.nix` file defines the repository and global settings for the projec
 
 ### Job Configuration (`jobs/*.nix`)
 
-Each file under `jobs/` defines a specific audit task (e.g., scanning ROM firmware, checking a subdirectory, using a specific model).
+Each file under `jobs/` defines a specific audit task (e.g., scanning PR diffs, auditing a specific branch, using a distinct model).
 
 #### Schema
 
-- **`name`** (String, Required): Human-readable name of the job.
-- **`model`** (String, Optional): Override the model to use (e.g., `gemini-3.6-flash` for deeper analysis, defaults to project default).
-- **`provider`** (String, Optional): Override the analysis provider (`genai` or `mock`).
-- **`batchSize`** (Integer, Optional): Number of concurrent tasks / files to process per batch (defaults to `8`).
+- **`name`** (String, Required / inferred from filename): Human-readable name of the job.
 - **`branch`** (String, Optional): Git branch to checkout (e.g., `main`).
 - **`tag`** (String, Optional): Git tag to checkout (e.g., `v1.0`).
 - **`commit`** (String, Optional): Git commit hash (SHA-1) to checkout.
+- **`diffBase`** (String, Optional): Git diff base revision (e.g., `main` or `HEAD~1`).
+- **`diffHead`** (String, Optional): Git diff head revision (defaults to `"HEAD"`).
 - **`srcDirs`** (List of Strings, Optional): Subdirectories within the repo to scan. Defaults to `[ "." ]` (scans everything).
-- **`extensions`** (List of Strings, Optional): Override file extensions to scan for this job.
 - **`maxFiles`** (Integer, Optional): Cap the maximum number of files to scan.
 - **`cmd`** (String, Optional): Build or verification command to run inside the compilation runner context.
+- **`ingestionReport`** (String, Optional): Path to an existing vulnerability report (CSV/JSON/SARIF) to ingest.
+- **`model`** (String, Optional): Override the model to use (defaults to `project.defaultModel`).
+- **`provider`** (String, Optional): Override the analysis provider (defaults to `project.defaultProvider`).
+- **`batchSize`** (Integer, Optional): Number of concurrent tasks / files to process per batch (defaults to `project.defaultBatchSize`).
+- **`extensions`** (List of Strings, Optional): Override file extensions to scan (defaults to `project.defaultExtensions`).
 
 #### Example
 
 ```nix
 {
-  name = "ROM Main";
-  branch = "main";
-  srcDirs = [ "rom/dev/src" ];
+  name = "CI";
+  srcDirs = [ "." ];
 }
 ```
 

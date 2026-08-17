@@ -178,12 +178,6 @@ To run a local mock test (verifies the python runner and local file system hooks
 nix run .#mock-smoke-test
 ```
 
-To verify GCS storage uploads with mock data:
-
-```bash
-nix run .#mock-gcs-test -- --bucket your-bucket
-```
-
 ### Live LLM Testing
 
 Run live scans on test fixtures using ambient ADC or optional API key:
@@ -197,15 +191,6 @@ nix run .#adk-gemini-test
 
 # Option C: ADK Ingestion Mode
 nix run .#adk-gemini-ingest-test
-```
-
-To verify end-to-end LLM scanning combined with GCS upload:
-
-```bash
-export MJOLNIR_GCS_BUCKET="your-bucket"
-nix run .#genai-gemini-gcs-test
-# or
-nix run .#adk-gemini-gcs-test
 ```
 
 ### Running All Tests

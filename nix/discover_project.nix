@@ -27,7 +27,7 @@ let
       if pkgs.lib.strings.hasSuffix ".nix" fileName then
         acc // {
           "${jobName}" = makeJob {
-            inherit pkgs project runner;
+            inherit pkgs project runner projectDir;
             job = import filePath;
             mjolnir-app = mjolnirApp;
           };
