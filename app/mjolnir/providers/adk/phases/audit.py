@@ -20,6 +20,7 @@ from providers.adk.utilities.async_runner import (
     run_batch_with_concurrency,
 )
 from providers.adk.utilities.cache_manager import PhaseContextCache
+from utilities.git import get_file_diff
 from utilities.logger import logger
 
 
@@ -74,6 +75,9 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
     ) as cache:
         auditor_agent = get_auditor_agent(model, threat_model, cached_content=cache.cache_name)
 
+        diff_base = ctx.state.get("diff_base")
+        diff_head = ctx.state.get("diff_head")
+
         async def audit_single_file(f_path: str) -> list[Vulnerability]:
             full_file_path = Path(code_dir) / f_path
             try:
@@ -82,10 +86,29 @@ async def audit_phase(ctx: Context, node_input: list[str]) -> list[Vulnerability
                 logger.error(f"Could not read {f_path}: {e}")
                 return []
 
+            if diff_base:
+                file_diff = get_file_diff(code_dir, diff_base, diff_head or "HEAD", f_path)
+                diff_section = (
+                    f"\n\n### Pull Request Diff (Changes Under Review):\n```diff\n{file_diff}\n```"
+                    if file_diff
+                    else ""
+                )
+                node_input = (
+                    f"Filename: {f_path}\n"
+                    f"Mode: Pull Request Diff Security Review\n"
+                    f"Instructions: Focus specifically on verifying whether the changes introduced in the PR diff "
+                    f"introduce vulnerabilities, weaken security invariants, violate zeroization/sanitization requirements, "
+                    f"or cause state corruption. Use the full file content and tool calls for contextual analysis of data flow and call sites.\n"
+                    f"{diff_section}\n\n"
+                    f"### Full File Content:\n{contents}"
+                )
+            else:
+                node_input = f"Filename: {f_path}\n\nContent:\n{contents}"
+
             report = await run_agent_node(
                 ctx,
                 auditor_agent,
-                node_input=f"Filename: {f_path}\n\nContent:\n{contents}",
+                node_input=node_input,
                 expected_schema=SecurityReport,
                 run_id=f_path,
             )

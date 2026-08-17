@@ -42,8 +42,7 @@ def _run_orchestrator():
     )
     parser.add_argument(
         "--diff-head",
-        default="HEAD",
-        help="Head git ref for PR diff mode (default: HEAD)",
+        help="Head git ref for PR diff mode",
     )
     args, unknown_args = parser.parse_known_args()
 
@@ -226,6 +225,8 @@ def _run_orchestrator():
             run_dir,
             batch_size,
             ingest_path=ingest_path,
+            diff_base=diff_base,
+            diff_head=diff_head,
         )
     else:
         logger.error(f"Unknown provider: {provider_name}")

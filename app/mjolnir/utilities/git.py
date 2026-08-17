@@ -150,3 +150,16 @@ class GitOperation:
                 rel_path = str(file_path.relative_to(self.directory))
                 files.append(rel_path)
         return files
+
+
+def get_file_diff(code_dir: str, diff_base: str, diff_head: str, file_path: str) -> str | None:
+    """Returns the unified git diff for a specific file between diff_base and diff_head."""
+    try:
+        res = run_command(
+            ["git", "diff", "-U5", diff_base, diff_head, "--", file_path],
+            cwd=code_dir,
+        )
+        return res.strip() if res else None
+    except Exception as e:
+        logger.warning(f"Failed to extract git diff for {file_path}: {e}")
+        return None
