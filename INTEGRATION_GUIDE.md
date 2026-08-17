@@ -14,7 +14,7 @@ Mjolnir operates as a **reusable security auditing tool and Nix flake library**:
 - **Decentralized Repository Ownership**: Target repositories maintain their own `./mjolnir/` configuration directory containing project metadata (`project.nix`), threat models (`threat_model.md`), and job definitions (`jobs/*.nix`).
 - **Autodiscovered Nix Jobs**: Target repositories import `mjolnir.lib.discoverProjectJobs` in their `flake.nix`, automatically exposing each job as a native runnable Nix package (`nix run .#ci`, `nix run .#main`, etc.).
 - **Language-Agnostic Local Execution**: Developers run audits directly via `nix run .#<job>`, reproducing exact CI behavior locally across any project language (Rust, C, Go, SystemVerilog).
-- **Self-Contained Outputs**: Local runs output structured audit artifacts to `./mjolnir/results/`.
+- **Self-Contained Outputs**: Local runs output structured audit artifacts to `./test-out/results/` (or your configured `outputDir`).
 
 ---
 
@@ -22,7 +22,7 @@ Mjolnir operates as a **reusable security auditing tool and Nix flake library**:
 
 ### Step 1: Create the `./mjolnir/` Directory
 
-In the root of your repository, create the `./mjolnir/` layout:
+In your repository, create the `./mjolnir/` configuration directory (note: while this directory is typically placed at `./mjolnir/`, it can be located anywhere in your repository):
 
 ```text
 your-repo/
@@ -39,13 +39,18 @@ your-repo/
 ```nix
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
-{ pkgs }:
 {
   name = "Your Project Name";
   repoName = "your-repo";
   repoUrl = "https://github.com/org/your-repo.git";
-  srcExtensions = [ "rs" "c" "h" "go" "sv" "py" ];
   threatModel = ./threat_model.md;
+  outputDir = "./test-out/results";
+  workspaceDir = "./test-out/workspace";
+
+  defaultModel = "gemini-3.6-flash";
+  defaultProvider = "adk";
+  defaultBatchSize = 64;
+  defaultExtensions = [ "rs" "c" "h" "go" "sv" "py" ];
 }
 ```
 
@@ -55,10 +60,7 @@ your-repo/
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 {
-  name = "ci";
-  model = "gemini-3.6-flash";
-  provider = "adk";
-  batchSize = 10;
+  name = "CI";
   srcDirs = [ "." ];
 }
 ```
@@ -69,10 +71,8 @@ your-repo/
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 {
-  name = "main";
-  model = "gemini-3.6-flash";
-  provider = "adk";
-  batchSize = 10;
+  name = "Main";
+  branch = "main";
   srcDirs = [ "." ];
 }
 ```
@@ -104,7 +104,7 @@ In your repository's `flake.nix`, add Mjolnir as an input and use `mjolnir.lib.d
           mjolnirApp = mjolnir.packages.${system}.mjolnir-app;
           projectDir = ./mjolnir;
           deployPackages = {
-            inherit (mjolnir.packages.${system}) deploy-gcs-runs deploy-gcs-web;
+            inherit (mjolnir.packages.${system}) deploy-gcs-runs;
           };
         };
       }
@@ -117,7 +117,7 @@ In your repository's `flake.nix`, add Mjolnir as an input and use `mjolnir.lib.d
 
 ### Step 3: Run Audits Locally
 
-Any job defined in `./mjolnir/jobs/` is immediately runnable via Nix:
+Any job defined in your configuration directory (`jobs/`) is immediately runnable via Nix:
 
 ```bash
 # Run PR diff audit against main:
@@ -127,7 +127,7 @@ nix run .#ci -- --diff-base main --diff-head HEAD
 nix run .#main
 
 # Sync audit artifacts to a Google Cloud Storage bucket:
-nix run .#deploy-gcs-runs -- --bucket my-reports-bucket --output-dir ./mjolnir/results
+nix run .#deploy-gcs-runs -- --bucket my-reports-bucket --output-dir ./test-out/results
 ```
 
 ---
@@ -177,70 +177,31 @@ jobs:
         run: |
           nix run path:.#deploy-gcs-runs -- \
             --bucket "caliptra-github-ci-caliptra-reports" \
-            --output-dir "./mjolnir/results"
+            --output-dir "./test-out/results"
 ```
 
 ---
 
-### Step 5: Add Manual Web Dashboard Workflow (`.github/workflows/mjolnir_web.yml`)
-
-Add a manual `workflow_dispatch` action in `.github/workflows/mjolnir_web.yml` to compile and deploy the static WASM Web Dashboard to the reports bucket:
-
-```yaml
-# Licensed under the Apache-2.0 license
-# SPDX-License-Identifier: Apache-2.0
-name: Mjolnir Web Dashboard Deployment
-
-on:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-jobs:
-  deploy-web:
-    name: Deploy Mjolnir Web Dashboard
-    runs-on: e2-standard-2-AI
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Install Nix
-        run: |
-          sh <(curl -L https://nixos.org/nix/install) --no-daemon
-          . ~/.nix-profile/etc/profile.d/nix.sh
-          mkdir -p ~/.config/nix
-          echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
-          echo "$HOME/.nix-profile/bin" >> $GITHUB_PATH
-
-      - name: Deploy Web Dashboard to GCS
-        run: |
-          nix run path:.#deploy-gcs-web -- --bucket "caliptra-github-ci-caliptra-reports"
-```
-
----
-
-### Step 6: Update `.gitignore`
+### Step 5: Update `.gitignore`
 
 Add Mjolnir's local results and workspace directories to your `.gitignore`:
 
 ```gitignore
 # Mjolnir Scan Output and Workspaces
-mjolnir/results/
-mjolnir/workspace/
+test-out/
+workspace/
+output/
 ```
 
 ---
 
 ## 3. Deployment Commands & Storage Layout
 
-Mjolnir provides two distinct deployment commands via Nix:
+Mjolnir provides data deployment via Nix:
 
 1. **`deploy-gcs-runs`** (Data Deployment):
-   - **Purpose**: Syncs versioned audit scan runs from `--output-dir` (e.g. `./mjolnir/results`) into `gs://<bucket>/v1/runs/`.
-   - **Usage**: `nix run .#deploy-gcs-runs -- --bucket <BUCKET> --output-dir ./mjolnir/results`
+   - **Purpose**: Syncs versioned audit scan runs from `--output-dir` (e.g. `./test-out/results`) into `gs://<bucket>/v1/runs/`.
+   - **Usage**: `nix run .#deploy-gcs-runs -- --bucket <BUCKET> --output-dir ./test-out/results`
 
 2. **`deploy-gcs-web`** (UI Deployment):
    - **Purpose**: Uploads the bundled WASM Web Dashboard assets directly to the bucket root.
@@ -285,7 +246,7 @@ gs://<bucket>/
 
 ## 5. Export Artifacts & Outputs
 
-For every analysis run, Mjolnir exports structured audit artifacts under `./mjolnir/results/v1/runs/<repo>/<job>/run_<timestamp>/`:
+For every analysis run, Mjolnir exports structured audit artifacts under `<outputDir>/v1/runs/<repo>/<job>/run_<timestamp>/` (e.g. `./test-out/results/v1/runs/<repo>/<job>/run_<timestamp>/`):
 
 | Artifact                       | Description                                                                                               |
 | :----------------------------- | :-------------------------------------------------------------------------------------------------------- |
