@@ -4,5 +4,11 @@
   name = "Caliptra MCU SW";
   repoName = "caliptra-mcu-sw";
   repoUrl = "https://github.com/chipsalliance/caliptra-mcu-sw.git";
-  srcExtensions = [ "rs" "c" "h" "sv" ];
+  outputDir = "./test-out/results";
+  workspaceDir = "./test-out/workspace";
+
+  defaultModel = "gemini-3.6-flash";
+  defaultProvider = "adk";
+  defaultBatchSize = 64;
+  defaultExtensions = [ "rs" "c" "h" "sv" ];
 }

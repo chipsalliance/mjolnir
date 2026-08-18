@@ -10,6 +10,11 @@ in
   repoUrl = "file://${dummyRepo}";
   repoName = "tests";
   commit = "main";
-  srcExtensions = [ "rs" ];
-  provider = "mock";
+  outputDir = "./test-out/results";
+  workspaceDir = "./test-out/workspace";
+
+  defaultModel = "mock";
+  defaultProvider = "mock";
+  defaultBatchSize = 64;
+  defaultExtensions = [ "rs" ];
 }
