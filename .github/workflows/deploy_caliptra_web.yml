@@ -1,0 +1,36 @@
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
+name: Deploy Caliptra Web Dashboard
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-web:
+    name: Deploy Caliptra Web Viewer to GCS
+    runs-on: e2-standard-2-reporter
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        run: |
+          sh <(curl -L https://nixos.org/nix/install) --no-daemon
+          . ~/.nix-profile/etc/profile.d/nix.sh
+          mkdir -p ~/.config/nix
+          echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+          echo "$HOME/.nix-profile/bin" >> $GITHUB_PATH
+
+      - name: Deploy Web Dashboard to GCS Bucket
+        run: |
+          nix run .#deploy-gcs-web -- \
+            --bucket "caliptra-github-ci-caliptra-reports"
