@@ -59,6 +59,8 @@ def run_analysis(
     run_dir: str,
     batch_size: int,
     ingest_path: str = None,
+    diff_base: str = None,
+    diff_head: str = None,
 ) -> tuple[list[Vulnerability], str]:
     """ADK 2.0 provider pipeline: executes a multi-node workflow graph."""
     logger.info("Initializing ADK 2.0 Workflow Engine...")
@@ -100,6 +102,8 @@ def run_analysis(
         "threat_model_context": threat_model_context,
         "batch_size": batch_size,
         "ingest_path": ingest_path,
+        "diff_base": diff_base,
+        "diff_head": diff_head,
         "run_dir": run_dir,
         "usage_tracker": usage_tracker,
     }
@@ -111,6 +115,8 @@ def run_analysis(
         "threat_model_context": threat_model_context,
         "batch_size": batch_size,
         "ingest_path": ingest_path,
+        "diff_base": diff_base,
+        "diff_head": diff_head,
         "run_dir": run_dir,
     }
 

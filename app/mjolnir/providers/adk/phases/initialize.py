@@ -20,6 +20,8 @@ async def initialize(ctx: Context, node_input: str) -> Union[list[str], str]:
     ctx.state["threat_model_context"] = input_data["threat_model_context"]
     ctx.state["batch_size"] = input_data["batch_size"]
     ctx.state["run_dir"] = input_data.get("run_dir")
+    ctx.state["diff_base"] = input_data.get("diff_base")
+    ctx.state["diff_head"] = input_data.get("diff_head")
 
     ingest_path = input_data.get("ingest_path")
     if ingest_path:
