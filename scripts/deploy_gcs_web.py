@@ -58,7 +58,9 @@ def deploy_web(web_dir: Path, client: storage.Client, bucket_name: str):
         blob.upload_from_filename(str(local_file), content_type=mime)
         print(f"  Uploaded {rel_path} -> gs://{bucket_name}/{target_blob_path} ({mime})")
 
+    web_url = f"https://storage.googleapis.com/{bucket_name}/index.html"
     print(f"Web Dashboard successfully deployed to gs://{bucket_name}/!")
+    print(f"Web Dashboard URL: {web_url}")
 
 
 def main():

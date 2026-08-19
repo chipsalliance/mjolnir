@@ -43,7 +43,9 @@ def upload_single_run(
             blob = bucket.blob(blob_name)
             blob.upload_from_filename(str(file_path), content_type=mime)
 
+    run_url = f"https://storage.googleapis.com/{bucket.name}/index.html#/run/{proj_name}/{job_name}/{run_id}"
     print(f"  Uploaded {gcs_run_prefix}")
+    print(f"  Run URL: {run_url}")
     return True
 
 
