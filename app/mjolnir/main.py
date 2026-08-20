@@ -44,6 +44,10 @@ def _run_orchestrator():
         "--diff-head",
         help="Head git ref for PR diff mode",
     )
+    parser.add_argument(
+        "--workspace",
+        help="Explicit destination directory for this audit run's artifacts.",
+    )
     args, unknown_args = parser.parse_known_args()
 
     if not args.spec:
@@ -96,11 +100,15 @@ def _run_orchestrator():
     timestamp_dir = now.strftime("%Y%m%d_%H%M%S")
     timestamp_pretty = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    run_id = timestamp_dir
-    raw_output = config.get("outputDir")
-    output_dir = str(Path(raw_output).expanduser().resolve())
-    run_dir = str(Path(output_dir) / f"run_{run_id}")
-    Path(run_dir).mkdir(parents=True, exist_ok=False)
+    if args.workspace:
+        run_dir = str(Path(args.workspace).expanduser().resolve())
+        Path(run_dir).mkdir(parents=True, exist_ok=True)
+    else:
+        run_id = timestamp_dir
+        raw_output = config.get("outputDir")
+        output_dir = str(Path(raw_output).expanduser().resolve())
+        run_dir = str(Path(output_dir) / f"run_{run_id}")
+        Path(run_dir).mkdir(parents=True, exist_ok=True)
 
     log_path = str(Path(run_dir) / "job.log")
 
