@@ -193,7 +193,9 @@ jobs:
         run: |
           nix run path:.#ci -- \
             --diff-base "${{ github.event.pull_request.base.sha }}" \
-            --diff-head "${{ github.event.pull_request.head.sha }}"
+            --diff-head "${{ github.event.pull_request.head.sha }}" \
+            --pr "${{ github.event.pull_request.html_url }}" \
+            --trigger ci
 
       - name: Sync Audit Artifacts to GCS
         run: |

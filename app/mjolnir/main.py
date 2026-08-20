@@ -44,6 +44,14 @@ def _run_orchestrator():
         "--diff-head",
         help="Head git ref for PR diff mode",
     )
+    parser.add_argument(
+        "--pr",
+        help="Optional pull request link or identifier triggering the audit",
+    )
+    parser.add_argument(
+        "--trigger",
+        help="Optional trigger source for the audit run (e.g. manual, ci, automated)",
+    )
     args, unknown_args = parser.parse_known_args()
 
     if not args.spec:
@@ -127,6 +135,8 @@ def _run_orchestrator():
     ingest_path = args.ingest or job.get("ingestionReport")
     diff_base = args.diff_base or job.get("diffBase")
     diff_head = args.diff_head or job.get("diffHead")
+    pr = args.pr or job.get("pr")
+    trigger = args.trigger or job.get("trigger") or "manual"
 
     logger.info(f"Writing project metadata.")
     write_metadata(
@@ -143,6 +153,8 @@ def _run_orchestrator():
             if provider_name == "mock"
             else ("Gemini API Key" if app_config.gemini_api_key else "Vertex AI")
         ),
+        pr=pr,
+        trigger=trigger,
     )
 
     # Execute command, if one is provided

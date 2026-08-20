@@ -55,6 +55,23 @@ export function parseRunTime(r) {
   return 0;
 }
 
+export function renderTriggerBadge(triggerStr) {
+  if (!triggerStr) return "";
+  const t = triggerStr.trim().toLowerCase();
+  if (!t) return "";
+  if (t === "ci") {
+    return `<span class="trigger-pill trigger-pill-ci">CI/CD</span>`;
+  }
+  if (t === "automated") {
+    return `<span class="trigger-pill trigger-pill-automated">Automated</span>`;
+  }
+  if (t === "manual") {
+    return `<span class="trigger-pill trigger-pill-manual">Manual</span>`;
+  }
+  const display = triggerStr.length > 12 ? triggerStr.substring(0, 12) : triggerStr;
+  return `<span class="trigger-pill trigger-pill-unknown">${display}</span>`;
+}
+
 let dynamicRoutes = {};
 
 let runsState = [];
@@ -330,6 +347,8 @@ async function fetchRunsFromGcsBucket() {
           model: meta.model || "Unknown",
           commit: meta.target_commit || "Unknown",
           mode: meta.mode || "Discovery",
+          pr: meta.pr || null,
+          trigger: meta.trigger || "",
           status: meta.status || "Success",
         };
       } catch (err) {
@@ -400,6 +419,7 @@ function renderSidebarNavigation() {
   const recent10 = runsState.slice(0, 10);
   let runsHtml = "";
   recent10.forEach(r => {
+    const triggerBadge = renderTriggerBadge(r.trigger);
     const timeFormatted = formatLocalTimestamp(r.timestamp);
     const runLabel = `${r.project} (${timeFormatted})`;
     const count = r.vuln_count ?? 0;
@@ -408,7 +428,7 @@ function renderSidebarNavigation() {
 
     runsHtml += `
       <a href="#/run/${r.project}/${r.job}/${r.run_id}" class="nav-item nav-subitem" id="nav-run-${r.run_id}">
-        <span title="${r.project} / ${r.job} / ${r.run_id} (${timeFormatted})">${runLabel}</span>
+        <span title="${r.project} / ${r.job} / ${r.run_id} (${timeFormatted})">${triggerBadge ? triggerBadge + ' ' : ''}${runLabel}</span>
         <span class="badge ${badgeClass}" ${badgeStyle}>${count}</span>
       </a>`;
   });
@@ -566,15 +586,17 @@ async function renderGlobalView(container) {
   }).join("");
 
   // Recent Runs Table Data
-  const recentRowsHtml = filtered.slice(0, 10).map(r => `
+  const recentRowsHtml = filtered.slice(0, 10).map(r => {
+    const triggerBadge = renderTriggerBadge(r.trigger);
+    return `
     <tr class="clickable-row" onclick="window.location.hash='#/run/${r.project}/${r.job}/${r.run_id}'">
-      <td><strong>${r.project}</strong></td>
+      <td><strong>${r.project}</strong>${triggerBadge ? ' ' + triggerBadge : ''}</td>
       <td>${r.job}</td>
       <td><code>${r.run_id}</code></td>
       <td>${renderRunBadge(r)}</td>
       <td><span title="UTC: ${r.timestamp || 'N/A'}">${formatLocalTimestamp(r.timestamp)}</span></td>
-    </tr>
-  `).join("");
+    </tr>`;
+  }).join("");
 
   container.innerHTML = `
     <div class="metrics-grid">
@@ -590,20 +612,20 @@ async function renderGlobalView(container) {
 
     <!-- Projects Summary Card -->
     <div class="card">
-      <div class="card-title">Projects Summary</div>
-      <div class="table-container" style="margin-bottom: 0;">
+      <div class="card-title">Projects Breakdown (${Object.keys(projMap).length})</div>
+      <div class="table-container">
         <table>
           <thead>
             <tr>
               <th>Project</th>
-              <th>Total Runs</th>
-              <th>Findings</th>
-              <th style="color: var(--severity-critical)">Crit</th>
-              <th style="color: var(--severity-high)">High</th>
-              <th style="color: var(--severity-medium)">Med</th>
-              <th style="color: var(--severity-low)">Low</th>
-              <th style="color: var(--severity-info)">Info</th>
-              <th style="color: var(--text-muted)">Closed</th>
+              <th>Runs</th>
+              <th>Total</th>
+              <th style="color: var(--severity-critical);">Crit</th>
+              <th style="color: var(--severity-high);">High</th>
+              <th style="color: var(--severity-medium);">Med</th>
+              <th style="color: var(--severity-low);">Low</th>
+              <th style="color: var(--severity-info);">Info</th>
+              <th style="color: var(--text-muted);">Closed</th>
             </tr>
           </thead>
           <tbody>
@@ -613,7 +635,7 @@ async function renderGlobalView(container) {
       </div>
     </div>
 
-    <!-- Recent Runs Card -->
+    <!-- Global Recent Runs Table Card -->
     <div class="card">
       <div class="card-title">Recent Scan Runs</div>
       <div class="table-container" style="margin-bottom: 0;">
@@ -623,7 +645,7 @@ async function renderGlobalView(container) {
               <th>Project</th>
               <th>Job Target</th>
               <th>Run Directory</th>
-              <th>Findings</th>
+              <th>Status</th>
               <th>Timestamp</th>
             </tr>
           </thead>
@@ -647,48 +669,51 @@ async function renderGlobalView(container) {
 function renderAllProjectsView(container) {
   const filtered = getFilteredRuns();
   if (!filtered || filtered.length === 0) {
-    container.innerHTML = renderEmptyState("No Projects Found", `No active security projects found in output/${RUNS_SUBDIR}/.`);
+    container.innerHTML = renderEmptyState("No Projects Found", `No analysis runs found in output/${RUNS_SUBDIR}/.`);
     return;
   }
 
-
   const projMap = {};
   filtered.forEach(r => {
-    const p = r.project;
-    if (!projMap[p]) projMap[p] = [];
-    projMap[p].push(r);
+    const p = r.project || "default";
+    if (!projMap[p]) {
+      projMap[p] = { runs: 0, vulns: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    }
+    projMap[p].runs++;
+    projMap[p].vulns += (r.vuln_count || 0);
+    projMap[p].critical += (r.critical_count || 0);
+    projMap[p].high += (r.high_count || 0);
+    projMap[p].medium += (r.medium_count || 0);
+    projMap[p].low += (r.low_count || 0);
   });
 
   const cardsHtml = Object.keys(projMap).sort().map(pName => {
-    const pRuns = projMap[pName];
-    let totalVulns = 0;
-    let crit = 0, high = 0, med = 0, low = 0;
-    pRuns.forEach(r => {
-      totalVulns += (r.vuln_count || 0);
-      crit += (r.critical_count || 0);
-      high += (r.high_count || 0);
-      med += (r.medium_count || 0);
-      low += (r.low_count || 0);
-    });
-
-    const badgeClass = totalVulns === 0 ? "" : (crit > 0 ? "badge-CRITICAL" : (high > 0 ? "badge-HIGH" : (med > 0 ? "badge-MEDIUM" : "badge-LOW")));
-    const badgeStyle = totalVulns === 0 ? 'style="background-color: rgba(16, 185, 129, 0.15); color: #10b981;"' : '';
-
+    const p = projMap[pName];
     return `
-      <div class="card clickable-row" onclick="window.location.hash='#/project/${pName}'" style="cursor: pointer;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-          <h3 style="font-size: 18px; font-weight: 600; color: var(--text-primary);">${pName}</h3>
-          <span class="badge ${badgeClass}" ${badgeStyle}>${totalVulns} Findings</span>
+      <div class="card clickable-card" onclick="window.location.hash='#/project/${pName}'" style="margin-bottom: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin: 0;">${pName}</h3>
+          <span class="badge" style="background-color: var(--bg-card);">${p.runs} ${p.runs === 1 ? 'run' : 'runs'}</span>
         </div>
-        <div style="display: flex; gap: 24px; color: var(--text-secondary); font-size: 14px;">
-          <div><strong>${pRuns.length}</strong> Total Runs</div>
-          <div>Latest Run: <code>${pRuns[0]?.run_id || 'N/A'}</code></div>
+        <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 0;">
+          <div style="background: var(--bg-app); padding: 8px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 0.72rem; color: var(--text-secondary);">Findings</div>
+            <div style="font-size: 1.1rem; font-weight: 700;">${p.vulns}</div>
+          </div>
+          <div style="background: var(--bg-app); padding: 8px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 0.72rem; color: var(--severity-critical);">Critical</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--severity-critical);">${p.critical}</div>
+          </div>
+          <div style="background: var(--bg-app); padding: 8px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 0.72rem; color: var(--severity-high);">High</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--severity-high);">${p.high}</div>
+          </div>
         </div>
       </div>`;
   }).join("");
 
   container.innerHTML = `
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;">
+    <div class="card-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
       ${cardsHtml}
     </div>`;
 }
@@ -700,15 +725,15 @@ function renderAllRunsView(container) {
     return;
   }
 
-
   const rowsHtml = filtered.map(r => {
     const count = r.vuln_count ?? 0;
     const badgeClass = count === 0 ? "" : ((r.critical_count ?? 0) > 0 ? "badge-CRITICAL" : ((r.high_count ?? 0) > 0 ? "badge-HIGH" : ((r.medium_count ?? 0) > 0 ? "badge-MEDIUM" : "badge-LOW")));
     const badgeStyle = count === 0 ? 'style="background-color: rgba(16, 185, 129, 0.15); color: #10b981;"' : '';
+    const triggerBadge = renderTriggerBadge(r.trigger);
 
     return `
       <tr class="clickable-row" onclick="window.location.hash='#/run/${r.project}/${r.job}/${r.run_id}'">
-        <td><strong>${r.project}</strong></td>
+        <td><strong>${r.project}</strong>${triggerBadge ? ' ' + triggerBadge : ''}</td>
         <td>${r.job}</td>
         <td><code>${r.run_id}</code></td>
         <td><span class="badge ${badgeClass}" ${badgeStyle}>${count} Findings</span></td>
@@ -758,10 +783,11 @@ async function renderProjectView(projName, container) {
     const count = r.vuln_count ?? 0;
     const badgeClass = count === 0 ? "" : ((r.critical_count ?? 0) > 0 ? "badge-CRITICAL" : ((r.high_count ?? 0) > 0 ? "badge-HIGH" : ((r.medium_count ?? 0) > 0 ? "badge-MEDIUM" : "badge-LOW")));
     const badgeStyle = count === 0 ? 'style="background-color: rgba(16, 185, 129, 0.15); color: #10b981;"' : '';
+    const triggerBadge = renderTriggerBadge(r.trigger);
 
     return `
       <tr class="clickable-row" onclick="window.location.hash='#/run/${r.project}/${r.job}/${r.run_id}'">
-        <td><strong>${r.job}</strong></td>
+        <td><strong>${r.job}</strong>${triggerBadge ? ' ' + triggerBadge : ''}</td>
         <td><code>${r.run_id}</code></td>
         <td><span class="badge ${badgeClass}" ${badgeStyle}>${count} Findings</span></td>
         <td><span title="UTC: ${r.timestamp || 'N/A'}">${formatLocalTimestamp(r.timestamp)}</span></td>
@@ -886,10 +912,20 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
     });
 
     const totalVulns = currentRunVulns.length;
+    const prLinkHtml = meta.pr
+      ? `<div class="run-meta-item">PR: ${meta.pr.startsWith("http") ? `<a href="${meta.pr}" target="_blank" rel="noopener noreferrer" class="pr-link">${meta.pr}</a>` : `<strong>${meta.pr}</strong>`}</div>`
+      : "";
+
+    const triggerHtml = renderTriggerBadge(meta.trigger);
+    const triggerMetaItem = triggerHtml
+      ? `<div class="run-meta-item">Trigger: ${triggerHtml}</div>`
+      : "";
 
     container.innerHTML = `
       <div class="run-meta-grid">
+        ${prLinkHtml}
         <div class="run-meta-item">Project: <strong>${proj}</strong></div>
+        ${triggerMetaItem}
         <div class="run-meta-item">Job: <strong>${job}</strong></div>
         <div class="run-meta-item">Model: <strong>${meta.model || 'Unknown'}</strong></div>
         <div class="run-meta-item">Commit: <code>${shortCommit}</code></div>
@@ -1219,6 +1255,13 @@ function generateCsvReport(proj, job, runId, vulns) {
 
 function generateMarkdownReport(proj, job, runId, vulns, meta = {}) {
   let md = `# Security Audit Report: ${proj} / ${job}\n\n`;
+  if (meta && meta.pr) {
+    md += `- **Pull Request**: ${meta.pr.startsWith("http") ? `[${meta.pr}](${meta.pr})` : meta.pr}\n`;
+  }
+  if (meta && meta.trigger) {
+    const triggerDisplay = meta.trigger.toLowerCase() === "ci" ? "CI/CD" : (meta.trigger.charAt(0).toUpperCase() + meta.trigger.slice(1));
+    md += `- **Trigger**: ${triggerDisplay}\n`;
+  }
   md += `- **Run Identifier**: \`${runId}\`\n`;
   md += `- **Total Findings Reported**: ${vulns.length}\n`;
   if (meta && meta.timestamp) {

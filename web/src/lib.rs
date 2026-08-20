@@ -34,6 +34,8 @@ pub struct RunMetadataV1 {
     pub target_commit: Option<String>,
     pub timestamp: Option<String>,
     pub mode: Option<String>,
+    pub pr: Option<String>,
+    pub trigger: Option<String>,
     #[serde(default = "default_schema_version")]
     pub schema_version: String,
 }
@@ -147,6 +149,10 @@ pub struct RunOverviewItem {
     pub run_id: String,
     #[serde(default)]
     pub timestamp: String,
+    #[serde(default)]
+    pub pr: Option<String>,
+    #[serde(default)]
+    pub trigger: Option<String>,
     #[serde(default)]
     pub vuln_count: usize,
     #[serde(default)]

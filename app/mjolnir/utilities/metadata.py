@@ -18,6 +18,8 @@ def write_metadata(
     auth_mode: str = None,
     gcp_project: str = None,
     gcp_location: str = None,
+    pr: str = None,
+    trigger: str = "manual",
 ):
     """Resolves HEAD commit hash and dumps run metadata.json."""
     metadata_file = Path(run_dir) / "metadata.json"
@@ -37,6 +39,7 @@ def write_metadata(
         "target_commit": resolved_commit,
         "timestamp": timestamp_pretty,
         "mode": mode,
+        "trigger": trigger or "manual",
     }
     if auth_mode:
         metadata["auth_mode"] = auth_mode
@@ -44,6 +47,8 @@ def write_metadata(
         metadata["gcp_project"] = gcp_project
     if gcp_location:
         metadata["gcp_location"] = gcp_location
+    if pr:
+        metadata["pr"] = pr
 
     with open(metadata_file, "w") as f:
         json.dump(metadata, f, indent=2)
