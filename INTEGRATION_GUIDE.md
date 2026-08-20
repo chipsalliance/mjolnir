@@ -126,7 +126,7 @@ In your repository's `flake.nix`, add Mjolnir as an input and use `mjolnir.lib.d
           mjolnirApp = mjolnir.packages.${system}.mjolnir-app;
           projectDir = ./tools/mjolnir;
           deployPackages = {
-            inherit (mjolnir.packages.${system}) deploy-gcs-runs;
+            inherit (mjolnir.packages.${system}) deploy-gcs-runs emit-report;
           };
         };
       }
@@ -147,6 +147,9 @@ nix run .#ci -- --diff-base main --diff-head HEAD
 
 # Run full repository audit:
 nix run .#main
+
+# Emit Markdown report for the run:
+nix run .#emit-report -- --output report.md --format markdown
 
 # Sync audit artifacts to a Google Cloud Storage bucket:
 nix run .#deploy-gcs-runs -- --bucket my-reports-bucket --output-dir ./test-out/results
@@ -196,6 +199,12 @@ jobs:
             --diff-head "${{ github.event.pull_request.head.sha }}" \
             --pr "${{ github.event.pull_request.html_url }}" \
             --trigger ci
+
+      - name: Emit Markdown Report
+        run: |
+          nix run path:.#emit-report -- \
+            --output "report.md" \
+            --format "markdown"
 
       - name: Sync Audit Artifacts to GCS
         run: |

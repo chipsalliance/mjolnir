@@ -10,7 +10,7 @@ This directory contains the high-performance WebAssembly (WASM) and Rust dashboa
 - **WebAssembly Engine (`web/src/lib.rs`)**: Compiled from Rust to WASM using `wasm-bindgen`. Executes fast client-side sorting, vulnerability filtering, multi-phase Sankey flow calculations, and summary statistics.
 - **Web Worker Offloading (`web/wasm-worker.js`)**: Spawns a background browser thread to execute all WASM filtering and Sankey graph transformations without blocking UI event loops or DOM rendering.
 - **Dashboard Frontend (`web/app.js`, `web/index.html`, `web/style.css`)**: Modern single-page application (SPA) rendering findings tables, file tree views, token usage metrics, tool usage metrics, and Google Charts Sankey flow diagrams.
-- **Local Development Server & Deployment CLI (`xtask/src/main.rs`)**: Rust `cargo xtask` runner that compiles WASM modules, serves local static files, and syncs web dashboard assets to Google Cloud Storage (GCS).
+- **Local Development Server, Deployment CLI & Report Generator (`xtask/src/main.rs`, `xtask/src/report.rs`)**: Rust `cargo xtask` runner that compiles WASM modules, serves local static files, syncs web dashboard assets to Google Cloud Storage (GCS), and emits Markdown reports from run findings.
 
 ## Building & Running
 
@@ -64,4 +64,21 @@ By default, test project runs are excluded. Use `--include-tests` to include tes
 
 ```bash
 nix run .#deploy-gcs-runs -- --include-tests
+```
+
+### 5. Emit Markdown Audit Reports
+
+Emits a GitHub-Flavored Markdown report from audit run findings:
+
+```bash
+nix run .#emit-report -- --output report.md
+
+# Specify format explicitly (defaults to markdown):
+nix run .#emit-report -- --output report.md --format markdown
+```
+
+Or using `cargo xtask`:
+
+```bash
+cargo xtask emit-report --output report.md --format markdown
 ```

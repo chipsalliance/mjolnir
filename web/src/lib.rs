@@ -3,6 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::Write;
 use wasm_bindgen::prelude::*;
 
 /// List of currently supported schema versions in Mjolnir core
@@ -44,6 +45,44 @@ fn default_schema_version() -> String {
     "v1".to_string()
 }
 
+impl RunMetadataV1 {
+    pub fn formatted_pr(&self) -> Option<String> {
+        let pr = self.pr.as_deref()?.trim();
+        if pr.is_empty() {
+            return None;
+        }
+        if pr.starts_with("http") {
+            Some(format!("[{pr}]({pr})"))
+        } else {
+            Some(pr.to_string())
+        }
+    }
+
+    pub fn formatted_trigger(&self) -> Option<String> {
+        let trigger = self.trigger.as_deref()?.trim();
+        if trigger.is_empty() {
+            return None;
+        }
+        if trigger.eq_ignore_ascii_case("ci") {
+            Some("CI/CD".to_string())
+        } else {
+            let mut chars = trigger.chars();
+            chars
+                .next()
+                .map(|f| f.to_uppercase().collect::<String>() + chars.as_str())
+        }
+    }
+
+    pub fn formatted_timestamp(&self) -> Option<&str> {
+        let ts = self.timestamp.as_deref()?.trim();
+        if ts.is_empty() {
+            None
+        } else {
+            Some(ts)
+        }
+    }
+}
+
 /// Unified presentation item - Decouples UI rendering from underlying schema versions.
 /// All frontend views (tables, Sankey flow, filters) render this normalized model.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -57,6 +96,37 @@ pub struct NormalizedVulnerability {
     pub status: String,
     pub rule_id: String,
     pub schema_version: String,
+}
+
+impl NormalizedVulnerability {
+    pub fn formatted_location(&self) -> String {
+        if self.location.is_empty() {
+            self.file.clone()
+        } else {
+            format!("{}:{}", self.file, self.location)
+        }
+    }
+
+    pub fn write_markdown_entry(&self, index: usize, out: &mut String) {
+        let loc = self.formatted_location();
+        let status = if self.status.is_empty() {
+            "Open"
+        } else {
+            &self.status
+        };
+
+        let _ = writeln!(out, "### {index}. [{}] {}", self.severity, self.title);
+        let _ = writeln!(out, "- **Location**: `{loc}`");
+        let _ = writeln!(out, "- **Status**: {status}\n");
+
+        if !self.description.is_empty() {
+            let _ = writeln!(out, "**Description**:\n{}\n", self.description);
+        }
+        if !self.recommendation.is_empty() {
+            let _ = writeln!(out, "**Recommendation**:\n{}\n", self.recommendation);
+        }
+        out.push_str("---\n\n");
+    }
 }
 
 impl From<VulnerabilityV1> for NormalizedVulnerability {
@@ -117,6 +187,21 @@ impl VulnerabilityFindings {
 
     pub fn len(&self) -> usize {
         self.findings.len()
+    }
+
+    pub fn generate_markdown_report(
+        &self,
+        idents: &RunIdentifiers,
+        metadata: Option<&RunMetadataV1>,
+    ) -> String {
+        let meta_json = metadata.and_then(|m| serde_json::to_string(m).ok());
+        generate_markdown_report(
+            &idents.project,
+            &idents.job,
+            &idents.run_id,
+            &self.raw_json,
+            meta_json,
+        )
     }
 }
 
@@ -243,6 +328,59 @@ fn parse_vulnerabilities(vulnerabilities_json: &str) -> Vec<NormalizedVulnerabil
     }
 
     Vec::new()
+}
+
+fn format_report_title(proj: &str, job: &str) -> String {
+    match (!proj.is_empty(), !job.is_empty()) {
+        (true, true) => format!("# Security Audit Report: {proj} / {job}\n\n"),
+        (true, false) => format!("# Security Audit Report: {proj}\n\n"),
+        _ => "# Security Audit Report\n\n".to_string(),
+    }
+}
+
+#[wasm_bindgen]
+pub fn generate_markdown_report(
+    proj: &str,
+    job: &str,
+    run_id: &str,
+    vulnerabilities_json: &str,
+    metadata_json: Option<String>,
+) -> String {
+    let vulns = parse_vulnerabilities(vulnerabilities_json);
+    let meta: Option<RunMetadataV1> = metadata_json
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .and_then(|s| serde_json::from_str(s).ok());
+
+    let mut md = format_report_title(proj, job);
+
+    if let Some(pr) = meta.as_ref().and_then(RunMetadataV1::formatted_pr) {
+        let _ = writeln!(md, "- **Pull Request**: {pr}");
+    }
+    if let Some(trigger) = meta.as_ref().and_then(RunMetadataV1::formatted_trigger) {
+        let _ = writeln!(md, "- **Trigger**: {trigger}");
+    }
+    if !run_id.is_empty() {
+        let _ = writeln!(md, "- **Run Identifier**: `{run_id}`");
+    }
+    let _ = writeln!(md, "- **Total Findings Reported**: {}", vulns.len());
+    if let Some(ts) = meta.as_ref().and_then(RunMetadataV1::formatted_timestamp) {
+        let _ = writeln!(md, "- **Scan Timestamp**: {ts}");
+    }
+
+    md.push_str("\n## Findings Summary\n\n");
+
+    if vulns.is_empty() {
+        md.push_str("No security vulnerabilities were identified in this audit scan.\n");
+        return md;
+    }
+
+    for (idx, vuln) in vulns.iter().enumerate() {
+        vuln.write_markdown_entry(idx + 1, &mut md);
+    }
+
+    md
 }
 
 #[wasm_bindgen]
@@ -564,4 +702,76 @@ pub fn compute_run_sankey_flow(vulnerabilities_json: &str) -> String {
     let vulns: Vec<serde_json::Value> =
         serde_json::from_str(vulnerabilities_json).unwrap_or_default();
     build_phase_sankey_rows(&vulns)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_markdown_report_with_metadata_and_status() {
+        let vulns_json = r#"[
+            {
+                "title": "SQL Injection",
+                "severity": "High",
+                "file": "src/db.rs",
+                "location": "42",
+                "status": "Fixed",
+                "description": "Unsanitized user input.",
+                "recommendation": "Use parameterized queries."
+            }
+        ]"#;
+
+        let meta_json = r#"{
+            "repo": "https://github.com/org/repo",
+            "pr": "https://github.com/org/repo/pull/123",
+            "trigger": "ci",
+            "timestamp": "2026-08-21T10:00:00Z"
+        }"#;
+
+        let report = generate_markdown_report(
+            "my_project",
+            "my_job",
+            "run_001",
+            vulns_json,
+            Some(meta_json.to_string()),
+        );
+
+        assert!(report.contains("# Security Audit Report: my_project / my_job"));
+        assert!(report.contains("- **Pull Request**: [https://github.com/org/repo/pull/123](https://github.com/org/repo/pull/123)"));
+        assert!(report.contains("- **Trigger**: CI/CD"));
+        assert!(report.contains("- **Run Identifier**: `run_001`"));
+        assert!(report.contains("- **Total Findings Reported**: 1"));
+        assert!(report.contains("- **Scan Timestamp**: 2026-08-21T10:00:00Z"));
+        assert!(report.contains("### 1. [HIGH] SQL Injection"));
+        assert!(report.contains("- **Location**: `src/db.rs:42`"));
+        assert!(report.contains("- **Status**: Fixed"));
+        assert!(report.contains("**Description**:\nUnsanitized user input."));
+        assert!(report.contains("**Recommendation**:\nUse parameterized queries."));
+    }
+
+    #[test]
+    fn test_generate_markdown_report_without_metadata() {
+        let vulns_json = r#"[
+            {
+                "title": "Buffer Overflow",
+                "severity": "Critical",
+                "file": "src/buffer.c",
+                "status": "Open",
+                "description": "Unchecked index."
+            }
+        ]"#;
+
+        let report = generate_markdown_report("proj", "job", "run_002", vulns_json, None);
+
+        assert!(report.contains("# Security Audit Report: proj / job"));
+        assert!(!report.contains("- **Pull Request**:"));
+        assert!(!report.contains("- **Trigger**:"));
+        assert!(report.contains("- **Run Identifier**: `run_002`"));
+        assert!(report.contains("- **Total Findings Reported**: 1"));
+        assert!(!report.contains("- **Scan Timestamp**:"));
+        assert!(report.contains("### 1. [CRITICAL] Buffer Overflow"));
+        assert!(report.contains("- **Location**: `src/buffer.c`"));
+        assert!(report.contains("- **Status**: Open"));
+    }
 }

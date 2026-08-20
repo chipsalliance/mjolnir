@@ -131,6 +131,24 @@ Optional flags for run deployment:
 nix run .#deploy-gcs-runs -- --include-tests
 ```
 
+### Emitting Audit Reports (Markdown)
+
+Convert findings from the most recent scan into GitHub-Flavored Markdown:
+
+```bash
+# Emit Markdown report for the latest run:
+nix run .#emit-report -- --output report.md
+
+# Specify format explicitly (defaults to markdown):
+nix run .#emit-report -- --output report.md --format markdown
+```
+
+You can also run it directly via `cargo xtask`:
+
+```bash
+cargo xtask emit-report --output report.md --format markdown
+```
+
 ---
 
 ## Authentication

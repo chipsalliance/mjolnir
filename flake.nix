@@ -158,6 +158,14 @@
             '';
           };
 
+          emit-report = pkgs.writeShellApplication {
+            name = "mjolnir-emit-report";
+            runtimeInputs = [ pkgs.cargo pkgs.rustc pkgs.wasm-bindgen-cli pkgs.lld ];
+            text = ''
+              cargo xtask emit-report "$@"
+            '';
+          };
+
 
         in
           discovered // {
@@ -165,7 +173,8 @@
               mjolnir-app
               web-viewer
               deploy-gcs-web
-              deploy-gcs-runs;
+              deploy-gcs-runs
+              emit-report;
 
             test-all = makeGroup {
               name = "test-all";

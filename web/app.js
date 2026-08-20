@@ -6,7 +6,8 @@ import init, {
   filter_vulnerabilities,
   compute_sankey_flow,
   compute_project_sankey_flow,
-  compute_run_sankey_flow
+  compute_run_sankey_flow,
+  generate_markdown_report
 } from './dist/mjolnir_dashboard_wasm.js';
 import { registerTokenUsageModule, renderProjectTokenUsage, renderRunTokenUsage } from './dist/token_usage_module.js';
 import { registerToolUsageModule, renderProjectToolUsage, renderRunToolUsage } from './dist/tool_usage_module.js';
@@ -1112,7 +1113,8 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
     });
 
     document.getElementById("btn-export-md").addEventListener("click", () => {
-      const mdContent = generateMarkdownReport(proj, job, runId, window.currentFiltered || currentRunVulns, meta);
+      const vulns = window.currentFiltered || currentRunVulns;
+      const mdContent = generate_markdown_report(proj, job, runId, JSON.stringify(vulns), JSON.stringify(meta));
       downloadFile(`${proj}_${job}_${runId}_report.md`, mdContent, "text/markdown");
     });
 
@@ -1251,34 +1253,6 @@ function generateCsvReport(proj, job, runId, vulns) {
   });
 
   return rows.join("\r\n");
-}
-
-function generateMarkdownReport(proj, job, runId, vulns, meta = {}) {
-  let md = `# Security Audit Report: ${proj} / ${job}\n\n`;
-  if (meta && meta.pr) {
-    md += `- **Pull Request**: ${meta.pr.startsWith("http") ? `[${meta.pr}](${meta.pr})` : meta.pr}\n`;
-  }
-  if (meta && meta.trigger) {
-    const triggerDisplay = meta.trigger.toLowerCase() === "ci" ? "CI/CD" : (meta.trigger.charAt(0).toUpperCase() + meta.trigger.slice(1));
-    md += `- **Trigger**: ${triggerDisplay}\n`;
-  }
-  md += `- **Run Identifier**: \`${runId}\`\n`;
-  md += `- **Total Findings Reported**: ${vulns.length}\n`;
-  if (meta && meta.timestamp) {
-    md += `- **Scan Timestamp**: ${formatLocalTimestamp(meta.timestamp)}\n`;
-  }
-  md += `\n## Findings Summary\n\n`;
-
-  vulns.forEach((v, idx) => {
-    md += `### ${idx + 1}. [${v.severity}] ${v.title}\n`;
-    md += `- **Location**: \`${v.file}${v.location ? ':' + v.location : ''}\`\n`;
-    md += `- **Status**: ${v.status}\n\n`;
-    md += `**Description**:\n${v.description}\n\n`;
-    md += `**Recommendation**:\n${v.recommendation}\n\n`;
-    md += `---\n\n`;
-  });
-
-  return md;
 }
 
 function renderSankeyChart(containerId, flowJson) {

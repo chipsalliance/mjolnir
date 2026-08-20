@@ -4,10 +4,11 @@
 mod build;
 mod deploy;
 mod files;
+mod report;
 mod server;
 
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -157,6 +158,60 @@ fn main() {
             let flag_refs: Vec<&str> = flags.iter().map(|s| s.as_str()).collect();
             deploy::deploy_gcs_runs(&root, &flag_refs);
         }
+        "emit-report" => {
+            let mut output: Option<String> = None;
+            let mut format = "markdown".to_string();
+
+            let mut i = 2;
+            while i < args.len() {
+                let arg = &args[i];
+                if arg == "--output" || arg == "-o" {
+                    i += 1;
+                    if i >= args.len() {
+                        eprintln!("Error: {} requires a file path argument.", arg);
+                        std::process::exit(1);
+                    }
+                    output = Some(args[i].clone());
+                } else if let Some(val) = arg.strip_prefix("--output=") {
+                    output = Some(val.to_string());
+                } else if let Some(val) = arg.strip_prefix("-o=") {
+                    output = Some(val.to_string());
+                } else if arg == "--format" || arg == "-f" {
+                    i += 1;
+                    if i >= args.len() {
+                        eprintln!("Error: {} requires a format argument.", arg);
+                        std::process::exit(1);
+                    }
+                    format = args[i].clone();
+                } else if let Some(val) = arg.strip_prefix("--format=") {
+                    format = val.to_string();
+                } else if let Some(val) = arg.strip_prefix("-f=") {
+                    format = val.to_string();
+                } else if arg == "--help" || arg == "-h" {
+                    println!("Usage: cargo xtask emit-report --output <FILE> [--format <FORMAT>]");
+                    return;
+                } else {
+                    eprintln!(
+                        "Error: Unrecognized argument '{}' for task 'emit-report'.\nAllowed flags: --output <FILE>, --format <FORMAT>",
+                        arg
+                    );
+                    std::process::exit(1);
+                }
+                i += 1;
+            }
+
+            let output = output.unwrap_or_else(|| {
+                eprintln!(
+                    "Error: Task 'emit-report' requires --output <FILE> (e.g. --output report.md)."
+                );
+                std::process::exit(1);
+            });
+
+            if let Err(err) = report::emit_report(Path::new(&output), &format) {
+                eprintln!("Error: {}", err);
+                std::process::exit(1);
+            }
+        }
 
         "help" | "-h" | "--help" => print_help(),
         _ => {
@@ -172,7 +227,8 @@ fn print_help() {
     println!("USAGE:");
     println!("    cargo xtask web [--serve] [--port <PORT>] [--include-token-usage] [--include-tool-usage]");
     println!("    cargo xtask deploy-gcs-web --bucket <NAME> [--include-token-usage] [--include-tool-usage]");
-    println!("    cargo xtask deploy-gcs-runs --bucket <NAME> [--include-tests]\n");
+    println!("    cargo xtask deploy-gcs-runs --bucket <NAME> [--include-tests]");
+    println!("    cargo xtask emit-report --output <FILE> [--format <FORMAT>]\n");
     println!("COMMANDS:");
     println!("    web              Builds the WebAssembly dashboard module");
     println!("    web --serve      Builds and starts a local HTTP viewer server (default: http://localhost:8080)");
@@ -180,6 +236,7 @@ fn print_help() {
         "    deploy-gcs-web   Builds WASM & deploys static web dashboard to target GCS bucket"
     );
     println!("    deploy-gcs-runs  Syncs local output/v1/runs/ to target GCS bucket (skipping existing runs)");
+    println!("    emit-report      Generates a Markdown report from audit run findings");
 }
 
 fn root_dir() -> PathBuf {
