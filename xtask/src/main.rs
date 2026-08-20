@@ -3,10 +3,11 @@
 
 mod build;
 mod deploy;
+mod files;
 mod server;
 
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -182,8 +183,5 @@ fn print_help() {
 }
 
 fn root_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf()
+    files::Mjolnir::default().root
 }

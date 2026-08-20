@@ -1,8 +1,7 @@
 // Licensed under the Apache-2.0 license
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fs;
-use std::io::Read;
+use crate::files::Mjolnir;
 use std::path::Path;
 use tiny_http::{Header, Response, Server};
 
@@ -22,39 +21,23 @@ pub fn serve_local(web_dir: &Path, runs_dir: &Path, port: u16) {
 
         // GCS XML bucket listing simulation for ?prefix=v1/runs/
         if raw_url.contains("prefix=v1/runs") {
-            let mut keys = Vec::new();
-            if runs_dir.exists() {
-                for proj_entry in fs::read_dir(runs_dir).into_iter().flatten().flatten() {
-                    let proj_path = proj_entry.path();
-                    if !proj_path.is_dir() {
-                        continue;
+            let structured_runs = Mjolnir::new(runs_dir).structured_runs();
+            let keys: Vec<String> = structured_runs
+                .into_iter()
+                .filter_map(|sr| {
+                    if sr.run.metadata().is_ok() {
+                        Some(format!(
+                            "v1/runs/{}/{}/{}/{}",
+                            sr.identifiers.project,
+                            sr.identifiers.job,
+                            sr.identifiers.run_id,
+                            Mjolnir::METADATA_JSON
+                        ))
+                    } else {
+                        None
                     }
-                    let proj_name = proj_entry.file_name().to_string_lossy().to_string();
-
-                    for job_entry in fs::read_dir(&proj_path).into_iter().flatten().flatten() {
-                        let job_path = job_entry.path();
-                        if !job_path.is_dir() {
-                            continue;
-                        }
-                        let job_name = job_entry.file_name().to_string_lossy().to_string();
-
-                        for run_entry in fs::read_dir(&job_path).into_iter().flatten().flatten() {
-                            let run_path = run_entry.path();
-                            if !run_path.is_dir() {
-                                continue;
-                            }
-                            let run_id = run_entry.file_name().to_string_lossy().to_string();
-                            let meta_file = run_path.join("metadata.json");
-                            if meta_file.exists() {
-                                keys.push(format!(
-                                    "v1/runs/{}/{}/{}/metadata.json",
-                                    proj_name, job_name, run_id
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
+                })
+                .collect();
 
             let contents_xml: String = keys
                 .into_iter()
@@ -109,37 +92,35 @@ pub fn serve_local(web_dir: &Path, runs_dir: &Path, port: u16) {
             file_path = web_dir.join(rel_path.strip_prefix("web/").unwrap_or(rel_path));
         }
 
-        if file_path.is_file() {
-            let content_type = match file_path.extension().and_then(|s| s.to_str()) {
-                Some("html") => "text/html; charset=utf-8",
-                Some("js") => "application/javascript",
-                Some("wasm") => "application/wasm",
-                Some("css") => "text/css",
-                Some("json") => "application/json",
-                _ => "application/octet-stream",
-            };
-
-            if let Ok(mut f) = fs::File::open(&file_path) {
-                let mut buffer = Vec::new();
-                if f.read_to_end(&mut buffer).is_ok() {
-                    let response = Response::from_data(buffer)
-                        .with_header(
-                            Header::from_bytes(&b"Content-Type"[..], content_type.as_bytes())
-                                .unwrap(),
-                        )
-                        .with_header(
-                            Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..])
-                                .unwrap(),
-                        )
-                        .with_header(
-                            Header::from_bytes(&b"Cache-Control"[..], &b"no-cache"[..]).unwrap(),
-                        );
-                    let _ = request.respond(response);
-                    continue;
-                }
-            }
+        if let Some((buffer, content_type)) = read_static_asset(&file_path) {
+            let response = Response::from_data(buffer)
+                .with_header(
+                    Header::from_bytes(&b"Content-Type"[..], content_type.as_bytes()).unwrap(),
+                )
+                .with_header(
+                    Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap(),
+                )
+                .with_header(Header::from_bytes(&b"Cache-Control"[..], &b"no-cache"[..]).unwrap());
+            let _ = request.respond(response);
+            continue;
         }
 
         let _ = request.respond(Response::from_string("404 Not Found").with_status_code(404));
     }
+}
+
+fn read_static_asset(path: &Path) -> Option<(Vec<u8>, &'static str)> {
+    if !path.is_file() {
+        return None;
+    }
+    let content_type = match path.extension().and_then(|s| s.to_str()) {
+        Some("html") => "text/html; charset=utf-8",
+        Some("js") => "application/javascript",
+        Some("wasm") => "application/wasm",
+        Some("css") => "text/css",
+        Some("json") => "application/json",
+        _ => "application/octet-stream",
+    };
+    let buffer = std::fs::read(path).ok()?;
+    Some((buffer, content_type))
 }

@@ -14,7 +14,7 @@ pub fn get_supported_schemas() -> String {
 }
 
 /// Schema V1 definition for Mjolnir Vulnerability Findings
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct VulnerabilityV1 {
     pub title: Option<String>,
     pub severity: Option<String>,
@@ -44,7 +44,7 @@ fn default_schema_version() -> String {
 
 /// Unified presentation item - Decouples UI rendering from underlying schema versions.
 /// All frontend views (tables, Sankey flow, filters) render this normalized model.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct NormalizedVulnerability {
     pub title: String,
     pub severity: String,
@@ -75,6 +75,54 @@ impl From<VulnerabilityV1> for NormalizedVulnerability {
             rule_id: v.rule_id.unwrap_or_default(),
             schema_version: "v1".to_string(),
         }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+pub struct RunIdentifiers {
+    pub project: String,
+    pub job: String,
+    pub run_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+pub struct VulnerabilityFindings {
+    pub findings: Vec<VulnerabilityV1>,
+    pub raw_json: String,
+}
+
+impl VulnerabilityFindings {
+    pub fn new(findings: Vec<VulnerabilityV1>, raw_json: String) -> Self {
+        Self { findings, raw_json }
+    }
+
+    pub fn from_json(raw_json: String) -> Result<Self, serde_json::Error> {
+        let findings: Vec<VulnerabilityV1> = serde_json::from_str(&raw_json)?;
+        Ok(Self { findings, raw_json })
+    }
+
+    pub fn findings(&self) -> &[VulnerabilityV1] {
+        &self.findings
+    }
+
+    pub fn raw_json(&self) -> &str {
+        &self.raw_json
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.findings.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.findings.len()
+    }
+}
+
+impl std::ops::Deref for VulnerabilityFindings {
+    type Target = [VulnerabilityV1];
+
+    fn deref(&self) -> &Self::Target {
+        &self.findings
     }
 }
 
@@ -258,10 +306,8 @@ pub fn filter_vulnerabilities(
             }
 
             // Severity check
-            if !sev_target.is_empty() && sev_target != "ALL" {
-                if v.severity != sev_target {
-                    return false;
-                }
+            if !sev_target.is_empty() && sev_target != "ALL" && v.severity != sev_target {
+                return false;
             }
 
             // Free text query match
