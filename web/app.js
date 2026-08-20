@@ -27,12 +27,39 @@ export function getAssetUrl(path) {
   return new URL(cleanPath, window.location.origin + base).href;
 }
 
+export function formatLocalTimestamp(ts) {
+  if (!ts) return "N/A";
+  const normalized = ts.includes(" ") ? ts.replace(" ", "T") + "Z" : ts;
+  const d = new Date(normalized);
+  return isNaN(d.getTime()) ? ts : d.toLocaleString(undefined, { timeZoneName: "short" });
+}
+
+export function parseRunTime(r) {
+  if (!r) return 0;
+  if (r.timestamp && r.timestamp !== "N/A" && r.timestamp !== "Unknown") {
+    const normalized = r.timestamp.includes(" ") ? r.timestamp.replace(" ", "T") + "Z" : r.timestamp;
+    const d = new Date(normalized);
+    if (!isNaN(d.getTime())) return d.getTime();
+  }
+  const match = String(r.run_id || "").match(/(\d{4})(\d{2})(\d{2})_?(\d{2})(\d{2})(\d{2})/);
+  if (match) {
+    return Date.UTC(
+      parseInt(match[1], 10),
+      parseInt(match[2], 10) - 1,
+      parseInt(match[3], 10),
+      parseInt(match[4], 10),
+      parseInt(match[5], 10),
+      parseInt(match[6], 10)
+    );
+  }
+  return 0;
+}
+
 let dynamicRoutes = {};
 
 let runsState = [];
 let currentRunVulns = [];
 let currentRouteParams = {};
-let hideTests = localStorage.getItem("mjolnir_hide_tests") === "true";
 
 let worker = null;
 let workerReady = false;
@@ -311,7 +338,9 @@ async function fetchRunsFromGcsBucket() {
     });
 
     const results = await Promise.all(runPromises);
-    return results.filter(Boolean);
+    const valid = results.filter(Boolean);
+    valid.sort((a, b) => parseRunTime(b) - parseRunTime(a) || String(b.run_id).localeCompare(String(a.run_id)));
+    return valid;
   } catch (err) {
     console.warn("GCS Bucket list fetch failed:", err);
     return [];
@@ -319,13 +348,7 @@ async function fetchRunsFromGcsBucket() {
 }
 
 function getFilteredRuns() {
-  if (!runsState) return [];
-  if (!hideTests) return runsState;
-  return runsState.filter(r => {
-    const proj = (r.project || "").toLowerCase();
-    const job = (r.job || "").toLowerCase();
-    return !proj.includes("test") && !job.includes("test");
-  });
+  return runsState || [];
 }
 
 function updateFooterTimestamp() {
@@ -377,14 +400,15 @@ function renderSidebarNavigation() {
   const recent10 = runsState.slice(0, 10);
   let runsHtml = "";
   recent10.forEach(r => {
-    const shortId = r.run_id.length > 18 ? r.run_id.substring(0, 18) : r.run_id;
+    const timeFormatted = formatLocalTimestamp(r.timestamp);
+    const runLabel = `${r.project} (${timeFormatted})`;
     const count = r.vuln_count ?? 0;
     const badgeClass = count === 0 ? "" : ((r.critical_count ?? 0) > 0 ? "badge-CRITICAL" : ((r.high_count ?? 0) > 0 ? "badge-HIGH" : ((r.medium_count ?? 0) > 0 ? "badge-MEDIUM" : "badge-LOW")));
     const badgeStyle = count === 0 ? 'style="margin-left: auto; background-color: rgba(16, 185, 129, 0.15); color: #10b981;"' : 'style="margin-left: auto;"';
 
     runsHtml += `
       <a href="#/run/${r.project}/${r.job}/${r.run_id}" class="nav-item nav-subitem" id="nav-run-${r.run_id}">
-        <span title="${r.run_id}">${shortId}</span>
+        <span title="${r.project} / ${r.job} / ${r.run_id} (${timeFormatted})">${runLabel}</span>
         <span class="badge ${badgeClass}" ${badgeStyle}>${count}</span>
       </a>`;
   });
@@ -542,13 +566,13 @@ async function renderGlobalView(container) {
   }).join("");
 
   // Recent Runs Table Data
-  const recentRowsHtml = filtered.map(r => `
+  const recentRowsHtml = filtered.slice(0, 10).map(r => `
     <tr class="clickable-row" onclick="window.location.hash='#/run/${r.project}/${r.job}/${r.run_id}'">
       <td><strong>${r.project}</strong></td>
       <td>${r.job}</td>
       <td><code>${r.run_id}</code></td>
       <td>${renderRunBadge(r)}</td>
-      <td>${r.timestamp || 'N/A'}</td>
+      <td><span title="UTC: ${r.timestamp || 'N/A'}">${formatLocalTimestamp(r.timestamp)}</span></td>
     </tr>
   `).join("");
 
@@ -616,7 +640,7 @@ async function renderGlobalView(container) {
       <div id="sankey-chart-container"></div>
     </div>`;
 
-  const flowJson = await workerComputeSankeyFlow(JSON.stringify(runsState), hideTests);
+  const flowJson = await workerComputeSankeyFlow(JSON.stringify(runsState), false);
   renderSankeyChart("sankey-chart-container", flowJson);
 }
 
@@ -688,7 +712,7 @@ function renderAllRunsView(container) {
         <td>${r.job}</td>
         <td><code>${r.run_id}</code></td>
         <td><span class="badge ${badgeClass}" ${badgeStyle}>${count} Findings</span></td>
-        <td>${r.timestamp || 'N/A'}</td>
+        <td><span title="UTC: ${r.timestamp || 'N/A'}">${formatLocalTimestamp(r.timestamp)}</span></td>
       </tr>`;
   }).join("");
 
@@ -715,7 +739,9 @@ function renderAllRunsView(container) {
 }
 
 async function renderProjectView(projName, container) {
-  const projRuns = runsState.filter(r => r.project === projName);
+  const projRuns = runsState
+    .filter(r => r.project === projName)
+    .sort((a, b) => parseRunTime(b) - parseRunTime(a) || String(b.run_id).localeCompare(String(a.run_id)));
 
   if (!projRuns || projRuns.length === 0) {
     container.innerHTML = renderEmptyState(
@@ -738,7 +764,7 @@ async function renderProjectView(projName, container) {
         <td><strong>${r.job}</strong></td>
         <td><code>${r.run_id}</code></td>
         <td><span class="badge ${badgeClass}" ${badgeStyle}>${count} Findings</span></td>
-        <td>${r.timestamp || 'N/A'}</td>
+        <td><span title="UTC: ${r.timestamp || 'N/A'}">${formatLocalTimestamp(r.timestamp)}</span></td>
       </tr>`;
   }).join("");
 
@@ -869,7 +895,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         <div class="run-meta-item">Commit: <code>${shortCommit}</code></div>
         <div class="run-meta-item">Mode: <strong>${meta.mode || 'Discovery'}</strong></div>
         <div class="run-meta-item">Status: <strong style="color: ${statusColor};">${statusStr}</strong></div>
-        <div class="run-meta-item">Scan Time: <strong>${meta.timestamp || 'N/A'}</strong></div>
+        <div class="run-meta-item">Scan Time: <strong title="UTC: ${meta.timestamp || 'N/A'}">${formatLocalTimestamp(meta.timestamp)}</strong></div>
       </div>
 
       ${errorsHtml}
@@ -1050,7 +1076,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
     });
 
     document.getElementById("btn-export-md").addEventListener("click", () => {
-      const mdContent = generateMarkdownReport(proj, job, runId, window.currentFiltered || currentRunVulns);
+      const mdContent = generateMarkdownReport(proj, job, runId, window.currentFiltered || currentRunVulns, meta);
       downloadFile(`${proj}_${job}_${runId}_report.md`, mdContent, "text/markdown");
     });
 
@@ -1191,11 +1217,14 @@ function generateCsvReport(proj, job, runId, vulns) {
   return rows.join("\r\n");
 }
 
-function generateMarkdownReport(proj, job, runId, vulns) {
+function generateMarkdownReport(proj, job, runId, vulns, meta = {}) {
   let md = `# Security Audit Report: ${proj} / ${job}\n\n`;
   md += `- **Run Identifier**: \`${runId}\`\n`;
-  md += `- **Total Findings Reported**: ${vulns.length}\n\n`;
-  md += `## Findings Summary\n\n`;
+  md += `- **Total Findings Reported**: ${vulns.length}\n`;
+  if (meta && meta.timestamp) {
+    md += `- **Scan Timestamp**: ${formatLocalTimestamp(meta.timestamp)}\n`;
+  }
+  md += `\n## Findings Summary\n\n`;
 
   vulns.forEach((v, idx) => {
     md += `### ${idx + 1}. [${v.severity}] ${v.title}\n`;

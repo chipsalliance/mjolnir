@@ -92,9 +92,9 @@ def _run_orchestrator():
 
     # Create output directory
 
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(datetime.timezone.utc)
     timestamp_dir = now.strftime("%Y%m%d_%H%M%S")
-    timestamp_pretty = now.strftime("%Y-%m-%d %H:%M:%S")
+    timestamp_pretty = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     run_id = timestamp_dir
     raw_output = config.get("outputDir")
