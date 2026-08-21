@@ -5,6 +5,15 @@ name: Deploy Caliptra Web Dashboard
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - "web/**"
+      - "xtask/**"
+      - "scripts/deploy_gcs_web.py"
+      - ".github/workflows/deploy_caliptra_web.yml"
+      - "flake.nix"
+      - "flake.lock"
+      - "Cargo.toml"
+      - "Cargo.lock"
   workflow_dispatch:
 
 permissions:
