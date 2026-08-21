@@ -7,7 +7,7 @@ import init, {
   compute_sankey_flow,
   compute_project_sankey_flow,
   compute_run_sankey_flow,
-  generate_markdown_report
+  generate_report
 } from './dist/mjolnir_dashboard_wasm.js';
 import { registerTokenUsageModule, renderProjectTokenUsage, renderRunTokenUsage } from './dist/token_usage_module.js';
 import { registerToolUsageModule, renderProjectToolUsage, renderRunToolUsage } from './dist/tool_usage_module.js';
@@ -1108,13 +1108,14 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
     });
 
     document.getElementById("btn-export-csv").addEventListener("click", () => {
-      const csvContent = generateCsvReport(proj, job, runId, window.currentFiltered || currentRunVulns);
+      const vulns = window.currentFiltered || currentRunVulns;
+      const csvContent = generate_report(proj, job, runId, JSON.stringify(vulns), JSON.stringify(meta), "csv");
       downloadFile(`${proj}_${job}_${runId}_findings.csv`, csvContent, "text/csv");
     });
 
     document.getElementById("btn-export-md").addEventListener("click", () => {
       const vulns = window.currentFiltered || currentRunVulns;
-      const mdContent = generate_markdown_report(proj, job, runId, JSON.stringify(vulns), JSON.stringify(meta));
+      const mdContent = generate_report(proj, job, runId, JSON.stringify(vulns), JSON.stringify(meta), "markdown");
       downloadFile(`${proj}_${job}_${runId}_report.md`, mdContent, "text/markdown");
     });
 
@@ -1223,36 +1224,6 @@ function downloadFile(filename, text, mimeType) {
   document.body.appendChild(element);
   element.click();
   document.body.removeChild(element);
-}
-
-function escapeCsvField(val) {
-  if (val === null || val === undefined) return '""';
-  const str = String(val);
-  return `"${str.replace(/"/g, '""')}"`;
-}
-
-function generateCsvReport(proj, job, runId, vulns) {
-  const headers = ["Project", "Job", "Run ID", "Finding ID", "Severity", "Title", "File", "Location", "Status", "Description", "Recommendation"];
-  const rows = [headers.map(escapeCsvField).join(",")];
-
-  (vulns || []).forEach((v, idx) => {
-    const row = [
-      proj,
-      job,
-      runId,
-      v.id || String(idx + 1),
-      v.severity || "LOW",
-      v.title || "Untitled Finding",
-      v.file || "",
-      v.location || "",
-      v.status || "Open",
-      v.description || "",
-      v.recommendation || "",
-    ];
-    rows.push(row.map(escapeCsvField).join(","));
-  });
-
-  return rows.join("\r\n");
 }
 
 function renderSankeyChart(containerId, flowJson) {

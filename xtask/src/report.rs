@@ -6,13 +6,13 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
 
-pub fn emit_report(output_path: &Path, _format: &str) -> Result<()> {
+pub fn emit_report(output_path: &Path, format: &str) -> Result<()> {
     let run = Mjolnir::default().latest_run()?;
     let vulns = run.vulnerabilities()?;
     let idents = run.resolve_run_identifiers();
     let meta = run.metadata().ok();
 
-    let report_content = vulns.generate_markdown_report(&idents, meta.as_ref());
+    let report_content = vulns.generate_report(&idents, meta.as_ref(), format);
 
     if let Some(parent) = output_path.parent() {
         if !parent.as_os_str().is_empty() {

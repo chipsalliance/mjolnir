@@ -99,6 +99,35 @@ pub struct NormalizedVulnerability {
 }
 
 impl NormalizedVulnerability {
+    pub const CSV_HEADERS: [&'static str; 18] = [
+        "Project",
+        "Job",
+        "Run ID",
+        "Timestamp",
+        "Trigger",
+        "PR",
+        "Commit",
+        "Model",
+        "Mode",
+        "Repo",
+        "Finding ID",
+        "Severity",
+        "Title",
+        "File",
+        "Location",
+        "Status",
+        "Description",
+        "Recommendation",
+    ];
+
+    pub fn csv_header_row() -> String {
+        Self::CSV_HEADERS
+            .iter()
+            .map(|h| format_csv_entry(Some(h)))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+
     pub fn formatted_location(&self) -> String {
         if self.location.is_empty() {
             self.file.clone()
@@ -107,13 +136,17 @@ impl NormalizedVulnerability {
         }
     }
 
-    pub fn write_markdown_entry(&self, index: usize, out: &mut String) {
-        let loc = self.formatted_location();
-        let status = if self.status.is_empty() {
+    pub fn effective_status(&self) -> &str {
+        if self.status.is_empty() {
             "Open"
         } else {
             &self.status
-        };
+        }
+    }
+
+    pub fn write_markdown_entry(&self, index: usize, out: &mut String) {
+        let loc = self.formatted_location();
+        let status = self.effective_status();
 
         let _ = writeln!(out, "### {index}. [{}] {}", self.severity, self.title);
         let _ = writeln!(out, "- **Location**: `{loc}`");
@@ -126,6 +159,38 @@ impl NormalizedVulnerability {
             let _ = writeln!(out, "**Recommendation**:\n{}\n", self.recommendation);
         }
         out.push_str("---\n\n");
+    }
+
+    pub fn to_csv_row(
+        &self,
+        proj: &str,
+        job: &str,
+        run_id: &str,
+        meta: Option<&RunMetadataV1>,
+        index: usize,
+    ) -> String {
+        let finding_id = index.to_string();
+        let fields = [
+            format_csv_entry(Some(proj)),
+            format_csv_entry(Some(job)),
+            format_csv_entry(Some(run_id)),
+            format_csv_entry(meta.and_then(|m| m.timestamp.as_deref())),
+            format_csv_entry(meta.and_then(|m| m.trigger.as_deref())),
+            format_csv_entry(meta.and_then(|m| m.pr.as_deref())),
+            format_csv_entry(meta.and_then(|m| m.target_commit.as_deref())),
+            format_csv_entry(meta.and_then(|m| m.model.as_deref())),
+            format_csv_entry(meta.and_then(|m| m.mode.as_deref())),
+            format_csv_entry(meta.and_then(|m| m.repo.as_deref())),
+            format_csv_entry(Some(&finding_id)),
+            format_csv_entry(Some(&self.severity)),
+            format_csv_entry(Some(&self.title)),
+            format_csv_entry(Some(&self.file)),
+            format_csv_entry(Some(&self.location)),
+            format_csv_entry(Some(self.effective_status())),
+            format_csv_entry(Some(&self.description)),
+            format_csv_entry(Some(&self.recommendation)),
+        ];
+        fields.join(",")
     }
 }
 
@@ -189,18 +254,20 @@ impl VulnerabilityFindings {
         self.findings.len()
     }
 
-    pub fn generate_markdown_report(
+    pub fn generate_report(
         &self,
         idents: &RunIdentifiers,
         metadata: Option<&RunMetadataV1>,
+        format: &str,
     ) -> String {
         let meta_json = metadata.and_then(|m| serde_json::to_string(m).ok());
-        generate_markdown_report(
+        generate_report(
             &idents.project,
             &idents.job,
             &idents.run_id,
             &self.raw_json,
             meta_json,
+            format,
         )
     }
 }
@@ -338,8 +405,7 @@ fn format_report_title(proj: &str, job: &str) -> String {
     }
 }
 
-#[wasm_bindgen]
-pub fn generate_markdown_report(
+fn generate_markdown_report(
     proj: &str,
     job: &str,
     run_id: &str,
@@ -381,6 +447,48 @@ pub fn generate_markdown_report(
     }
 
     md
+}
+
+fn format_csv_entry(val: Option<&str>) -> String {
+    let s = val.unwrap_or("");
+    format!("\"{}\"", s.replace('"', "\"\""))
+}
+
+fn generate_csv_report(
+    proj: &str,
+    job: &str,
+    run_id: &str,
+    vulnerabilities_json: &str,
+    metadata_json: Option<String>,
+) -> String {
+    let vulns = parse_vulnerabilities(vulnerabilities_json);
+    let metadata: Option<RunMetadataV1> = metadata_json
+        .as_deref()
+        .and_then(|json| serde_json::from_str(json).ok());
+
+    let mut rows: Vec<String> = Vec::with_capacity(vulns.len() + 1);
+    rows.push(NormalizedVulnerability::csv_header_row());
+
+    for (idx, v) in vulns.iter().enumerate() {
+        rows.push(v.to_csv_row(proj, job, run_id, metadata.as_ref(), idx + 1));
+    }
+
+    rows.join("\r\n")
+}
+
+#[wasm_bindgen]
+pub fn generate_report(
+    proj: &str,
+    job: &str,
+    run_id: &str,
+    vulnerabilities_json: &str,
+    metadata_json: Option<String>,
+    format: &str,
+) -> String {
+    match format.trim().to_lowercase().as_str() {
+        "csv" => generate_csv_report(proj, job, run_id, vulnerabilities_json, metadata_json),
+        _ => generate_markdown_report(proj, job, run_id, vulnerabilities_json, metadata_json),
+    }
 }
 
 #[wasm_bindgen]
@@ -729,12 +837,13 @@ mod tests {
             "timestamp": "2026-08-21T10:00:00Z"
         }"#;
 
-        let report = generate_markdown_report(
+        let report = generate_report(
             "my_project",
             "my_job",
             "run_001",
             vulns_json,
             Some(meta_json.to_string()),
+            "markdown",
         );
 
         assert!(report.contains("# Security Audit Report: my_project / my_job"));
@@ -762,7 +871,7 @@ mod tests {
             }
         ]"#;
 
-        let report = generate_markdown_report("proj", "job", "run_002", vulns_json, None);
+        let report = generate_report("proj", "job", "run_002", vulns_json, None, "markdown");
 
         assert!(report.contains("# Security Audit Report: proj / job"));
         assert!(!report.contains("- **Pull Request**:"));
@@ -773,5 +882,98 @@ mod tests {
         assert!(report.contains("### 1. [CRITICAL] Buffer Overflow"));
         assert!(report.contains("- **Location**: `src/buffer.c`"));
         assert!(report.contains("- **Status**: Open"));
+    }
+
+    #[test]
+    fn test_generate_csv_report() {
+        let vulns_json = r#"[
+            {
+                "title": "SQL Injection in \"login\"",
+                "severity": "High",
+                "file": "src/db.rs",
+                "location": "42",
+                "status": "Open",
+                "description": "User input with, commas and quotes.",
+                "recommendation": "Use parameterized queries."
+            }
+        ]"#;
+
+        let meta_json = r#"{
+            "repo": "https://github.com/google/caliptra-sw.git",
+            "model": "gemini-2.5-pro",
+            "target_commit": "abc12345",
+            "timestamp": "2026-08-20T10:00:00Z",
+            "mode": "autonomous",
+            "pr": "https://github.com/google/caliptra-sw/pull/123",
+            "trigger": "push"
+        }"#;
+
+        let csv = generate_report(
+            "my_project",
+            "my_job",
+            "run_001",
+            vulns_json,
+            Some(meta_json.to_string()),
+            "csv",
+        );
+        let lines: Vec<&str> = csv.split("\r\n").collect();
+
+        assert_eq!(lines.len(), 2);
+        assert_eq!(
+            lines[0],
+            "\"Project\",\"Job\",\"Run ID\",\"Timestamp\",\"Trigger\",\"PR\",\"Commit\",\"Model\",\"Mode\",\"Repo\",\"Finding ID\",\"Severity\",\"Title\",\"File\",\"Location\",\"Status\",\"Description\",\"Recommendation\""
+        );
+        assert_eq!(
+            lines[1],
+            "\"my_project\",\"my_job\",\"run_001\",\"2026-08-20T10:00:00Z\",\"push\",\"https://github.com/google/caliptra-sw/pull/123\",\"abc12345\",\"gemini-2.5-pro\",\"autonomous\",\"https://github.com/google/caliptra-sw.git\",\"1\",\"HIGH\",\"SQL Injection in \"\"login\"\"\",\"src/db.rs\",\"42\",\"Open\",\"User input with, commas and quotes.\",\"Use parameterized queries.\""
+        );
+
+        // Test without metadata
+        let csv_no_meta =
+            generate_report("my_project", "my_job", "run_001", vulns_json, None, "csv");
+        let lines_no_meta: Vec<&str> = csv_no_meta.split("\r\n").collect();
+        assert_eq!(
+            lines_no_meta[1],
+            "\"my_project\",\"my_job\",\"run_001\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"1\",\"HIGH\",\"SQL Injection in \"\"login\"\"\",\"src/db.rs\",\"42\",\"Open\",\"User input with, commas and quotes.\",\"Use parameterized queries.\""
+        );
+    }
+
+    #[test]
+    fn test_generate_report_dispatch() {
+        let vulns_json = r#"[
+            {
+                "title": "Finding A",
+                "severity": "Low",
+                "file": "src/main.rs"
+            }
+        ]"#;
+
+        let meta_json = r#"{
+            "model": "gemini-2.5-flash",
+            "trigger": "ci"
+        }"#;
+
+        let md = generate_report(
+            "proj",
+            "job",
+            "run_1",
+            vulns_json,
+            Some(meta_json.to_string()),
+            "markdown",
+        );
+        assert!(md.contains("# Security Audit Report: proj / job"));
+        assert!(md.contains("- **Trigger**: CI/CD"));
+        assert!(md.contains("### 1. [LOW] Finding A"));
+
+        let csv = generate_report(
+            "proj",
+            "job",
+            "run_1",
+            vulns_json,
+            Some(meta_json.to_string()),
+            "csv",
+        );
+        assert!(csv.contains("\"Project\",\"Job\",\"Run ID\",\"Timestamp\",\"Trigger\""));
+        assert!(csv.contains("\"proj\",\"job\",\"run_1\",\"\",\"ci\",\"\",\"\",\"gemini-2.5-flash\",\"\",\"\",\"1\",\"LOW\",\"Finding A\""));
     }
 }
