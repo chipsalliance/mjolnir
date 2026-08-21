@@ -1154,10 +1154,10 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
       document.getElementById("vulnerability-modal").classList.remove("hidden");
     };
 
-    updateTable();
+    await updateTable();
 
     // Auto open modal if deep linked to finding index
-    if (deepLinkFindingIdx !== null && !isNaN(deepLinkFindingIdx) && window.currentFiltered[deepLinkFindingIdx]) {
+    if (deepLinkFindingIdx !== null && !isNaN(deepLinkFindingIdx) && window.currentFiltered?.[deepLinkFindingIdx]) {
       window.showFindingModal(deepLinkFindingIdx);
     }
 
