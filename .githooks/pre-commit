@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Licensed under the Apache-2.0 license
+# SPDX-License-Identifier: Apache-2.0
+
+set -euo pipefail
+
+# 1. Identify files currently staged for commit (Added, Copied, Modified)
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -z "$STAGED_FILES" ]; then
+    exit 0
+fi
+
+echo "==> [pre-commit] Formatting source files (Rust, Markdown, Python, Shell, Starlark)..."
+bazel run //quality:format
+
+# 2. Re-stage any formatted files that were part of this commit
+echo "$STAGED_FILES" | while IFS= read -r file; do
+    if [ -f "$file" ]; then
+        git add "$file"
+    fi
+done
+
+# 3. Verify format check passes
+echo "==> [pre-commit] Verifying formatting compliance..."
+bazel test //quality:format_check
+
+echo "==> [pre-commit] Checks passed successfully."

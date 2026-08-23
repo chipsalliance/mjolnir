@@ -216,3 +216,32 @@ nix run .#adk-gemini-ingest-test
 ```bash
 nix run .#test-all
 ```
+
+---
+
+## Code Quality & Pre-Commit Hooks
+
+Mjolnir enforces code formatting and quality checks across Rust (`rustfmt`), Markdown/JavaScript (`prettier`), Python (`ruff`), Shell (`shfmt`), and Starlark (`buildifier`).
+
+### Running Quality Checks Manually
+
+```bash
+# Auto-format all supported files in the repository:
+bazel run //quality:format
+
+# Check formatting compliance:
+bazel test //quality:format_check
+
+# Run full quality test suite (formatting, license headers, shellcheck):
+bazel test //quality
+```
+
+### Enabling Pre-Commit Auto-Formatting
+
+Mjolnir includes a shared Git pre-commit hook in [`.githooks/pre-commit`](.githooks/pre-commit) that automatically formats staged files and verifies formatting before each commit.
+
+To activate the hook in your local clone, run once:
+
+```bash
+git config core.hooksPath .githooks
+```
