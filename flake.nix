@@ -190,17 +190,6 @@
               ];
             };
 
-            caliptra-all = makeGroup {
-              name = "caliptra-all";
-              description = "All Caliptra jobs";
-              jobs = [
-                discovered.caliptra-sw-main
-                discovered.caliptra-sw-rom-main
-                discovered.caliptra-sw-caliptra-1x
-                discovered.caliptra-mcu-sw-main
-              ];
-            };
-
             opentitan-all = makeGroup {
               name = "opentitan-all";
               description = "All OpenTitan jobs";

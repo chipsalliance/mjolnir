@@ -86,13 +86,13 @@ nix run .#<project-target>
 
 #### Examples
 
-- **Run Caliptra SW Audit**:
-  ```bash
-  nix run .#caliptra-sw-main
-  ```
 - **Run OpenTitan ROM Audit**:
   ```bash
   nix run .#opentitan-rom
+  ```
+- **Run All OpenTitan Jobs**:
+  ```bash
+  nix run .#opentitan-all
   ```
 
 ---

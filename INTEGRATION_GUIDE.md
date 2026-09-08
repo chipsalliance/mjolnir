@@ -209,7 +209,7 @@ jobs:
       - name: Sync Audit Artifacts to GCS
         run: |
           nix run path:.#deploy-gcs-runs -- \
-            --bucket "caliptra-github-ci-caliptra-reports" \
+            --bucket "my-reports-bucket" \
             --output-dir "./test-out/results"
 ```
 

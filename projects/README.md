@@ -3,18 +3,26 @@
 
 # Projects
 
-This directory contains definitions for each project currently supported by Mjolnir.
+> [!WARNING]
+> **DEPRECATION NOTICE: Centralized Direct Project Integration**
+> Adding or maintaining project configurations directly within Mjolnir's `projects/` directory is **deprecated**.
+>
+> Mjolnir has transitioned to a **decentralized, repository-native architecture**. Adopting projects should maintain their own Mjolnir configuration directory (`./tools/mjolnir/` or `./mjolnir/`), threat models, jobs, and CI workflows natively within their own repositories (as implemented by `caliptra-sw`, `caliptra-mcu-sw`, and `caliptra-dpe`).
+>
+> Please refer to the [Mjolnir Integration Guide](../INTEGRATION_GUIDE.md) for instructions on integrating Mjolnir directly into your target repository.
+
+This directory contains legacy centralized definitions for projects supported by Mjolnir.
 
 ## Existing Projects
 
-- [Caliptra DPE](./caliptra-dpe/): Caliptra's DPE repository.
-- [Caliptra MCU SW](./caliptra-mcu-sw/): Caliptra's MCU SW repository.
-- [Caliptra SW](./caliptra-sw/): Caliptra's SW repository.
-- [OpenTitan](./opentitan/): OpenTitan's main repository.
+- [OpenTitan](./opentitan/): OpenTitan's main repository (legacy built-in configuration).
 
-## Adding a New Project
+## Adding a New Project (Deprecated Workflow)
 
-To add a new project target to Mjolnir, you need to create a project folder under `projects/` with the following structure:
+> [!IMPORTANT]
+> New projects should follow the decentralized model in the [Mjolnir Integration Guide](../INTEGRATION_GUIDE.md). The instructions below are retained only for legacy reference.
+
+To add a legacy centralized project target to Mjolnir, you need to create a project folder under `projects/` with the following structure:
 
 ```
 projects/
@@ -54,9 +62,9 @@ The `project.nix` file defines the repository and global settings for the projec
 
 ```nix
 {
-  name = "Caliptra DPE";
-  repoName = "caliptra-dpe";
-  repoUrl = "https://github.com/chipsalliance/caliptra-dpe.git";
+  name = "My Root of Trust Project";
+  repoName = "my-rot-project";
+  repoUrl = "https://github.com/example/my-rot-project.git";
   threatModel = ./threat_model.md;
   outputDir = "./test-out/results";
   workspaceDir = "./test-out/workspace";
@@ -64,7 +72,7 @@ The `project.nix` file defines the repository and global settings for the projec
   defaultModel = "gemini-3.6-flash";
   defaultProvider = "adk";
   defaultBatchSize = 64;
-  defaultExtensions = [ "rs" "go" ];
+  defaultExtensions = [ "rs" "c" "h" ];
 }
 ```
 
