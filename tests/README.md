@@ -14,8 +14,6 @@ These targets test Mjolnir's **Python analysis engine, agent workflows, git oper
 - **`jobs/`**: Test scenario specifications:
   - `mock-smoke.nix`: Basic local mock scan verifying discovery, search tools, and report generation (`nix run .#mock-smoke-test`).
   - `mock-ci.nix`: PR diff mode mock verification (`nix run .#mock-ci-test`).
-  - `genai-ci.nix`: PR diff check using the GenAI provider (`nix run .#genai-ci-test`).
-  - `genai-gemini.nix`: Live Gemini API request verifying ADC/API-key authentication via GenAI provider (`nix run .#genai-gemini-test`).
   - `adk-ci.nix`: PR diff check using the ADK provider graph (`nix run .#adk-ci-test`).
   - `adk-gemini.nix`: Live multi-agent workflow test using the ADK provider (`nix run .#adk-gemini-test`).
   - `adk-gemini-ingest.nix`: Mock report ingestion pipeline test using the ADK provider (`nix run .#adk-gemini-ingest-test`).

@@ -8,8 +8,7 @@ Execution backends that scan codebase files and compile findings.
 ## Directories
 
 - **`mock/`**: Instantly yields hardcoded findings for testing the orchestrator.
-- **`genai/`**: Google GenAI SDK (Gemini) backend.
-- **`adk/`**: Agent Development Kit (ADK) backend.
+- **`adk/`**: Agent Development Kit (ADK) execution engine.
 
 ## Provider Interface
 

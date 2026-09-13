@@ -48,7 +48,7 @@ graph TD
   - **Orchestration (`orchestrator.nix`)**: When a target is executed (via `nix run`), it packages the job by serializing the configuration attributes into a static JSON spec file in the Nix store, and builds a launcher script.
 - **Python Layer (Application Engine)**:
   - **Orchestrator (`main.py`)**: Parses the serialized JSON spec, sets up the workspace directory, clones the target repository, and checks out the designated revision.
-  - **Analysis Execution**: Filters files based on source directories and extensions, then delegates analysis to the specified provider backend (e.g., `genai` or `mock`).
+  - **Analysis Execution**: Filters files based on source directories and extensions, then delegates analysis to the specified provider (`adk` or `mock`).
   - **Reporting & Dashboarding**: Compiles the findings into `vulnerabilities.json` and generates an interactive HTML dashboard in the output directory.
 
 ### Execution Flow
@@ -63,7 +63,7 @@ graph TD
 ## Directory Structure
 
 - **[INTEGRATION_GUIDE.md](./INTEGRATION_GUIDE.md)**: Guide for integrating Mjolnir security audits into repositories (GitHub Actions, GCS export, PR diff mode).
-- **[app/mjolnir/](./app/mjolnir/)**: Core Python application engine, including agent tools, data models, and providers (mock, genai). See [Application Engine README](./app/mjolnir/README.md).
+- **[app/mjolnir/](./app/mjolnir/)**: Core Python application engine, including agent tools, data models, and providers (mock, adk). See [Application Engine README](./app/mjolnir/README.md).
 - **[nix/](./nix/)**: Nix infrastructure for job packaging, auto-discovery, and orchestration. See [Nix README](./nix/README.md).
 - **[projects/](./projects/)**: Supported project definitions and job configurations. See [Projects README](./projects/README.md).
 - **`output/`**: Generated analysis reports, run logs, and HTML dashboards.
@@ -201,10 +201,7 @@ nix run .#mock-smoke-test
 Run live scans on test fixtures using ambient ADC or optional API key:
 
 ```bash
-# Option A: GenAI Provider Target
-nix run .#genai-gemini-test
-
-# Option B: ADK Provider Target (Google Agent Development Kit)
+# ADK Provider Target (Google Agent Development Kit)
 nix run .#adk-gemini-test
 
 # Option C: ADK Ingestion Mode

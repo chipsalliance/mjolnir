@@ -12,7 +12,7 @@ This directory contains the core Python application engine for Mjolnir. It handl
 - `data/`: Pydantic data models defining the schema for vulnerabilities, findings, verdicts, and status.
 - `providers/`: Implementations of different analysis backends.
   - `mock/`: A mock provider that returns pre-defined findings quickly, useful for testing the orchestrator and dashboard generation.
-  - `genai/`: The production provider using the Google GenAI SDK to run LLM-based audit and review pipelines.
+  - `adk/`: The production provider built on Google's Agent Development Kit.
 - `utilities/`: Helper modules for logging, dashboard generation, git operations, GCS upload, and metadata tracking.
 
 ## Execution Flow

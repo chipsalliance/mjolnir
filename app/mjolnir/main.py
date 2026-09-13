@@ -10,7 +10,6 @@ from pathlib import Path
 from config import AppConfig
 from data.status import Status
 import providers.adk.main as adk
-import providers.genai.main as genai
 import providers.mock.main as mock
 from utilities.command import run_command
 from utilities.discovery import discover_source_files
@@ -219,16 +218,6 @@ def _run_orchestrator():
 
     if provider_name == "mock":
         vulnerabilities, status = mock.run_analysis(
-            model_name,
-            code_dir,
-            files_to_scan,
-            threat_model_context,
-            run_dir,
-            batch_size,
-            ingest_path=ingest_path,
-        )
-    elif provider_name == "genai":
-        vulnerabilities, status = genai.run_analysis(
             model_name,
             code_dir,
             files_to_scan,

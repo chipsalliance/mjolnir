@@ -182,8 +182,6 @@
               jobs = [
                 discovered.mock-smoke-test
                 discovered.mock-ci-test
-                discovered.genai-ci-test
-                discovered.genai-gemini-test
                 discovered.adk-ci-test
                 discovered.adk-gemini-test
                 discovered.adk-gemini-ingest-test
