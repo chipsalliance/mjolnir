@@ -1,15 +1,9 @@
 <!-- Licensed under the Apache-2.0 license -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# Analysis Providers
+# Analysis Engines
 
-Execution backends that scan codebase files and compile findings.
+This directory contains the execution backends for Mjolnir analysis:
 
-## Directories
-
-- **`mock/`**: Instantly yields hardcoded findings for testing the orchestrator.
-- **`adk/`**: Agent Development Kit (ADK) execution engine.
-
-## Provider Interface
-
-All providers must implement `run_analysis` in their `main.py`. Refer to the [Mjolnir Application Engine README](../README.md#analysis-providers) for specifications.
+- **`adk/`**: The core production analysis engine built on Google's Agent Development Kit (ADK). Orchestrates multi-phase auditing, agent tool calling, and adversarial review.
+- **`mock/`**: Deterministic mock engine used exclusively for integration tests and local pipeline verification (`model = "mock"`).

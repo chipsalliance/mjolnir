@@ -54,7 +54,6 @@ The `project.nix` file defines the repository and global settings for the projec
 - **`workspaceDir`** (String, Required): Relative path where temporary analysis workspaces are created (e.g. `"./test-out/workspace"`).
 
 - **`defaultModel`** (String, Required unless set in job): Default AI foundation model (e.g. `"gemini-3.6-flash"`).
-- **`defaultProvider`** (String, Required unless set in job): Default execution engine (`"adk"` or `"mock"`).
 - **`defaultBatchSize`** (Integer, Required unless set in job): Default batch window size for agent analysis (e.g. `64`).
 - **`defaultExtensions`** (List of Strings, Required unless set in job): Default source file extensions to audit (e.g. `["rs", "c", "h"]`).
 
@@ -70,7 +69,6 @@ The `project.nix` file defines the repository and global settings for the projec
   workspaceDir = "./test-out/workspace";
 
   defaultModel = "gemini-3.6-flash";
-  defaultProvider = "adk";
   defaultBatchSize = 64;
   defaultExtensions = [ "rs" "c" "h" ];
 }
@@ -96,7 +94,6 @@ Each file under `jobs/` defines a specific audit task (e.g., scanning PR diffs, 
 - **`cmd`** (String, Optional): Build or verification command to run inside the development shell context.
 - **`ingestionReport`** (String, Optional): Path to an existing vulnerability report (CSV/JSON/SARIF) to ingest.
 - **`model`** (String, Optional): Override the model to use (defaults to `project.defaultModel`).
-- **`provider`** (String, Optional): Override the analysis provider (defaults to `project.defaultProvider`).
 - **`batchSize`** (Integer, Optional): Number of concurrent tasks / files to process per batch (defaults to `project.defaultBatchSize`).
 - **`extensions`** (List of Strings, Optional): Override file extensions to scan (defaults to `project.defaultExtensions`).
 
