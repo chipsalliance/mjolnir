@@ -5,14 +5,13 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
-    nixpkgs-v4.url = "github:NixOS/nixpkgs/nixos-22.05";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, nixpkgs-v4, rust-overlay }:
+  outputs = { self, nixpkgs, rust-overlay }:
     let
       supportedSystems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -32,7 +31,6 @@
       packages = forAllSystems (system:
         let
           pkgs = nixpkgsFor.${system};
-          pkgs-v4 = nixpkgs-v4.legacyPackages.${system};
 
 
 
