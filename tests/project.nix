@@ -14,7 +14,6 @@ in
   workspaceDir = "./test-out/workspace";
 
   defaultModel = "mock";
-  defaultProvider = "mock";
   defaultBatchSize = 64;
   defaultExtensions = [ "rs" ];
 }

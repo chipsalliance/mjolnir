@@ -3,7 +3,6 @@
 { pkgs, project, job, mjolnir-app, devShell ? null, ... }:
 let
   model = job.model or project.defaultModel or (throw "Mjolnir: No model specified for job '${job.name or "unknown"}' (set 'model' in job.nix or 'defaultModel' in project.nix).");
-  provider = job.provider or project.defaultProvider or (throw "Mjolnir: No provider specified for job '${job.name or "unknown"}' (set 'provider' in job.nix or 'defaultProvider' in project.nix).");
   batchSize = job.batchSize or project.defaultBatchSize or (throw "Mjolnir: No batchSize specified for job '${job.name or "unknown"}' (set 'batchSize' in job.nix or 'defaultBatchSize' in project.nix).");
   extensions = job.extensions or project.defaultExtensions or (throw "Mjolnir: No extensions specified for job '${job.name or "unknown"}' (set 'extensions' in job.nix or 'defaultExtensions' in project.nix).");
   outputDir = project.outputDir or (throw "Mjolnir: No 'outputDir' specified for project '${project.name or "unknown"}' (set 'outputDir' in project.nix).");
@@ -17,7 +16,7 @@ let
 
     job = {
       inherit (job) name;
-      inherit model provider batchSize extensions;
+      inherit model batchSize extensions;
       branch = job.branch or null;
       tag = job.tag or null;
       commit = job.commit or null;

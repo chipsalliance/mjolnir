@@ -5,6 +5,5 @@
   srcDirs = [ "src" ];
   maxFiles = 5;
   model = "gemini-3.6-flash";
-  provider = "adk";
   extensions = [ "rs" ];
 }

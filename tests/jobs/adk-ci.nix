@@ -5,5 +5,4 @@
   diffBase = "HEAD~1";
   diffHead = "HEAD";
   model = "gemini-3.6-flash";
-  provider = "adk";
 }

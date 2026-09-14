@@ -9,7 +9,6 @@
   workspaceDir = "./test-out/workspace";
 
   defaultModel = "gemini-3.6-flash";
-  defaultProvider = "adk";
   defaultBatchSize = 64;
   defaultExtensions = [ "rs" "c" "h" "sv" ];
 }

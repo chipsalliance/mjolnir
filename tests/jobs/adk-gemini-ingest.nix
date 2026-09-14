@@ -4,5 +4,4 @@
   name = "adk-gemini-ingest-test";
   ingestionReport = "mock_report.csv";
   model = "gemini-3.6-flash";
-  provider = "adk";
 }
