@@ -14,7 +14,9 @@ These targets test Mjolnir's **Python analysis engine, agent workflows, git oper
 - **`jobs/`**: Test scenario specifications:
   - `mock-smoke.nix`: Basic local mock scan verifying discovery, search tools, and report generation (`nix run .#mock-smoke-test`).
   - `mock-ci.nix`: PR diff mode mock verification (`nix run .#mock-ci-test`).
-  - `adk-ci.nix`: PR diff check using the ADK provider graph (`nix run .#adk-ci-test`).
-  - `adk-gemini.nix`: Live multi-agent workflow test using the ADK provider (`nix run .#adk-gemini-test`).
-  - `adk-gemini-ingest.nix`: Mock report ingestion pipeline test using the ADK provider (`nix run .#adk-gemini-ingest-test`).
+  - `adk-ci.nix`: PR diff check using the ADK engine (`nix run .#adk-ci-test`).
+  - `adk-gemini.nix`: Live multi-agent workflow test using Gemini (`nix run .#adk-gemini-test`).
+  - `adk-gemini-ingest.nix`: Mock report ingestion pipeline test (`nix run .#adk-gemini-ingest-test`).
+  - `adk-claude.nix`: Claude multi-agent workflow test (`nix run .#adk-claude-test`).
+  - `adk-ollama.nix`: Ollama local model workflow test (`nix run .#adk-ollama-test`).
   - `ci.nix`: Default CI integration check (`nix run .#ci-test`).
