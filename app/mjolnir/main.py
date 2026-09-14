@@ -7,7 +7,6 @@ import os
 import sys
 from pathlib import Path
 
-from config import AppConfig
 from data.status import Status
 import providers.adk.main as adk
 import providers.mock.main as mock
@@ -88,11 +87,6 @@ def _run_orchestrator():
     else:
         code_dir = str(Path(workspace_dir) / repo_name)
 
-    app_config = AppConfig.from_env(
-        code_dir=code_dir,
-        workspace_dir=workspace_dir,
-    )
-
     # Load threat model
 
     threat_model_context = load_threat_model(project.get("threatModel"))
@@ -132,6 +126,19 @@ def _run_orchestrator():
     pr = args.pr or job.get("pr")
     trigger = args.trigger or job.get("trigger") or "manual"
 
+    if model_name == "mock":
+        auth_mode = "Mock"
+    elif model_name.startswith(("ollama/", "ollama_chat/")):
+        auth_mode = "Ollama (local)"
+    elif model_name.startswith("claude"):
+        auth_mode = "Anthropic"
+    elif model_name.startswith(("gpt-", "o1-", "o3-")):
+        auth_mode = "OpenAI"
+    elif model_name.startswith("gemini"):
+        auth_mode = "Gemini API Key" if os.environ.get("GEMINI_API_KEY") else "Vertex AI"
+    else:
+        auth_mode = model_name
+
     logger.info("Writing project metadata.")
     write_metadata(
         run_dir,
@@ -142,11 +149,7 @@ def _run_orchestrator():
         timestamp_pretty,
         ingest_path=ingest_path,
         diff_base=diff_base,
-        auth_mode=(
-            "Mock"
-            if model_name == "mock"
-            else ("Gemini API Key" if app_config.gemini_api_key else "Vertex AI")
-        ),
+        auth_mode=auth_mode,
         pr=pr,
         trigger=trigger,
     )
