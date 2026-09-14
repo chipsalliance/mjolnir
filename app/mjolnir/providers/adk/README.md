@@ -31,5 +31,24 @@ flowchart LR
   - `constants.py`: Pure numeric ceilings for LLM rounds and tool budgets (`AUDITOR_MAX_LLM_CALLS`, `REVIEWER_MAX_TOOL_CALLS`).
 - **`utilities/`**: Infrastructure and execution helpers.
   - `async_runner.py`: Provides `run_batch_with_concurrency` (`Semaphore(batch_size)` task bounding) and `run_agent_with_backoff` (AIMD window limiter + localized exponential backoff on `429` quota hits).
+  - `cache_manager.py`: Explicit context caching (`PhaseContextCache`) for Gemini models.
   - `usage_tracker.py`: Real-time telemetry and token accounting across ADK `Event` dispatches.
 - **`main.py`**: Entrypoint assembling `Workflow(name="MjolnirAnalysis", edges=[...])` and driving execution via `Runner`.
+
+## Supported Models
+
+The `model` field of a job spec selects the foundation model (`model = "mock"` executes the mock testing engine; all other models execute via ADK). ADK resolves models dynamically via its registry:
+
+| Model Prefix            | Engine                     | Auth / Environment                                             | Notes                                                              |
+| :---------------------- | :------------------------- | :------------------------------------------------------------- | :----------------------------------------------------------------- |
+| `gemini-*`              | Google GenAI / Vertex AI   | `GEMINI_API_KEY` or `gcloud` ADC                               | Default. Supports explicit context caching (`PhaseContextCache`).  |
+| `claude-*`              | Claude on Vertex AI        | `gcloud` ADC (`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`) | Uses ADK's `Claude` integration with Vertex AI.                    |
+| `anthropic/claude-*`    | Anthropic via LiteLLM      | `ANTHROPIC_API_KEY`                                            | Calls Anthropic API directly (bypasses Google Cloud / Vertex).     |
+| `gpt-*`, `o1-*`, `o3-*` | OpenAI via ADK             | `OPENAI_API_KEY`                                               | Native OpenAI support via ADK's `OpenAILlm`.                       |
+| `ollama/<tag>`          | Ollama via LiteLLM         | None (`$OLLAMA_HOST` or default `localhost:11434`)             | Fully local/on-prem inference. Expects model pre-pulled.           |
+| `<provider>/<model>`    | 100+ Providers via LiteLLM | Provider-specific API key                                      | LiteLLM passthrough (e.g. `groq/*`, `together_ai/*`, `mistral/*`). |
+
+### Context Caching Behavior
+
+- **Gemini**: `PhaseContextCache` (`utilities/cache_manager.py`) automatically generates explicit Vertex AI cached content objects for system instructions and tool declarations to reduce latency and token usage.
+- **Other Providers**: Context caching is safely bypassed (`None` returned), falling back to standard prompt delivery without configuration changes.

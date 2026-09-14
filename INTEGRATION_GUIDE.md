@@ -49,7 +49,6 @@ your-repo/
   workspaceDir = "./test-out/workspace";
 
   defaultModel = "gemini-3.6-flash";
-  defaultProvider = "adk";
   defaultBatchSize = 64;
   defaultExtensions = [ "rs" "c" "h" "go" "sv" "py" ];
 }
@@ -271,9 +270,45 @@ gs://<bucket>/
 
 ## 4. Environment & Credentials Configuration
 
-- **Local Developer Workstations**:
-  - Set `GEMINI_API_KEY=<your-key>` in your environment, OR
-  - Run `gcloud auth application-default login` for Vertex AI ADC access.
+Mjolnir resolves models dynamically via ADK's model registry. Authentication depends on the model prefix:
+
+| Model Prefix            | Engine                     | Required Credentials / Environment                                                                                                                      |
+| :---------------------- | :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `gemini-*`              | Google GenAI / Vertex AI   | `GEMINI_API_KEY` (Developer API) **or** `gcloud auth application-default login` (Vertex AI ADC with `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION`) |
+| `claude-*`              | Claude on Vertex AI        | `gcloud auth application-default login` (Vertex AI ADC) + `GOOGLE_CLOUD_PROJECT` + `GOOGLE_CLOUD_LOCATION`                                              |
+| `anthropic/claude-*`    | Anthropic via LiteLLM      | `ANTHROPIC_API_KEY`                                                                                                                                     |
+| `gpt-*`, `o1-*`, `o3-*` | OpenAI via ADK             | `OPENAI_API_KEY`                                                                                                                                        |
+| `ollama/<tag>`          | Ollama via LiteLLM         | External Ollama server (connects to `http://localhost:11434` or `$OLLAMA_HOST`). No cloud credentials needed                                            |
+| `<provider>/<model>`    | 100+ Providers via LiteLLM | Provider-specific API key (e.g. `GROQ_API_KEY`, `MISTRAL_API_KEY`, `DEEPSEEK_API_KEY`)                                                                  |
+
+### Usage Examples
+
+```bash
+# Gemini via Developer API key
+export GEMINI_API_KEY="AIzaSy..."
+nix run .#adk-gemini-test
+
+# Gemini via Vertex AI (ADC)
+gcloud auth application-default login
+export GOOGLE_CLOUD_PROJECT="my-gcp-project"
+export GOOGLE_CLOUD_LOCATION="us-central1"
+nix run .#adk-gemini-test
+
+# Claude on Vertex AI (model = "claude-3-5-sonnet")
+gcloud auth application-default login
+export GOOGLE_CLOUD_PROJECT="my-gcp-project"
+export GOOGLE_CLOUD_LOCATION="us-east5"
+
+# Claude via direct Anthropic API (model = "anthropic/claude-3-5-sonnet-20241022")
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# OpenAI (model = "gpt-4o")
+export OPENAI_API_KEY="sk-..."
+
+# Ollama / Local (model = "ollama/gemma4:31b")
+export OLLAMA_HOST="http://localhost:11434"  # optional, default localhost:11434
+nix run .#adk-ollama-test
+```
 
 ---
 
@@ -285,7 +320,7 @@ For every analysis run, Mjolnir exports structured audit artifacts under `<outpu
 | :----------------------------- | :-------------------------------------------------------------------------------------------------------- |
 | `vulnerabilities.json`         | Complete audit graph containing all discovered vulnerabilities, historical findings, and agent reasoning. |
 | `vulnerabilities_minimal.json` | Filtered subset containing only active, verified `Status.OPEN` vulnerabilities.                           |
-| `metadata.json`                | Run metadata including execution timestamp, commit SHA, model, provider, and status.                      |
+| `metadata.json`                | Run metadata including execution timestamp, commit SHA, model, and status.                                |
 | `job.log`                      | Raw execution log and turn telemetry.                                                                     |
 | `token_usage.json`             | LLM token consumption breakdown.                                                                          |
 | `tool_usage.json`              | Detailed agent tool call logs and invocation stats.                                                       |

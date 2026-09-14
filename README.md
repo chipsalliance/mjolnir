@@ -178,6 +178,21 @@ export GEMINI_API_KEY="AIzaSy..."
 
 ---
 
+### Multi-Model Support
+
+Mjolnir supports multiple foundation models via ADK's native registry:
+
+- **Gemini**: `gemini-*` (via Vertex AI ADC or `GEMINI_API_KEY`)
+- **Claude**: `claude-*` (via Vertex AI ADC) or `anthropic/claude-*` (via direct `ANTHROPIC_API_KEY`)
+- **OpenAI**: `gpt-*`, `o1-*`, `o3-*` (via `OPENAI_API_KEY`)
+- **Ollama / Local**: `ollama/<tag>` connects to an external Ollama server (defaults to `http://localhost:11434` or `$OLLAMA_HOST`). Ensure the model is pulled beforehand (`ollama pull <tag>`).
+
+```bash
+nix run .#adk-ollama-test        # runs against local ollama/gemma4:31b
+```
+
+---
+
 ## Testing
 
 Mjolnir includes a suite of test targets to verify local pipelines, GCS uploads, and live LLM integration. These targets run against a synthetic git repository fixture without requiring a compiler development shell (`devShell = null`).
