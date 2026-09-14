@@ -1,6 +1,6 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
-{ pkgs ? import <nixpkgs> {}, pkgs-v4 ? pkgs }:
+{ pkgs ? import <nixpkgs> {} }:
 let
   openssl-static = pkgs.openssl.override { static = true; };
 in
@@ -8,7 +8,7 @@ pkgs.mkShell {
   name = "opentitan-shell";
   nativeBuildInputs = with pkgs; [
     bazelisk
-    (pkgs-v4.verilator or verilator)
+    verilator
     git
     python3
     gcc
