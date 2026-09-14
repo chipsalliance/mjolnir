@@ -9,7 +9,7 @@ in
   name = "Integration Tests";
   repoName = "tests";
   repoUrl = "file://${dummyRepo}";
-  commit = "main";
+  defaultRef = "main";
   outputDir = "./test-out/results";
   workspaceDir = "./test-out/workspace";
 

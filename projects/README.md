@@ -46,7 +46,6 @@ The `project.nix` file defines the repository and global settings for the projec
 - **`name`** (String, Required): Human-readable name of the project.
 - **`repoName`** (String, Required): Name of the repository folder when checked out.
 - **`repoUrl`** (String, Required): HTTPS git URL of the target repository.
-- **`commit`** (String, Optional): Default git commit hash or branch to checkout.
 - **`threatModel`** (Path, Optional): Path to a threat model Markdown file (`threat_model.md`) containing context and security requirements.
 - **`shell`** (Path, Optional): Path to a Nix development shell file (defaults to `./shell.nix` if present).
 
@@ -54,6 +53,7 @@ The `project.nix` file defines the repository and global settings for the projec
 - **`workspaceDir`** (String, Required): Relative path where temporary analysis workspaces are created (e.g. `"./test-out/workspace"`).
 
 - **`defaultModel`** (String, Required unless set in job): Default AI foundation model (e.g. `"gemini-3.6-flash"`).
+- **`defaultRef`** (String, Optional): Default git ref (commit hash, branch, or tag) to checkout (defaults to `"HEAD"`).
 - **`defaultBatchSize`** (Integer, Required unless set in job): Default batch window size for agent analysis (e.g. `64`).
 - **`defaultExtensions`** (List of Strings, Required unless set in job): Default source file extensions to audit (e.g. `["rs", "c", "h"]`).
 
@@ -69,6 +69,7 @@ The `project.nix` file defines the repository and global settings for the projec
   workspaceDir = "./test-out/workspace";
 
   defaultModel = "gemini-3.6-flash";
+  defaultRef = "main";
   defaultBatchSize = 64;
   defaultExtensions = [ "rs" "c" "h" ];
 }
@@ -83,9 +84,7 @@ Each file under `jobs/` defines a specific audit task (e.g., scanning PR diffs, 
 #### Schema
 
 - **`name`** (String, Required / inferred from filename): Human-readable name of the job.
-- **`branch`** (String, Optional): Git branch to checkout (e.g., `main`).
-- **`tag`** (String, Optional): Git tag to checkout (e.g., `v1.0`).
-- **`commit`** (String, Optional): Git commit hash (SHA-1) to checkout.
+- **`ref`** (String, Optional): Git reference (branch, tag, or commit SHA) to checkout (defaults to `project.defaultRef` or `"HEAD"`).
 - **`localDir`** (String, Optional): Explicit relative path to a local repository directory to audit directly (e.g., `"."`), bypassing remote git cloning and workspace isolation.
 - **`diffBase`** (String, Optional): Git diff base revision (e.g., `main` or `HEAD~1`).
 - **`diffHead`** (String, Optional): Git diff head revision (defaults to `"HEAD"`).

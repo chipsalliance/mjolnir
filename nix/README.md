@@ -9,8 +9,8 @@ This directory contains the Nix expressions that define the build and execution 
 
 - `orchestrator.nix`: Defines the function to package a single job. It:
   - Accepts project and job definitions.
-  - Serializes the job configuration into a JSON spec file in the Nix store.
-  - Enforces required configuration (`outputDir`, `workspaceDir`) and merges project-level defaults (`defaultModel`, `defaultBatchSize`, `defaultExtensions`).
+  - Enforces required configuration (`outputDir`, `workspaceDir`) and merges project-level defaults (`defaultModel`, `defaultRef`, `defaultBatchSize`, `defaultExtensions`).
+  - Resolves guaranteed execution defaults (`ref = "HEAD"`, `diffHead = "HEAD"`, `srcDirs = [ "." ]`).
   - Injects any project development shell (`devShell` / `shell.nix`) into `PATH` and executes its `shellHook`.
   - Creates a launcher script (`mjolnir-orchestrator-...`) that runs `mjolnir-run` with the generated spec.
 - `discovery.nix`: Automatically scans the `projects/` directory to discover all projects and their jobs, converting them into Nix packages.

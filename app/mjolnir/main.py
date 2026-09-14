@@ -72,7 +72,7 @@ def _run_orchestrator():
 
     repo_name = project.get("repoName")
     repo_url = project.get("repoUrl")
-    repo_ref = job.get("branch") or job.get("tag") or job.get("commit")
+    repo_ref = job.get("ref", "HEAD")
 
     model_name = job.get("model")
 
@@ -117,7 +117,7 @@ def _run_orchestrator():
 
     logger.header("Welcome to Mjolnir!")
 
-    logger.info(f"Model: {model_name} | Target: {repo_name} ({repo_ref or 'HEAD'})")
+    logger.info(f"Model: {model_name} | Target: {repo_name} ({repo_ref})")
 
     if local_dir:
         logger.info(f"Local audit mode enabled. Targeting: {code_dir}")
