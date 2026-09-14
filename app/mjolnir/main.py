@@ -117,12 +117,7 @@ def _run_orchestrator():
 
     logger.header("Welcome to Mjolnir!")
 
-    provider_name = job.get("provider")
-
-    # Log execution engine
-    logger.info(
-        f"Engine: {provider_name.upper()} | Model: {model_name} | Target: {repo_name} ({repo_ref or 'HEAD'})"
-    )
+    logger.info(f"Model: {model_name} | Target: {repo_name} ({repo_ref or 'HEAD'})")
 
     if local_dir:
         logger.info(f"Local audit mode enabled. Targeting: {code_dir}")
@@ -137,7 +132,7 @@ def _run_orchestrator():
     pr = args.pr or job.get("pr")
     trigger = args.trigger or job.get("trigger") or "manual"
 
-    logger.info(f"Writing project metadata.")
+    logger.info("Writing project metadata.")
     write_metadata(
         run_dir,
         repo_url,
@@ -149,7 +144,7 @@ def _run_orchestrator():
         diff_base=diff_base,
         auth_mode=(
             "Mock"
-            if provider_name == "mock"
+            if model_name == "mock"
             else ("Gemini API Key" if app_config.gemini_api_key else "Vertex AI")
         ),
         pr=pr,
@@ -210,13 +205,12 @@ def _run_orchestrator():
 
     # Execute analyis via selected provider
 
-    provider_name = job.get("provider")
-
-    logger.info(f"Executing analysis using {provider_name} provider (model={model_name}).")
+    # Execute analysis via selected model
+    logger.info(f"Executing analysis (model={model_name}).")
 
     batch_size = job.get("batchSize")
 
-    if provider_name == "mock":
+    if model_name == "mock":
         vulnerabilities, status = mock.run_analysis(
             model_name,
             code_dir,
@@ -226,7 +220,7 @@ def _run_orchestrator():
             batch_size,
             ingest_path=ingest_path,
         )
-    elif provider_name == "adk":
+    else:
         vulnerabilities, status = adk.run_analysis(
             model_name,
             code_dir,
@@ -238,9 +232,6 @@ def _run_orchestrator():
             diff_base=diff_base,
             diff_head=diff_head,
         )
-    else:
-        logger.error(f"Unknown provider: {provider_name}")
-        sys.exit(1)
 
     # Update metadata with status
     metadata_path = Path(run_dir) / "metadata.json"
