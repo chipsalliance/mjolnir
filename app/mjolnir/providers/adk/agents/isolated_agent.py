@@ -11,11 +11,13 @@ from google.adk.models import BaseLlm, LLMRegistry, LlmRequest
 from google.adk.models.google_llm import Gemini
 from google.genai import types
 
-# Default transport-level retry configuration for LLM calls (exponential backoff with jitter)
-DEFAULT_RETRY_ATTEMPTS = 5
-DEFAULT_RETRY_INITIAL_DELAY = 2.0
-DEFAULT_RETRY_MAX_DELAY = 60.0
+from constants import (
+    DEFAULT_RETRY_ATTEMPTS,
+    DEFAULT_RETRY_INITIAL_DELAY,
+    DEFAULT_RETRY_MAX_DELAY,
+)
 
+# Default transport-level retry configuration for LLM calls (exponential backoff with jitter)
 DEFAULT_HTTP_RETRY_OPTIONS = types.HttpRetryOptions(
     attempts=DEFAULT_RETRY_ATTEMPTS,
     initial_delay=DEFAULT_RETRY_INITIAL_DELAY,

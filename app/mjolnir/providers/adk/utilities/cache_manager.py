@@ -33,7 +33,7 @@ class PhaseContextCache:
         Returns the cache name (e.g. 'projects/.../cachedContents/...') or None if
         caching is unsupported or failed.
         """
-        if not self.model or "mock" in self.model.lower():
+        if not self.model or not self.model.lower().startswith("gemini"):
             return None
 
         try:

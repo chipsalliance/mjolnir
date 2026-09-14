@@ -2,18 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Central constants and operational defaults for Mjolnir."""
 
-from google.genai import types
-
 # --- Transport & SDK Retry Configuration ---
 DEFAULT_RETRY_ATTEMPTS = 5
 DEFAULT_RETRY_INITIAL_DELAY = 2.0
 DEFAULT_RETRY_MAX_DELAY = 60.0
-
-DEFAULT_HTTP_RETRY_OPTIONS = types.HttpRetryOptions(
-    attempts=DEFAULT_RETRY_ATTEMPTS,
-    initial_delay=DEFAULT_RETRY_INITIAL_DELAY,
-    max_delay=DEFAULT_RETRY_MAX_DELAY,
-)
 
 # --- Concurrency & Dispatch Configuration ---
 DEFAULT_DISPATCH_STAGGER_SECONDS = 0.25
