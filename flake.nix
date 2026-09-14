@@ -97,6 +97,9 @@
             ps.pandas
             ps.openpyxl
             ps.tabulate
+            ps.litellm
+            ps.anthropic
+            ps.openai
             google-adk
           ]);
 
