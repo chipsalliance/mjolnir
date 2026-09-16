@@ -19,8 +19,7 @@ from utilities.prompt_loader import prompt_registry
 
 def build_reviewer_instruction(threat_model_context: str = "") -> str:
     """Builds the full, deterministic system instruction for the AdversarialReviewerAgent."""
-    fallback_instruction = "Analyze the security audit finding to determine if it is exploitable."
-    instruction = prompt_registry.load_prompt("reviewer", fallback=fallback_instruction) + "\n\n"
+    instruction = prompt_registry.load_prompt("reviewer") + "\n\n"
 
     if threat_model_context:
         instruction += threat_model_context

@@ -22,8 +22,7 @@ from utilities.prompt_loader import prompt_registry
 def build_auditor_instruction(threat_model_context: str = "") -> str:
     """Builds the full, deterministic system instruction for the AuditorAgent."""
     current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    fallback_instruction = "Analyze the codebase for vulnerabilities."
-    instruction = prompt_registry.load_prompt("auditor", fallback=fallback_instruction) + "\n\n"
+    instruction = prompt_registry.load_prompt("auditor") + "\n\n"
 
     if threat_model_context:
         instruction += threat_model_context
