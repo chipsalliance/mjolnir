@@ -10,6 +10,7 @@ from agent_tools.ast_search import ast_search
 from agent_tools.ctags_search import ctags_search
 from agent_tools.grep_search import grep_search
 from agent_tools.read_file import read_file
+from constants import PHASE_2_ID, PHASE_2_NAME
 from data.review_finding import ReviewFinding
 from data.status import Status
 from data.vulnerability import Vulnerability
@@ -45,6 +46,7 @@ async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vu
         model=model,
         instruction=reviewer_instruction,
         tools=reviewer_tools,
+        output_schema=ReviewFinding,
         display_name=f"mjolnir-phase2-{Path(code_dir).name}",
     ) as cache:
         reviewer_agent = get_reviewer_agent(model, threat_model, cached_content=cache.cache_name)
@@ -54,7 +56,7 @@ async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vu
                 vuln = Vulnerability.model_validate(vuln)
 
             if getattr(vuln, "status", Status.OPEN) != Status.OPEN:
-                vuln.add_skipped("2", "Initial Review", f"Skipped: Status is {vuln.status}")
+                vuln.add_skipped(PHASE_2_ID, PHASE_2_NAME, f"Skipped: Status is {vuln.status}")
                 return vuln
 
             try:
@@ -67,18 +69,25 @@ async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vu
                 )
 
                 if verdict:
-                    vuln.add(phase_id="2", phase_name="Initial Review", finding=verdict)
+                    if getattr(verdict, "refusal_reason", None):
+                        vuln.add_skipped(
+                            PHASE_2_ID,
+                            PHASE_2_NAME,
+                            f"Model soft refusal: {verdict.refusal_reason}",
+                        )
+                    else:
+                        vuln.add(phase_id=PHASE_2_ID, phase_name=PHASE_2_NAME, finding=verdict)
                 else:
                     vuln.add_skipped(
-                        "2",
-                        "Initial Review",
+                        PHASE_2_ID,
+                        PHASE_2_NAME,
                         "Reviewer agent returned empty/unparseable verdict after retries.",
                     )
             except Exception as rev_err:
                 logger.error(f" [Reviewer FATAL] Failed {vuln.file} after max retries: {rev_err}")
                 vuln.add_skipped(
-                    "2",
-                    "Initial Review",
+                    PHASE_2_ID,
+                    PHASE_2_NAME,
                     f"FATAL ERROR: AI Reviewer agent failed after retries ({type(rev_err).__name__}).",
                 )
 
@@ -100,7 +109,7 @@ async def review_phase(ctx: Context, node_input: list[Vulnerability]) -> list[Vu
 
     run_dir = ctx.state.get("run_dir")
 
-    await checkpoint_audit_findings(results, run_dir, phase_id="2")
+    await checkpoint_audit_findings(results, run_dir, phase_id=PHASE_2_ID)
 
     logger.info("Phase 2 complete.")
     return results

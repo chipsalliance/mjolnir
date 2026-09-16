@@ -7,6 +7,7 @@ from pathlib import Path
 from google.adk import Context
 from google.adk.workflow import node
 
+from constants import PHASE_1_ID
 from data.audit_finding import AuditFinding
 from data.security_report import SecurityReport
 from data.vulnerability import Vulnerability
@@ -93,7 +94,7 @@ async def ingest_report_phase(ctx: Context, node_input: str) -> list[Vulnerabili
         vulns = report.to_vulnerabilities(fallback_file_path=report_file_path)
 
     if run_dir:
-        await checkpoint_audit_findings(vulns, run_dir, phase_id="1")
+        await checkpoint_audit_findings(vulns, run_dir, phase_id=PHASE_1_ID)
 
     logger.info(f"Ingestion complete. Extracted {len(vulns)} vulnerabilities.")
     return vulns

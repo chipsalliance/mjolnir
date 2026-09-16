@@ -6,6 +6,7 @@ import uuid
 
 from tqdm import tqdm
 
+from constants import PHASE_1_ID, PHASE_1_NAME, PHASE_2_ID, PHASE_2_NAME
 from data.audit_finding import AuditFinding
 from data.review_finding import ReviewFinding
 from data.severity import Severity
@@ -57,7 +58,7 @@ def run_analysis(
             description=audit_finding.description,
             recommendation=audit_finding.recommendation,
         )
-        vuln.add(phase_id="1", phase_name="Source File Exploration", finding=audit_finding)
+        vuln.add(phase_id=PHASE_1_ID, phase_name=PHASE_1_NAME, finding=audit_finding)
 
         # 2. Simulate Reviewer (Phase 2)
         # We vary status to test all flow branches (kept, downgraded, FP/discarded, skipped/kept)
@@ -75,7 +76,7 @@ def run_analysis(
                 justification="Testing intact path.",
                 attack_vector="Trigger exploit directly.",
             )
-            vuln.add(phase_id="2", phase_name="Initial Review", finding=review)
+            vuln.add(phase_id=PHASE_2_ID, phase_name=PHASE_2_NAME, finding=review)
         elif case == 1:
             # Finding is downgraded
             review = ReviewFinding(
@@ -88,7 +89,7 @@ def run_analysis(
                 justification="Testing downgrade path.",
                 attack_vector="",
             )
-            vuln.add(phase_id="2", phase_name="Initial Review", finding=review)
+            vuln.add(phase_id=PHASE_2_ID, phase_name=PHASE_2_NAME, finding=review)
         elif case == 2:
             # Finding is resolved as False Positive (Discarded)
             review = ReviewFinding(
@@ -101,12 +102,12 @@ def run_analysis(
                 justification="Testing false positive path.",
                 attack_vector="",
             )
-            vuln.add(phase_id="2", phase_name="Initial Review", finding=review)
+            vuln.add(phase_id=PHASE_2_ID, phase_name=PHASE_2_NAME, finding=review)
         else:
             # Finding is skipped (Omitted by reviewer -> Kept via fail-open)
             vuln.add_skipped(
-                phase_id="2",
-                phase_name="Initial Review",
+                phase_id=PHASE_2_ID,
+                phase_name=PHASE_2_NAME,
                 justification="Omitted during mock review simulation.",
             )
 

@@ -5,7 +5,26 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+from constants import BENIGN_FINISH_REASONS, TOOL_ERROR_PREFIXES
 from utilities.logger import logger
+
+
+def parse_tool_response(resp: Any) -> tuple[bool, str]:
+    """Inspects a tool response payload for structured or prefix-based errors.
+
+    Returns:
+        A tuple of (is_error, cleaned_response_string).
+    """
+    if isinstance(resp, dict):
+        if "error" in resp and resp["error"] is not None:
+            return True, str(resp["error"]).strip()
+        if "result" in resp:
+            clean_str = str(resp["result"]).strip()
+            return clean_str.startswith(TOOL_ERROR_PREFIXES), clean_str
+        return False, json.dumps(resp)
+
+    clean_str = str(resp).strip()
+    return clean_str.startswith(TOOL_ERROR_PREFIXES), clean_str
 
 
 class UsageTracker:
@@ -92,8 +111,12 @@ class UsageTracker:
         msg = str(root_e).splitlines()[0] if str(root_e) else ""
         clean_err = f"{code}: {msg[:100]}" if msg and msg != str(code) else str(code)
 
+        self._record_agent_error(clean_err, agent_name)
+
+    def _record_agent_error(self, err_key: str, agent_name: str):
+        """Increments total, grouped, and per-agent error counters."""
         self.total_usage["total_errors"] += 1
-        self.error_counts[clean_err] = self.error_counts.get(clean_err, 0) + 1
+        self.error_counts[err_key] = self.error_counts.get(err_key, 0) + 1
 
         if agent_name not in self.usage_by_agent:
             self.usage_by_agent[agent_name] = self._get_empty_agent_stats()
@@ -118,80 +141,122 @@ class UsageTracker:
         """Alias for track_event."""
         return self.track_event(ev, agent_name=agent_name)
 
-    def track_event(self, ev: Any, agent_name: str = "UnknownAgent"):
-        """Extracts token usage metadata and function calls/responses from an ADK event."""
+    @staticmethod
+    def _resolve_event_keys(ev: Any, default_agent: str) -> tuple[str, str | None, str]:
+        """Extracts (agent_name, item_key, target_key) from an ADK event."""
         raw_key = getattr(ev, "branch", None)
         if raw_key and "@" in raw_key:
             parts = raw_key.split("@", 1)
-            agent_name = getattr(ev, "author", None) or parts[0] or agent_name
+            agent_name = getattr(ev, "author", None) or parts[0] or default_agent
             item_key = parts[1]
         else:
-            agent_name = getattr(ev, "author", None) or agent_name
+            agent_name = getattr(ev, "author", None) or default_agent
             item_key = raw_key
 
-        # Inspect and record thoughts, tool calls, and tool responses
-        if hasattr(ev, "content") and ev.content and hasattr(ev.content, "parts"):
-            target_key = item_key or agent_name
-            if target_key not in self.reasoning_log:
-                self.reasoning_log[target_key] = []
+        target_key = item_key or agent_name
+        return agent_name, item_key, target_key
 
-            for part in ev.content.parts:
-                is_thought = getattr(part, "thought", False)
-                text = getattr(part, "text", None)
-                fn_call = getattr(part, "function_call", None)
-                fn_res = getattr(part, "function_response", None)
+    def _track_finish_reason(self, ev: Any, agent_name: str, target_key: str):
+        """Checks for event-level refusal or non-standard finish reason."""
+        raw_finish_reason = getattr(ev, "finish_reason", None)
+        if raw_finish_reason is None:
+            return
 
-                if is_thought and text:
-                    self.reasoning_log[target_key].append(
-                        {
-                            "agent": agent_name,
-                            "type": "thought",
-                            "content": text.strip(),
-                        }
-                    )
-                elif text and not is_thought:
-                    self.reasoning_log[target_key].append(
-                        {
-                            "agent": agent_name,
-                            "type": "output",
-                            "content": text.strip(),
-                        }
-                    )
-                elif fn_call:
-                    fn_name = getattr(fn_call, "name", "unknown")
-                    fn_args = getattr(fn_call, "args", {})
-                    serializable_args = fn_args if isinstance(fn_args, dict) else str(fn_args)
-                    self.reasoning_log[target_key].append(
-                        {
-                            "agent": agent_name,
-                            "type": "tool_call",
-                            "tool": fn_name,
-                            "args": serializable_args,
-                        }
-                    )
-                elif fn_res:
-                    tool_name = getattr(fn_res, "name", "unknown_tool")
-                    resp = getattr(fn_res, "response", "")
-                    res_str = resp.get("result", "") if isinstance(resp, dict) else str(resp)
-                    clean_str = res_str.strip() if isinstance(res_str, str) else str(res_str)
+        reason_name = getattr(raw_finish_reason, "name", str(raw_finish_reason))
+        if "." in reason_name:
+            reason_name = reason_name.split(".", 1)[1]
 
-                    # Tool failure is an explicit tool-level error prefix
-                    is_error = clean_str.startswith("Error:")
-                    self.track_tool_call(
-                        tool_name=tool_name,
-                        success=not is_error,
-                        agent_name=agent_name,
-                        item_key=item_key,
-                    )
-                    self.reasoning_log[target_key].append(
-                        {
-                            "agent": agent_name,
-                            "type": "tool_response",
-                            "tool": tool_name,
-                            "response": clean_str[:500] if len(clean_str) > 500 else clean_str,
-                        }
-                    )
+        if reason_name not in BENIGN_FINISH_REASONS:
+            logger.warning(
+                f"LLM refusal or non-standard finish_reason '{reason_name}' "
+                f"(agent={agent_name}, target={target_key})"
+            )
+            self._record_agent_error(f"FinishReason.{reason_name}", agent_name)
+            self.reasoning_log.setdefault(target_key, []).append(
+                {
+                    "agent": agent_name,
+                    "type": "refusal",
+                    "finish_reason": str(reason_name),
+                }
+            )
 
+    def _track_event_error(self, ev: Any, agent_name: str, target_key: str):
+        """Checks for event-level error_code and error_message attributes."""
+        error_code = getattr(ev, "error_code", None)
+        error_msg = getattr(ev, "error_message", None)
+        if not (error_code or error_msg):
+            return
+
+        err_str = (
+            f"{error_code}: {error_msg}"
+            if error_code and error_msg
+            else str(error_code or error_msg)
+        )
+        logger.error(f"Event error reported: {err_str} (agent={agent_name}, target={target_key})")
+        self._record_agent_error(err_str, agent_name)
+
+    def _track_content_parts(self, ev: Any, agent_name: str, item_key: str | None, target_key: str):
+        """Inspects and records thoughts, text outputs, tool calls, and tool responses."""
+        if not (hasattr(ev, "content") and ev.content and hasattr(ev.content, "parts")):
+            return
+
+        log_entries = self.reasoning_log.setdefault(target_key, [])
+        for part in ev.content.parts:
+            is_thought = getattr(part, "thought", False)
+            text = getattr(part, "text", None)
+            fn_call = getattr(part, "function_call", None)
+            fn_res = getattr(part, "function_response", None)
+
+            if is_thought and text:
+                log_entries.append(
+                    {
+                        "agent": agent_name,
+                        "type": "thought",
+                        "content": text.strip(),
+                    }
+                )
+            elif text and not is_thought:
+                log_entries.append(
+                    {
+                        "agent": agent_name,
+                        "type": "output",
+                        "content": text.strip(),
+                    }
+                )
+            elif fn_call:
+                fn_name = getattr(fn_call, "name", "unknown")
+                fn_args = getattr(fn_call, "args", {})
+                serializable_args = fn_args if isinstance(fn_args, dict) else str(fn_args)
+                log_entries.append(
+                    {
+                        "agent": agent_name,
+                        "type": "tool_call",
+                        "tool": fn_name,
+                        "args": serializable_args,
+                    }
+                )
+            elif fn_res:
+                tool_name = getattr(fn_res, "name", "unknown_tool")
+                resp = getattr(fn_res, "response", "")
+                is_error, clean_str = parse_tool_response(resp)
+
+                self.track_tool_call(
+                    tool_name=tool_name,
+                    success=not is_error,
+                    agent_name=agent_name,
+                    item_key=item_key,
+                )
+                log_entries.append(
+                    {
+                        "agent": agent_name,
+                        "type": "tool_response",
+                        "tool": tool_name,
+                        "response": clean_str[:500] if len(clean_str) > 500 else clean_str,
+                    }
+                )
+
+    def _track_token_metadata(self, ev: Any, agent_name: str):
+        """Extracts and accumulates token usage counters from event usage_metadata."""
         if not hasattr(ev, "usage_metadata") or not ev.usage_metadata:
             return
 
@@ -213,23 +278,23 @@ class UsageTracker:
         output_tokens = o_tokens + t_tokens
         all_tokens = input_tokens + output_tokens
 
-        self.usage_by_agent[agent_name]["prompt_tokens"] += p_tokens
-        self.usage_by_agent[agent_name]["uncached_tokens"] += u_tokens
-        self.usage_by_agent[agent_name]["cache_tokens"] += c_tokens
-        self.usage_by_agent[agent_name]["output_tokens"] += o_tokens
-        self.usage_by_agent[agent_name]["thoughts_tokens"] += t_tokens
-        self.usage_by_agent[agent_name]["total_input_tokens"] += input_tokens
-        self.usage_by_agent[agent_name]["total_output_tokens"] += output_tokens
-        self.usage_by_agent[agent_name]["total_tokens"] += all_tokens
+        for bucket in (self.usage_by_agent[agent_name], self.total_usage):
+            bucket["prompt_tokens"] += p_tokens
+            bucket["uncached_tokens"] += u_tokens
+            bucket["cache_tokens"] += c_tokens
+            bucket["output_tokens"] += o_tokens
+            bucket["thoughts_tokens"] += t_tokens
+            bucket["total_input_tokens"] += input_tokens
+            bucket["total_output_tokens"] += output_tokens
+            bucket["total_tokens"] += all_tokens
 
-        self.total_usage["prompt_tokens"] += p_tokens
-        self.total_usage["uncached_tokens"] += u_tokens
-        self.total_usage["cache_tokens"] += c_tokens
-        self.total_usage["output_tokens"] += o_tokens
-        self.total_usage["thoughts_tokens"] += t_tokens
-        self.total_usage["total_input_tokens"] += input_tokens
-        self.total_usage["total_output_tokens"] += output_tokens
-        self.total_usage["total_tokens"] += all_tokens
+    def track_event(self, ev: Any, agent_name: str = "UnknownAgent"):
+        """Extracts token usage metadata and function calls/responses from an ADK event."""
+        agent_name, item_key, target_key = self._resolve_event_keys(ev, agent_name)
+        self._track_finish_reason(ev, agent_name, target_key)
+        self._track_event_error(ev, agent_name, target_key)
+        self._track_content_parts(ev, agent_name, item_key, target_key)
+        self._track_token_metadata(ev, agent_name)
 
     @staticmethod
     def _calc_stats(counts: list[int]) -> dict[str, Any]:

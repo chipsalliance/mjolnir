@@ -5,11 +5,9 @@ import asyncio
 import re
 from typing import Any, Optional
 
+from constants import DEFAULT_DISPATCH_STAGGER_SECONDS
 from tqdm import tqdm
 from utilities.logger import logger
-
-# Default stagger delay between worker launches to prevent concurrent prefill spikes
-DEFAULT_DISPATCH_STAGGER_SECONDS = 0.25
 
 
 def extract_agent_output(res: Any, expected_schema: Any) -> Any:
@@ -38,6 +36,22 @@ def extract_agent_output(res: Any, expected_schema: Any) -> Any:
             logger.warning(f"Failed to validate JSON output against {expected_schema}: {e}")
 
 
+def track_soft_refusal(ctx: Any, result: Any, agent_name: str, target_id: str) -> Optional[str]:
+    """Checks a structured agent result for `refusal_reason`, logging and recording it in UsageTracker."""
+    refusal_reason = getattr(result, "refusal_reason", None)
+    if not refusal_reason:
+        return None
+
+    logger.warning(f"{agent_name} soft refusal on '{target_id}': {refusal_reason}")
+    tracker = ctx.state.get("usage_tracker")
+    if tracker:
+        tracker.track_error(
+            ValueError(f"SoftRefusal: {refusal_reason}"),
+            agent_name,
+        )
+    return refusal_reason
+
+
 async def run_agent_node(
     ctx,
     agent,
@@ -54,7 +68,21 @@ async def run_agent_node(
             use_sub_branch=True,
             override_isolation_scope=run_id,
         )
-        return extract_agent_output(res, expected_schema) if expected_schema else res
+        extracted = extract_agent_output(res, expected_schema) if expected_schema else res
+        if expected_schema and extracted is None and res is not None:
+            schema_name = getattr(expected_schema, "__name__", str(expected_schema))
+            logger.warning(
+                f"Agent {agent.name} output failed validation against {schema_name} for {run_id}"
+            )
+            tracker = ctx.state.get("usage_tracker")
+            if tracker:
+                tracker.track_error(
+                    ValueError(f"SchemaValidationError: {schema_name}"),
+                    agent.name,
+                )
+        elif extracted is not None:
+            track_soft_refusal(ctx, extracted, agent.name, run_id)
+        return extracted
     except Exception as e:
         tracker = ctx.state.get("usage_tracker")
         if tracker:

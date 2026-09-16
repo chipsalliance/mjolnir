@@ -26,14 +26,17 @@ DEFAULT_HTTP_RETRY_OPTIONS = types.HttpRetryOptions(
 
 
 class CachedGemini(Gemini):
-    """ADK Gemini model wrapper that correctly handles Vertex AI explicit cached content by not duplicating system instruction/tools in per-request configs."""
+    """ADK Gemini model wrapper that correctly handles Vertex AI explicit cached content and enables thinking trace visibility."""
 
     async def _preprocess_request(self, llm_request: LlmRequest) -> None:
         await super()._preprocess_request(llm_request)
-        if llm_request.config and getattr(llm_request.config, "cached_content", None):
-            llm_request.config.system_instruction = None
-            llm_request.config.tools = None
-            llm_request.config.tool_config = None
+        if llm_request.config:
+            if getattr(llm_request.config, "thinking_config", None) is None:
+                llm_request.config.thinking_config = types.ThinkingConfig(include_thoughts=True)
+            if getattr(llm_request.config, "cached_content", None):
+                llm_request.config.system_instruction = None
+                llm_request.config.tools = None
+                llm_request.config.tool_config = None
 
 
 def resolve_model_with_retries(model: str | BaseLlm) -> BaseLlm:

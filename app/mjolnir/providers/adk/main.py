@@ -11,6 +11,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
+from constants import PHASE_1_ID
 from data.vulnerability import Vulnerability
 from providers.adk.phases import (
     audit_phase,
@@ -127,7 +128,7 @@ def run_analysis(
 
     # Run the graph
     status = "Success"
-    vulnerabilities: list[Vulnerability] = []
+    vulnerabilities: list[Vulnerability] | None = None
     try:
         for ev in runner.run(
             user_id="mjolnir_user",
@@ -144,8 +145,9 @@ def run_analysis(
     # Write usage report
     usage_tracker.write_to_disk(run_dir)
 
-    if not vulnerabilities and run_dir:
-        audit_path = Path(run_dir) / "finding_phase_1.json"
+    # Only fall back to Phase 1 checkpoints if Phase 2 failed or was interrupted
+    if vulnerabilities is None and run_dir:
+        audit_path = Path(run_dir) / f"finding_phase_{PHASE_1_ID}.json"
         if not audit_path.exists():
             audit_path = Path(run_dir) / "audit_findings.json"
 
@@ -160,6 +162,9 @@ def run_analysis(
                     vulnerabilities = raw_vulns
             except Exception as e:
                 logger.error(f"Could not load fallback Phase 1 vulnerabilities: {e}")
+
+    if vulnerabilities is None:
+        vulnerabilities = []
 
     # Ensure all elements in vulnerabilities are validated Pydantic models
     clean_vulns: list[Vulnerability] = []

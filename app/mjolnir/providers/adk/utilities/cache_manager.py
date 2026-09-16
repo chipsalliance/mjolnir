@@ -3,7 +3,14 @@
 
 import os
 from typing import Any, List, Optional
+from constants import (
+    DEFAULT_CONTEXT_CACHE_TTL_SECONDS,
+    MIN_CONTEXT_CACHE_CHARS_ESTIMATE,
+    MIN_CONTEXT_CACHE_TOKENS,
+    SET_MODEL_RESPONSE_INSTRUCTION,
+)
 from google.adk.tools import FunctionTool
+from google.adk.tools.set_model_response_tool import SetModelResponseTool
 from google.genai import Client, types
 from utilities.logger import logger
 
@@ -16,12 +23,17 @@ class PhaseContextCache:
         model: str,
         instruction: str,
         tools: Optional[List[Any]] = None,
-        ttl_seconds: int = 7200,
+        output_schema: Optional[Any] = None,
+        ttl_seconds: int = DEFAULT_CONTEXT_CACHE_TTL_SECONDS,
         display_name: str = "mjolnir-phase-cache",
     ):
         self.model = model
-        self.instruction = instruction
-        self.tools = tools or []
+        self.tools = list(tools or [])
+        if output_schema and self.tools:
+            self.tools.append(SetModelResponseTool(output_schema))
+            self.instruction = f"{instruction}\n\n{SET_MODEL_RESPONSE_INSTRUCTION}"
+        else:
+            self.instruction = instruction
         self.ttl_seconds = ttl_seconds
         self.display_name = display_name
         self.cache_name: Optional[str] = None
@@ -34,6 +46,15 @@ class PhaseContextCache:
         caching is unsupported or failed.
         """
         if not self.model or not self.model.lower().startswith("gemini"):
+            return None
+
+        estimated_chars = len(self.instruction) + len(self.tools) * 400
+        if estimated_chars < MIN_CONTEXT_CACHE_CHARS_ESTIMATE:
+            logger.debug(
+                f"Skipping explicit context cache for {self.model}: estimated size "
+                f"({estimated_chars} chars) is below minimum threshold "
+                f"(~{MIN_CONTEXT_CACHE_TOKENS} tokens)."
+            )
             return None
 
         try:
@@ -69,9 +90,13 @@ class PhaseContextCache:
             )
             return self.cache_name
         except Exception as e:
-            logger.info(
-                f"Explicit context caching skipped ({e}). Proceeding with standard inference."
-            )
+            err_str = str(e)
+            if "minimum token count" in err_str or "INVALID_ARGUMENT" in err_str:
+                logger.debug(f"Explicit context caching skipped (below token threshold): {e}")
+            else:
+                logger.info(
+                    f"Explicit context caching skipped ({e}). Proceeding with standard inference."
+                )
             self.cache_name = None
             return None
 
