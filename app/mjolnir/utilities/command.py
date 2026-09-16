@@ -102,7 +102,7 @@ class CommandRunner:
         self,
         args: list[str],
         cwd: str | Path | None = None,
-        timeout_sec: float | None = 5.0,
+        timeout_sec: float | None = None,
         env: dict[str, str] | None = None,
     ) -> None:
         self.args = args
@@ -119,8 +119,12 @@ class CommandRunner:
         except Exception as e:
             return False, f"Error executing {self.args[0]}: {e}"
 
-        if res.returncode != 0 and not res.stdout:
-            err_msg = res.stderr.strip() or f"Process exited with code {res.returncode}"
+        if res.returncode != 0:
+            err_msg = (
+                res.stderr.strip()
+                or res.stdout.strip()
+                or f"Process exited with code {res.returncode}"
+            )
             return False, f"Error executing {self.args[0]}: {err_msg}"
         return True, res.stdout.strip()
 

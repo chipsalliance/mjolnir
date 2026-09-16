@@ -3,30 +3,33 @@
 """Runner abstraction for Ripgrep (rg) CLI tool."""
 
 import asyncio
+import json
 from pathlib import Path
-from utilities.command import CommandRunner
+from utilities.command import CommandRunner, run_command_capture
 
 
 def format_grep_output(
     raw_output: str, pattern: str, dir_path: str, filter_pattern: str | None = None
 ) -> str:
-    """Formats raw ripgrep output into grouped file matches."""
-    lines = raw_output.splitlines()
-    if not lines or raw_output == "No matches found.":
-        return "No matches found."
+    """Formats structured ripgrep JSON output into grouped file matches."""
+    matches_by_file: dict[str, list[tuple[int, str]]] = {}
 
-    matches_by_file: dict[str, list[tuple[str, str]]] = {}
-    for line in lines:
-        try:
-            parts = line.split(":", 2)
-            if len(parts) < 3:
-                continue
-            filename, line_num, content = parts
-            if filename not in matches_by_file:
-                matches_by_file[filename] = []
-            matches_by_file[filename].append((line_num, content))
-        except ValueError:
+    for line in raw_output.splitlines():
+        line = line.strip()
+        if not line:
             continue
+        try:
+            entry = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+
+        if isinstance(entry, dict) and entry.get("type") == "match":
+            data = entry.get("data", {})
+            file_path = data.get("path", {}).get("text", "")
+            line_num = data.get("line_number", 0)
+            line_content = data.get("lines", {}).get("text", "").rstrip("\r\n")
+            if file_path:
+                matches_by_file.setdefault(file_path, []).append((line_num, line_content))
 
     if not matches_by_file:
         return "No matches found."
@@ -57,7 +60,7 @@ class RipgrepRunner:
         self,
         case_sensitive: bool = True,
         show_line_numbers: bool = True,
-        timeout: float = 5.0,
+        timeout: float | None = None,
     ) -> None:
         self.case_sensitive = case_sensitive
         self.show_line_numbers = show_line_numbers
@@ -76,9 +79,7 @@ class RipgrepRunner:
         cwd_path = str(search_path.parent) if is_file else str(search_path)
         target_path = search_path.name if is_file else "."
 
-        cmd = ["rg"]
-        if self.show_line_numbers:
-            cmd.extend(["--line-number", "--no-heading", "--with-filename"])
+        cmd = ["rg", "--json"]
         if not self.case_sensitive:
             cmd.append("-i")
         if include_pattern and not is_file:
@@ -87,11 +88,14 @@ class RipgrepRunner:
             cmd.extend(["-g", f"!{exclude_pattern}"])
         cmd.extend([pattern, target_path])
 
-        cmd_runner = CommandRunner(cmd, cwd=cwd_path, timeout_sec=self.timeout)
-        _, stdout_content = cmd_runner.execute()
-        return format_grep_output(
-            stdout_content or "No matches found.", pattern, dir_path, include_pattern
-        )
+        res = run_command_capture(cmd, cwd=cwd_path, timeout=self.timeout)
+        if res.returncode == 0:
+            return format_grep_output(res.stdout or "", pattern, dir_path, include_pattern)
+        elif res.returncode == 1:
+            return "No matches found."
+        else:
+            err = res.stderr.strip() or f"Process exited with code {res.returncode}"
+            return f"Error executing rg: {err}"
 
     async def search_async(
         self,

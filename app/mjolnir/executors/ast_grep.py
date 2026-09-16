@@ -10,7 +10,11 @@ from utilities.command import CommandRunner
 class AstGrepRunner:
     """Encapsulates ast-grep CLI execution for structural syntax code search."""
 
-    def __init__(self, search_path: Path | None = None, timeout: float = 15.0) -> None:
+    def __init__(
+        self,
+        search_path: Path | None = None,
+        timeout: float | None = None,
+    ) -> None:
         self.search_path = search_path
         self.timeout = timeout
 

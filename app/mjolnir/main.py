@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from data.status import Status
+from executors.ctags import CtagsRunner
 import providers.adk.main as adk
 import providers.mock.main as mock
 from utilities.command import run_command
@@ -115,6 +116,7 @@ def _run_orchestrator():
 
     if local_dir:
         logger.info(f"Local audit mode enabled. Targeting: {code_dir}")
+        CtagsRunner().ensure_tags(Path(code_dir))
     else:
         logger.info(f"Setting up repository for {repo_name}.")
         setup_repository(repo_url, code_dir, repo_ref, workspace_dir)

@@ -1,9 +1,12 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
+import asyncio
 import os
 import shutil
 from pathlib import Path
 
+from constants import BINARY_CHECK_CHUNK_BYTES
+from executors.ctags import CtagsRunner
 from security.path_sanitizer import resolve_workspace_path
 from utilities.command import CommandRunner, run_command
 from utilities.logger import logger
@@ -38,16 +41,21 @@ def setup_repository(repo_url: str, code_dir: str, ref: str, workspace_dir: str)
         run_command(["git", "checkout", ref], cwd=code_dir)
         run_command(["git", "submodule", "update", "--init", "--recursive"], cwd=code_dir)
 
+    # Pre-generate universal-ctags index in .git/tags for O(1) symbol lookups
+    CtagsRunner().ensure_tags(code_path)
+
     return get_head_commit(code_dir)
 
 
 def get_head_commit(code_dir: str) -> str:
-    """Returns the current HEAD commit hash for code_dir, or 'unknown' on error."""
+    """Returns the current HEAD commit hash for code_dir, or 'local-untracked'/'unknown'."""
     try:
         cmd = ["git", "rev-parse", "HEAD"]
-        success, output = CommandRunner(cmd, cwd=code_dir, timeout_sec=5.0).execute()
+        success, output = CommandRunner(cmd, cwd=code_dir).execute()
         if success and output:
             return output
+        if "not a git repository" in output.lower():
+            return "local-untracked"
         logger.warning(
             f"Could not determine HEAD commit. Failed to call git rev-parse: {output}. "
             f"Are you in a valid git workspace at '{code_dir}'?"
@@ -65,7 +73,7 @@ def is_binary_file(file_path: str) -> bool:
     """Returns True if the file contains binary data (e.g. NUL bytes), False if text."""
     try:
         with open(file_path, "rb") as f:
-            chunk = f.read(8192)
+            chunk = f.read(BINARY_CHECK_CHUNK_BYTES)
             return b"\x00" in chunk
     except Exception:
         return True
@@ -83,7 +91,7 @@ def get_diff_files(code_dir: str, base_ref: str, head_ref: str = "HEAD") -> list
             base_ref,
             head_ref,
         ]
-        success, output = CommandRunner(cmd, cwd=code_dir, timeout_sec=10.0).execute()
+        success, output = CommandRunner(cmd, cwd=code_dir).execute()
         if not success or not output.strip():
             # Fallback to single base_ref comparison if two-ref fails
             cmd_fallback = [
@@ -93,7 +101,7 @@ def get_diff_files(code_dir: str, base_ref: str, head_ref: str = "HEAD") -> list
                 "--diff-filter=d",
                 base_ref,
             ]
-            success, output = CommandRunner(cmd_fallback, cwd=code_dir, timeout_sec=10.0).execute()
+            success, output = CommandRunner(cmd_fallback, cwd=code_dir).execute()
 
         if not success or not output.strip():
             return []
@@ -135,17 +143,21 @@ class GitOperation:
 
         if self.respect_git_ignore:
             cmd = ["git", "ls-files", "-c", "-o", "--exclude-standard"] + path_args
-            _, output = CommandRunner(cmd, cwd=cwd_path, timeout_sec=5.0).execute()
-            lines = [line for line in output.splitlines() if line]
-            return lines if not is_file else ([target_name] if lines else [])
+            success, output = CommandRunner(cmd, cwd=cwd_path).execute()
+            if success:
+                lines = [line for line in output.splitlines() if line]
+                return lines if not is_file else ([target_name] if lines else [])
 
         if is_file:
             return [target_name]
 
         files: list[str] = []
-        for root, _, filenames in os.walk(self.directory):
+        for root, dirs, filenames in os.walk(self.directory):
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
             root_path = Path(root)
             for filename in filenames:
+                if filename.startswith("."):
+                    continue
                 file_path = root_path / filename
                 rel_path = str(file_path.relative_to(self.directory))
                 files.append(rel_path)
@@ -163,3 +175,10 @@ def get_file_diff(code_dir: str, diff_base: str, diff_head: str, file_path: str)
     except Exception as e:
         logger.warning(f"Failed to extract git diff for {file_path}: {e}")
         return None
+
+
+async def get_file_diff_async(
+    code_dir: str, diff_base: str, diff_head: str, file_path: str
+) -> str | None:
+    """Asynchronously returns the unified git diff for a specific file without blocking the event loop."""
+    return await asyncio.to_thread(get_file_diff, code_dir, diff_base, diff_head, file_path)
