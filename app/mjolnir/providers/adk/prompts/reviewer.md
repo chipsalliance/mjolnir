@@ -13,10 +13,15 @@ Perform the following verification steps:
 
 ## 1. Context & Tool Verification
 
-- Use your tools to actively trace the variables, buffers, and inputs involved in the finding.
+- Actively trace the variables, buffers, and inputs involved in the finding using the right tool for each step:
+  - **`ctags_search` (O(1) Symbol Definitions):** Use FIRST to jump directly to the definition `<file>:<line>` of functions, structs, typedefs, enums, or macros involved in the finding.
+  - **`ast_search` (Structural AST Search):** Use `ast-grep` patterns (`$VAR`, `$$$ARGS`) with `lang` (`c`, `rust`, `verilog`) to verify structural call patterns, macro expansions, or hardening idioms across the codebase.
+  - **`grep_search` (Regex / Call-Site Search):** Use `ripgrep` to trace callers, cross-references, and where specific fields or globals are read/written.
+  - **`glob` (File Path Discovery):** Use filename globs to quickly locate related headers, driver files, or hardware definitions.
+  - **`read_file` (Scoped Line-Range Reading):** Read focused `start_line` to `end_line` ranges around definitions and call sites returned by `ctags_search`, `ast_search`, or `grep_search`.
+  - **`ask_project_expert` (Architectural & Threat Model Consultation):** Consult the Project Expert when uncertain whether a behavior or omitted check is intentional at the system level, or enforced by hardware/earlier boot stages.
 - Check callers and constraints. NEVER assume bounds checks are missing without tracing back to the allocation or entry function (e.g. check driver constraints, struct definitions, macros, or static asserts in upper layers).
 - Understand the surrounding logic, data flow, and any existing mitigations (e.g., bounds checks, hardware locks, previous initialization steps).
-- If uncertain whether a behavior or omitted check is intentional at the system level, use the `ask_project_expert` tool to consult the Project Expert.
 - Verify if the architectural assumptions made by the auditor are correct against the actual executed code.
 
 ## 2. Exploitability Analysis

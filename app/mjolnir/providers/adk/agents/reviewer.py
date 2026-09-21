@@ -9,6 +9,7 @@ from google.genai import types
 
 from agent_tools.ast_search import ast_search
 from agent_tools.ctags_search import ctags_search
+from agent_tools.glob import glob
 from agent_tools.grep_search import grep_search
 from agent_tools.project_expert import ask_project_expert
 from agent_tools.read_file import read_file
@@ -17,7 +18,7 @@ from data.review_finding import ReviewFinding
 from providers.adk.agents.isolated_agent import IsolatedAgent
 from utilities.prompt_loader import prompt_registry
 
-REVIEWER_TOOLS = [read_file, grep_search, ctags_search, ast_search, ask_project_expert]
+REVIEWER_TOOLS = [read_file, glob, grep_search, ctags_search, ast_search, ask_project_expert]
 
 
 def build_reviewer_instruction(

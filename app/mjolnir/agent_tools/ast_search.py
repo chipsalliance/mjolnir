@@ -15,7 +15,21 @@ async def ast_search(
     dir_path: str = ".",
     tool_context: ToolContext | None = None,
 ) -> str:
-    """Uses tree-sitter (via ast-grep / sg) to perform structural syntax search."""
+    """Performs structural abstract syntax tree (AST) search across the codebase using `ast-grep` (`sg`).
+
+    Use this tool to match code structures, call patterns, or control-flow idioms regardless of
+    whitespace or formatting (for example, finding all calls `memcpy($DST, $SRC, $LEN)`,
+    unhardened comparisons `if ($ERR != kErrorOk)`, or specific struct initializers).
+    Use `$META` to match a single AST node and `$$$ARGS` to match zero or more arguments/statements.
+
+    Args:
+        pattern: Structural code pattern using `ast-grep` syntax (e.g., `HARDENED_CHECK_EQ($A, $B)`).
+        lang: Target language parser to use (e.g., `c`, `rust`, `cpp`, `verilog`).
+        dir_path: Optional relative directory scope within the workspace (defaults to `.`).
+
+    Returns:
+        Matching source code snippets with file paths and line numbers.
+    """
     code_dir = tool_context.state.get("code_dir", ".") if tool_context else "."
     try:
         search_path = resolve_workspace_path(dir_path, base_dir=code_dir)

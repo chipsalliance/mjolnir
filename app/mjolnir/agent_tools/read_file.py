@@ -17,7 +17,20 @@ async def read_file(
     end_line: int | None = None,
     tool_context: ToolContext | None = None,
 ) -> str:
-    """Reads the contents of a file from the checked-out codebase, optionally filtering by line range."""
+    """Reads the contents of a file from the checked-out codebase, optionally scoped to a line range.
+
+    When inspecting definitions or call sites found via `ctags_search`, `ast_search`, or
+    `grep_search`, specify `start_line` and `end_line` around the target line number to read the
+    relevant function or struct efficiently without loading entire large files.
+
+    Args:
+        file_path: Relative path to the file from the repository root.
+        start_line: 1-indexed starting line number to read from (defaults to `1`).
+        end_line: Optional 1-indexed ending line number (inclusive). Omit to read to end of file.
+
+    Returns:
+        Line-numbered source file content for the requested range.
+    """
     code_dir = tool_context.state.get("code_dir", ".") if tool_context else "."
     try:
         safe_path = resolve_workspace_path(file_path, base_dir=code_dir)

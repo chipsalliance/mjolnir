@@ -19,7 +19,22 @@ async def grep_search(
     case_sensitive: bool = True,
     tool_context: ToolContext | None = None,
 ) -> str:
-    """Searches for a regular expression pattern within file contents."""
+    """Searches for a regular expression or literal pattern within file contents using `ripgrep` (`rg`).
+
+    Use this tool to locate call sites, cross-references, string literals, register names, or
+    comments across the codebase. For jumping directly to a function, struct, typedef, or macro
+    definition, prefer `ctags_search` first; for structural syntax matching, consider `ast_search`.
+
+    Args:
+        pattern: Regular expression pattern to search for (e.g., `rom_ext_verify\\(`).
+        dir_path: Optional relative directory scope to narrow the search (e.g., `sw/device/silicon_creator`).
+        include_pattern: Optional glob filter for included filenames (e.g., `*.h`, `*.c`).
+        exclude_pattern: Optional glob filter to exclude paths (e.g., `*_unittest.cc`, `*test*`).
+        case_sensitive: Whether the regex match is case-sensitive (defaults to `True`).
+
+    Returns:
+        Matching lines formatted with relative file paths and 1-indexed line numbers.
+    """
     code_dir = tool_context.state.get("code_dir", ".") if tool_context else "."
     try:
         search_path = resolve_workspace_path(dir_path, base_dir=code_dir)

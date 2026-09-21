@@ -18,7 +18,20 @@ async def glob(
     respect_git_ignore: bool = True,
     tool_context: ToolContext | None = None,
 ) -> str:
-    """Finds files matching specific glob patterns across the workspace."""
+    """Finds file paths matching a glob pattern across the workspace without scanning file contents.
+
+    Use this tool to quickly locate headers, implementation files, build definitions, or subsystem
+    directory layouts by filename pattern (e.g., `*manifest*.h`, `**/epmp*.c`, `BUILD*`).
+
+    Args:
+        pattern: Filename or path glob pattern (e.g., `*rom_ext*.h`, `**/*.sv`).
+        dir_path: Optional relative directory scope within the workspace (defaults to `.`).
+        case_sensitive: Whether filename matching is case-sensitive (defaults to `False`).
+        respect_git_ignore: Whether to exclude `.gitignore`d files (defaults to `True`).
+
+    Returns:
+        Newline-separated list of matching relative file paths.
+    """
     base_dir = tool_context.state.get("code_dir", ".") if tool_context else "."
     try:
         search_path = resolve_workspace_path(dir_path, base_dir=base_dir)
