@@ -1,5 +1,7 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
+import json
+import re
 from typing import Any, Optional
 from google.adk import Agent
 from google.adk.agents.invocation_context import (
@@ -16,6 +18,7 @@ from constants import (
     DEFAULT_RETRY_INITIAL_DELAY,
     DEFAULT_RETRY_MAX_DELAY,
 )
+from utilities.logger import logger
 
 # Default transport-level retry configuration for LLM calls (exponential backoff with jitter)
 DEFAULT_HTTP_RETRY_OPTIONS = types.HttpRetryOptions(
@@ -77,9 +80,88 @@ class IsolatedAgent(Agent):
             ctx.run_config = self.run_config
         return ctx
 
+    def _is_final_model_text_event(self, event: Any) -> bool:
+        """Returns True if event is a completed final model response requiring schema validation."""
+        return bool(
+            self.output_schema
+            and not (hasattr(event, "get_function_calls") and event.get_function_calls())
+            and not getattr(event, "partial", False)
+            and getattr(event, "content", None)
+            and getattr(event.content, "role", None) == "model"
+            and getattr(event.content, "parts", None)
+        )
+
+    @staticmethod
+    def _extract_json_candidate(raw_text: str) -> str:
+        """Extracts a JSON object string from markdown code fences or surrounding text."""
+        fenced_match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw_text, flags=re.DOTALL)
+        if fenced_match:
+            return fenced_match.group(1).strip()
+        start = raw_text.find("{")
+        end = raw_text.rfind("}")
+        return raw_text[start : end + 1].strip() if (start != -1 and end > start) else ""
+
+    def _coerce_to_schema_json(self, raw_text: str) -> Optional[str]:
+        """Validates raw_text or an extracted JSON candidate against self.output_schema."""
+        try:
+            self.output_schema.model_validate_json(raw_text)
+            return raw_text
+        except Exception:
+            pass
+
+        candidate = self._extract_json_candidate(raw_text)
+        if not candidate:
+            return None
+
+        try:
+            data = json.loads(candidate)
+            if (
+                isinstance(data, dict)
+                and "vulnerabilities" not in data
+                and isinstance(data.get("findings"), list)
+            ):
+                data["vulnerabilities"] = data.pop("findings")
+            validated = self.output_schema.model_validate(data)
+            return validated.model_dump_json()
+        except Exception as e:
+            logger.debug(f"Could not coerce fenced JSON for {self.name}: {e}")
+            return None
+
+    def _sanitize_structured_event(self, event: Any, tracker: Any = None) -> None:
+        """Normalizes model text parts to valid schema JSON before ADK processes output_schema."""
+        if not self._is_final_model_text_event(event):
+            return
+
+        non_thought_parts = [
+            p
+            for p in event.content.parts
+            if getattr(p, "text", None) and not getattr(p, "thought", False)
+        ]
+        raw_text = "".join(p.text for p in non_thought_parts).strip()
+        if not raw_text:
+            return
+
+        coerced_json = self._coerce_to_schema_json(raw_text)
+        if coerced_json is not None:
+            non_thought_parts[0].text = coerced_json
+            for extra_part in non_thought_parts[1:]:
+                extra_part.text = ""
+            return
+
+        schema_name = getattr(self.output_schema, "__name__", str(self.output_schema))
+        logger.warning(
+            f"Agent {self.name} returned non-JSON text instead of {schema_name}; suppressing crash."
+        )
+        if tracker:
+            tracker.track_error(ValueError(f"SchemaValidationError: {schema_name}"), self.name)
+        for part in non_thought_parts:
+            part.text = ""
+
     async def run_async(self, parent_context: InvocationContext):
         tracker = getattr(parent_context.session, "state", {}).get("usage_tracker")
         async for event in super().run_async(parent_context):
             if tracker:
                 tracker.track_event(event, agent_name=self.name)
+            if self.output_schema:
+                self._sanitize_structured_event(event, tracker)
             yield event
