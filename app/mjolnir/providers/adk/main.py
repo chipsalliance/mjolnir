@@ -17,6 +17,7 @@ from providers.adk.phases import (
     audit_phase,
     ingest_report_phase,
     initialize,
+    project_exploration_phase,
     review_phase,
 )
 from providers.adk.utilities.usage_tracker import UsageTracker
@@ -27,7 +28,8 @@ def build_audit_workflow(name: str = "MjolnirAuditWorkflow") -> Workflow:
     """Factory builder for standard discovery and audit workflow graph."""
     edges = [
         ("START", initialize),
-        (initialize, audit_phase),
+        (initialize, project_exploration_phase),
+        (project_exploration_phase, audit_phase),
         (audit_phase, review_phase),
     ]
     return Workflow(name=name, edges=edges)
@@ -37,7 +39,8 @@ def build_ingest_workflow(name: str = "MjolnirIngestWorkflow") -> Workflow:
     """Factory builder for report ingestion workflow graph."""
     edges = [
         ("START", initialize),
-        (initialize, ingest_report_phase),
+        (initialize, project_exploration_phase),
+        (project_exploration_phase, ingest_report_phase),
         (ingest_report_phase, review_phase),
     ]
     return Workflow(name=name, edges=edges)

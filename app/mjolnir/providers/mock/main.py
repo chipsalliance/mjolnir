@@ -6,7 +6,13 @@ import uuid
 
 from tqdm import tqdm
 
-from constants import PHASE_1_ID, PHASE_1_NAME, PHASE_2_ID, PHASE_2_NAME
+from constants import (
+    PHASE_1_ID,
+    PHASE_1_NAME,
+    PHASE_2_ID,
+    PHASE_2_NAME,
+    PROJECT_EXPERT_SUMMARY_FILENAME,
+)
 from data.audit_finding import AuditFinding
 from data.review_finding import ReviewFinding
 from data.severity import Severity
@@ -26,6 +32,14 @@ def run_analysis(
     ingest_path: str = None,
 ) -> list:
     """Instantly returns hardcoded mock findings and compiles a mock flow history for testing."""
+
+    logger.info("Executing initial project exploration (Project Expert - Mock)...")
+    if threat_model_context:
+        logger.debug("Project Expert ingested threat model context.")
+    if run_dir:
+        summary_path = os.path.join(run_dir, PROJECT_EXPERT_SUMMARY_FILENAME)
+        with open(summary_path, "w", encoding="utf-8") as f:
+            f.write("# Project Expert Summary (Mock)\n\nMock project architecture summary.\n")
 
     all_vulnerabilities = []
 
