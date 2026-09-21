@@ -12,10 +12,12 @@ These targets test Mjolnir's **Python analysis engine, agent workflows, git oper
 - **`project.nix`**: Defines the test project and builds the synthetic git fixture repository using `mock_repo.nix`.
 - **`mock_repo.nix`**: Nix derivation that constructs a deterministic mock git repository in the Nix store with mock source files, commits, branches, and PR diff history.
 - **`jobs/`**: Test scenario specifications:
-  - `mock-smoke.nix`: Basic local mock scan verifying discovery, search tools, and report generation (`nix run .#mock-smoke-test`).
+  - `mock-smoke.nix`: Basic local mock scan (`fast` mode default) verifying discovery, search tools, and report generation (`nix run .#mock-smoke-test`).
+  - `mock-full.nix`: Full-mode local mock scan (`mode = "full"`) verifying Project Expert Phase 0 reconnaissance and summary output (`nix run .#mock-full-test`).
   - `mock-ci.nix`: PR diff mode mock verification (`nix run .#mock-ci-test`).
   - `adk-ci.nix`: PR diff check using the ADK engine (`nix run .#adk-ci-test`).
-  - `adk-gemini.nix`: Live multi-agent workflow test using Gemini (`nix run .#adk-gemini-test`).
+  - `adk-gemini.nix`: Live multi-agent workflow test using Gemini in default `fast` mode (`[discovery, initial_review]`, no Project Expert) (`nix run .#adk-gemini-test`).
+  - `adk-gemini-full.nix`: Live multi-agent workflow test using Gemini in `full` mode (`[project_exploration, discovery, initial_review]` with `ask_project_expert`) (`nix run .#adk-gemini-full-test`).
   - `adk-gemini-ingest.nix`: Mock report ingestion pipeline test (`nix run .#adk-gemini-ingest-test`).
   - `adk-claude.nix`: Claude multi-agent workflow test (`nix run .#adk-claude-test`).
   - `adk-ollama.nix`: Ollama local model workflow test (`nix run .#adk-ollama-test`).

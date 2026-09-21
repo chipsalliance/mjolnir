@@ -182,9 +182,11 @@
               description = "All tests";
               jobs = [
                 discovered.mock-smoke-test
+                discovered.mock-full-test
                 discovered.mock-ci-test
                 discovered.adk-ci-test
                 discovered.adk-gemini-test
+                discovered.adk-gemini-full-test
                 discovered.adk-gemini-ingest-test
               ];
             };
