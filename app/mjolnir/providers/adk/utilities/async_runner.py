@@ -10,6 +10,14 @@ from tqdm import tqdm
 from utilities.logger import logger
 
 
+def extract_agent_text(res: Any, default: str = "") -> str:
+    """Extracts plain text output from an ADK node execution result."""
+    if res is None:
+        return default
+    text_val = getattr(res, "output", None) or getattr(res, "text", None) or str(res)
+    return str(text_val).strip() if text_val else default
+
+
 def extract_agent_output(res: Any, expected_schema: Any) -> Any:
     """Safely extracts and validates a Pydantic model instance from an ADK node execution result."""
     if res is None or expected_schema is None or isinstance(res, expected_schema):
@@ -21,13 +29,8 @@ def extract_agent_output(res: Any, expected_schema: Any) -> Any:
             logger.warning(f"Failed to validate dict output against {expected_schema}: {e}")
             return
 
-    text_val = (
-        getattr(res, "output", None)
-        or getattr(res, "text", None)
-        or (str(res) if isinstance(res, str) else None)
-    )
-    if isinstance(text_val, str):
-        text_val = text_val.strip()
+    text_val = extract_agent_text(res)
+    if text_val:
         if text_val.startswith("```"):
             text_val = re.sub(r"^```(?:json)?\s*|\s*```$", "", text_val, flags=re.DOTALL)
         try:

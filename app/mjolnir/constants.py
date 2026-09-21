@@ -39,20 +39,39 @@ SET_MODEL_RESPONSE_INSTRUCTION = (
 DEFAULT_DISPATCH_STAGGER_SECONDS = 0.25
 
 # --- Agent Turn Ceilings (RunConfig backstop) ---
+PROJECT_EXPERT_MAX_LLM_CALLS = 50
 AUDITOR_MAX_LLM_CALLS = 40
 REVIEWER_MAX_LLM_CALLS = 100
 INGESTION_MAX_LLM_CALLS = 50
 
 # --- Tool Execution & Output Limits ---
 DEFAULT_TOOL_OUTPUT_MAX_CHARS = 40000
+PROJECT_EXPERT_QUERY_LOG_PREVIEW_CHARS = 100
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 BINARY_CHECK_CHUNK_BYTES = 8192
 
-# --- Pipeline Phases ---
+# --- Pipeline Phases & Artifacts ---
+PHASE_0_ID = "0"
+PHASE_0_NAME = "Project Exploration"
+PROJECT_EXPERT_RUN_ID = "project_exploration"
+PROJECT_EXPERT_SUMMARY_FILENAME = "project_expert_summary.md"
 PHASE_1_ID = "1"
 PHASE_1_NAME = "Source File Exploration"
 PHASE_2_ID = "2"
 PHASE_2_NAME = "Initial Review"
+
+# --- Project Expert Prompts ---
+PROJECT_EXPLORATION_TASK_PROMPT = (
+    "Project Root Directory: {code_dir}\n\n"
+    "Execute your Initial Exploration (Reconnaissance) role over this repository and synthesize "
+    "a concise architectural overview for downstream auditor and reviewer agents."
+)
+PROJECT_EXPERT_QUERY_PROMPT_TEMPLATE = (
+    "A downstream security agent has consulted you with the following question regarding the project:\n\n"
+    "Question: {question}\n\n"
+    "Please provide a precise, grounded answer referencing project files, conventions, "
+    "hardware register definitions, build targets, or threat model constraints where applicable."
+)
 
 # --- Event & Tool Error Detection ---
 BENIGN_FINISH_REASONS = ("STOP", "FINISH_REASON_UNSPECIFIED", "None", "")
