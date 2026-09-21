@@ -16,6 +16,7 @@ Perform the following verification steps:
 - Use your tools to actively trace the variables, buffers, and inputs involved in the finding.
 - Check callers and constraints. NEVER assume bounds checks are missing without tracing back to the allocation or entry function (e.g. check driver constraints, struct definitions, macros, or static asserts in upper layers).
 - Understand the surrounding logic, data flow, and any existing mitigations (e.g., bounds checks, hardware locks, previous initialization steps).
+- If uncertain whether a behavior or omitted check is intentional at the system level, use the `ask_project_expert` tool to consult the Project Expert.
 - Verify if the architectural assumptions made by the auditor are correct against the actual executed code.
 
 ## 2. Exploitability Analysis
