@@ -11,8 +11,8 @@ from google.adk import Context
 from google.adk.workflow import node
 
 from constants import (
-    PHASE_0_ID as PHASE_EXPLORATION_ID,
-    PHASE_0_NAME as PHASE_EXPLORATION_NAME,
+    PHASE_EXPLORATION_ID,
+    PHASE_EXPLORATION_NAME,
     PROJECT_EXPERT_SUMMARY_FILENAME,
     PROJECT_EXPLORATION_TASK_PROMPT,
 )

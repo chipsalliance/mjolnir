@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fmt::Write;
 use wasm_bindgen::prelude::*;
 
@@ -592,8 +592,9 @@ pub fn build_phase_sankey_rows(vulns: &[serde_json::Value]) -> String {
         return "[]".to_string();
     }
 
-    // 1. Gather all phase_id -> phase_name mapping
-    let mut phase_map: BTreeMap<i32, String> = BTreeMap::new();
+    // 1. Gather ordered (phase_id, phase_name) sequence from chronological history
+    let mut phase_keys: Vec<String> = Vec::new();
+    let mut phase_map: HashMap<String, String> = HashMap::new();
 
     for v in vulns {
         if let Some(hist) = v.get("history").and_then(|h| h.as_array()) {
@@ -602,19 +603,22 @@ pub fn build_phase_sankey_rows(vulns: &[serde_json::Value]) -> String {
                     .get("phase_id")
                     .map(|p| p.to_string().trim_matches('"').to_string())
                     .unwrap_or_default();
+                if pid_str.is_empty() {
+                    continue;
+                }
                 let pname = h
                     .get("phase_name")
                     .and_then(|p| p.as_str())
                     .unwrap_or("Phase")
                     .to_string();
-                if let Ok(pid) = pid_str.parse::<i32>() {
-                    phase_map.insert(pid, pname);
+                if !phase_map.contains_key(&pid_str) {
+                    phase_keys.push(pid_str.clone());
                 }
+                phase_map.insert(pid_str, pname);
             }
         }
     }
 
-    let phase_keys: Vec<i32> = phase_map.keys().cloned().collect();
     if phase_keys.len() < 2 {
         return fallback_sankey_rows(vulns);
     }
@@ -629,44 +633,48 @@ pub fn build_phase_sankey_rows(vulns: &[serde_json::Value]) -> String {
             None => continue,
         };
 
-        let mut phase_node_names: HashMap<i32, String> = HashMap::new();
+        let mut phase_node_names: HashMap<String, String> = HashMap::new();
 
-        for &p_key in &phase_keys {
+        for (step_idx, p_key) in phase_keys.iter().enumerate() {
             let snap = hist.iter().find(|h| {
                 let pid_str = h
                     .get("phase_id")
                     .map(|p| p.to_string().trim_matches('"').to_string())
                     .unwrap_or_default();
-                pid_str.parse::<i32>().ok() == Some(p_key)
+                &pid_str == p_key
             });
 
             if let Some(s) = snap {
                 let phase_name = phase_map
-                    .get(&p_key)
+                    .get(p_key)
                     .cloned()
-                    .unwrap_or_else(|| format!("Phase {}", p_key));
+                    .unwrap_or_else(|| format!("Phase {}", step_idx + 1));
+                let phase_label = if let Ok(num) = p_key.parse::<i32>() {
+                    format!("Phase {}: {}", num, phase_name)
+                } else {
+                    format!("Phase {}: {}", step_idx + 1, phase_name)
+                };
                 let severity = s
                     .get("severity")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
                 let node_name = if is_closed_status(s) {
-                    format!("Phase {}: {} - Closed", p_key, phase_name)
+                    format!("{} - Closed", phase_label)
                 } else if severity.eq_ignore_ascii_case("Skipped") {
-                    format!("Phase {}: {} - Skipped", p_key, phase_name)
+                    format!("{} - Skipped", phase_label)
                 } else {
-                    format!("Phase {}: {} - {}", p_key, phase_name, severity)
+                    format!("{} - {}", phase_label, severity)
                 };
 
-                phase_node_names.insert(p_key, node_name);
+                phase_node_names.insert(p_key.clone(), node_name);
             }
         }
 
         for i in 0..(phase_keys.len() - 1) {
-            let p1 = phase_keys[i];
-            let p2 = phase_keys[i + 1];
+            let p1 = &phase_keys[i];
+            let p2 = &phase_keys[i + 1];
 
-            if let (Some(base1), Some(base2)) =
-                (phase_node_names.get(&p1), phase_node_names.get(&p2))
+            if let (Some(base1), Some(base2)) = (phase_node_names.get(p1), phase_node_names.get(p2))
             {
                 *node_counts.entry(base1.clone()).or_insert(0) += 1;
                 *node_counts.entry(base2.clone()).or_insert(0) += 1;
@@ -975,5 +983,37 @@ mod tests {
         );
         assert!(csv.contains("\"Project\",\"Job\",\"Run ID\",\"Timestamp\",\"Trigger\""));
         assert!(csv.contains("\"proj\",\"job\",\"run_1\",\"\",\"ci\",\"\",\"\",\"gemini-2.5-flash\",\"\",\"\",\"1\",\"LOW\",\"Finding A\""));
+    }
+
+    #[test]
+    fn test_build_phase_sankey_rows_semantic_ids() {
+        let vulns: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[
+                {
+                    "title": "Ingested Finding",
+                    "severity": "High",
+                    "status": "Open",
+                    "history": [
+                        {
+                            "phase_id": "report_ingestion",
+                            "phase_name": "Report Ingestion",
+                            "severity": "High",
+                            "status": "Open"
+                        },
+                        {
+                            "phase_id": "initial_review",
+                            "phase_name": "Initial Review",
+                            "severity": "Medium",
+                            "status": "Open"
+                        }
+                    ]
+                }
+            ]"#,
+        )
+        .unwrap();
+
+        let rows = build_phase_sankey_rows(&vulns);
+        assert!(rows.contains("Phase 1: Report Ingestion - High (count: 1)"));
+        assert!(rows.contains("Phase 2: Initial Review - Medium (count: 1)"));
     }
 }

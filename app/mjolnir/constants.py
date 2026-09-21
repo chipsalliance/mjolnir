@@ -50,15 +50,25 @@ PROJECT_EXPERT_QUERY_LOG_PREVIEW_CHARS = 100
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 BINARY_CHECK_CHUNK_BYTES = 8192
 
-# --- Pipeline Phases & Artifacts ---
-PHASE_0_ID = "0"
-PHASE_0_NAME = "Project Exploration"
-PROJECT_EXPERT_RUN_ID = "project_exploration"
+# --- Pipeline Modes, Phases & Artifacts ---
+PIPELINE_MODE_FAST = "fast"
+PIPELINE_MODE_FULL = "full"
+
+PHASE_EXPLORATION_ID = "project_exploration"
+PHASE_EXPLORATION_NAME = "Project Exploration"
 PROJECT_EXPERT_SUMMARY_FILENAME = "project_expert_summary.md"
-PHASE_1_ID = "1"
-PHASE_1_NAME = "Source File Exploration"
-PHASE_2_ID = "2"
-PHASE_2_NAME = "Initial Review"
+
+PHASE_DISCOVERY_ID = "discovery"
+PHASE_DISCOVERY_NAME = "Source File Discovery"
+
+PHASE_INGEST_ID = "report_ingestion"
+PHASE_INGEST_NAME = "Report Ingestion"
+
+PHASE_INITIAL_REVIEW_ID = "initial_review"
+PHASE_INITIAL_REVIEW_NAME = "Initial Review"
+
+PHASE_FINAL_REVIEW_ID = "final_review"
+PHASE_FINAL_REVIEW_NAME = "Final Review"
 
 # --- Project Expert Prompts ---
 PROJECT_EXPLORATION_TASK_PROMPT = (
