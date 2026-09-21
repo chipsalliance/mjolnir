@@ -92,14 +92,27 @@ class IsolatedAgent(Agent):
         )
 
     @staticmethod
-    def _extract_json_candidate(raw_text: str) -> str:
-        """Extracts a JSON object string from markdown code fences or surrounding text."""
-        fenced_match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw_text, flags=re.DOTALL)
-        if fenced_match:
-            return fenced_match.group(1).strip()
+    def _extract_json_candidates(raw_text: str) -> list[str]:
+        """Extracts JSON object candidates from markdown code fences (last-to-first) or surrounding text."""
+        candidates: list[str] = []
+        # Match JSON objects wrapped in markdown code fences, e.g.:
+        # ```json
+        # {"vulnerabilities": [...]}
+        # ```
+        fenced_blocks = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", raw_text, flags=re.DOTALL)
+        for block in reversed(fenced_blocks):
+            if stripped := block.strip():
+                candidates.append(stripped)
+
+        # Fallback for unfenced JSON surrounded by prose (e.g. "Here is the report: {...} Done."):
+        # slice from the first '{' through the last '}' (inclusive via `end + 1` to keep `{...}`).
         start = raw_text.find("{")
         end = raw_text.rfind("}")
-        return raw_text[start : end + 1].strip() if (start != -1 and end > start) else ""
+        if start != -1 and end > start:
+            outer = raw_text[start : end + 1].strip()
+            if outer not in candidates:
+                candidates.append(outer)
+        return candidates
 
     def _coerce_to_schema_json(self, raw_text: str) -> Optional[str]:
         """Validates raw_text or an extracted JSON candidate against self.output_schema."""
@@ -109,23 +122,20 @@ class IsolatedAgent(Agent):
         except Exception:
             pass
 
-        candidate = self._extract_json_candidate(raw_text)
-        if not candidate:
-            return None
-
-        try:
-            data = json.loads(candidate)
-            if (
-                isinstance(data, dict)
-                and "vulnerabilities" not in data
-                and isinstance(data.get("findings"), list)
-            ):
-                data["vulnerabilities"] = data.pop("findings")
-            validated = self.output_schema.model_validate(data)
-            return validated.model_dump_json()
-        except Exception as e:
-            logger.debug(f"Could not coerce fenced JSON for {self.name}: {e}")
-            return None
+        for candidate in self._extract_json_candidates(raw_text):
+            try:
+                data = json.loads(candidate)
+                if (
+                    isinstance(data, dict)
+                    and "vulnerabilities" not in data
+                    and isinstance(data.get("findings"), list)
+                ):
+                    data["vulnerabilities"] = data.pop("findings")
+                validated = self.output_schema.model_validate(data)
+                return validated.model_dump_json()
+            except Exception as e:
+                logger.debug(f"Could not coerce fenced JSON candidate for {self.name}: {e}")
+        return None
 
     def _sanitize_structured_event(self, event: Any, tracker: Any = None) -> None:
         """Normalizes model text parts to valid schema JSON before ADK processes output_schema."""
@@ -152,8 +162,6 @@ class IsolatedAgent(Agent):
         logger.warning(
             f"Agent {self.name} returned non-JSON text instead of {schema_name}; suppressing crash."
         )
-        if tracker:
-            tracker.track_error(ValueError(f"SchemaValidationError: {schema_name}"), self.name)
         for part in non_thought_parts:
             part.text = ""
 
