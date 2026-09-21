@@ -51,6 +51,11 @@ def _run_orchestrator():
         "--trigger",
         help="Optional trigger source for the audit run (e.g. manual, ci, automated)",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["fast", "full"],
+        help="Pipeline depth mode: 'fast' (discovery + initial review) or 'full' (adds project expert and deep verification)",
+    )
     args, unknown_args = parser.parse_known_args()
 
     if not args.spec:
@@ -211,7 +216,8 @@ def _run_orchestrator():
     # Execute analyis via selected provider
 
     # Execute analysis via selected model
-    logger.info(f"Executing analysis (model={model_name}).")
+    pipeline_mode = args.mode or job.get("mode")
+    logger.info(f"Executing analysis (model={model_name}, mode={pipeline_mode}).")
 
     batch_size = job.get("batchSize")
 
@@ -223,6 +229,7 @@ def _run_orchestrator():
             threat_model_context,
             run_dir,
             batch_size,
+            pipeline_mode,
             ingest_path=ingest_path,
         )
     else:
@@ -233,6 +240,7 @@ def _run_orchestrator():
             threat_model_context,
             run_dir,
             batch_size,
+            pipeline_mode,
             ingest_path=ingest_path,
             diff_base=diff_base,
             diff_head=diff_head,

@@ -9,6 +9,7 @@ let
   workspaceDir = project.workspaceDir or (throw "Mjolnir: No 'workspaceDir' specified for project '${project.name or "unknown"}' (set 'workspaceDir' in project.nix).");
 
   ref = job.ref or project.defaultRef or project.ref or job.commit or job.branch or job.tag or project.commit or "HEAD";
+  mode = job.mode or project.defaultMode or "fast";
 
   jobSpec = {
     project = {
@@ -18,7 +19,7 @@ let
 
     job = {
       inherit (job) name;
-      inherit model batchSize extensions ref;
+      inherit model batchSize extensions ref mode;
       srcDirs = job.srcDirs or [ "." ];
       maxFiles = job.maxFiles or null;
       cmd = job.cmd or null;

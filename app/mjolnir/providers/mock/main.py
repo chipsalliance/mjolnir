@@ -7,10 +7,11 @@ import uuid
 from tqdm import tqdm
 
 from constants import (
-    PHASE_1_ID,
-    PHASE_1_NAME,
-    PHASE_2_ID,
-    PHASE_2_NAME,
+    PHASE_DISCOVERY_ID,
+    PHASE_DISCOVERY_NAME,
+    PHASE_INITIAL_REVIEW_ID,
+    PHASE_INITIAL_REVIEW_NAME,
+    PIPELINE_MODE_FULL,
     PROJECT_EXPERT_SUMMARY_FILENAME,
 )
 from data.audit_finding import AuditFinding
@@ -29,17 +30,19 @@ def run_analysis(
     threat_model_context: str,
     run_dir: str,
     batch_size: int,
+    mode: str,
     ingest_path: str = None,
 ) -> list:
     """Instantly returns hardcoded mock findings and compiles a mock flow history for testing."""
 
-    logger.info("Executing initial project exploration (Project Expert - Mock)...")
-    if threat_model_context:
-        logger.debug("Project Expert ingested threat model context.")
-    if run_dir:
-        summary_path = os.path.join(run_dir, PROJECT_EXPERT_SUMMARY_FILENAME)
-        with open(summary_path, "w", encoding="utf-8") as f:
-            f.write("# Project Expert Summary (Mock)\n\nMock project architecture summary.\n")
+    if mode == PIPELINE_MODE_FULL:
+        logger.info("Executing initial project exploration (Project Expert - Mock)...")
+        if threat_model_context:
+            logger.debug("Project Expert ingested threat model context.")
+        if run_dir:
+            summary_path = os.path.join(run_dir, PROJECT_EXPERT_SUMMARY_FILENAME)
+            with open(summary_path, "w", encoding="utf-8") as f:
+                f.write("# Project Expert Summary (Mock)\n\nMock project architecture summary.\n")
 
     all_vulnerabilities = []
 
@@ -54,7 +57,7 @@ def run_analysis(
 
         fid = str(uuid.uuid4())
 
-        # 1. Auditor Finding (Phase 1)
+        # 1. Discovery Finding
         audit_finding = AuditFinding(
             title="Mock Vulnerability",
             severity=Severity.MEDIUM,
@@ -72,9 +75,13 @@ def run_analysis(
             description=audit_finding.description,
             recommendation=audit_finding.recommendation,
         )
-        vuln.add(phase_id=PHASE_1_ID, phase_name=PHASE_1_NAME, finding=audit_finding)
+        vuln.add(
+            phase_id=PHASE_DISCOVERY_ID,
+            phase_name=PHASE_DISCOVERY_NAME,
+            finding=audit_finding,
+        )
 
-        # 2. Simulate Reviewer (Phase 2)
+        # 2. Simulate Initial Review
         # We vary status to test all flow branches (kept, downgraded, FP/discarded, skipped/kept)
         case = idx % 4
 
@@ -90,7 +97,11 @@ def run_analysis(
                 justification="Testing intact path.",
                 attack_vector="Trigger exploit directly.",
             )
-            vuln.add(phase_id=PHASE_2_ID, phase_name=PHASE_2_NAME, finding=review)
+            vuln.add(
+                phase_id=PHASE_INITIAL_REVIEW_ID,
+                phase_name=PHASE_INITIAL_REVIEW_NAME,
+                finding=review,
+            )
         elif case == 1:
             # Finding is downgraded
             review = ReviewFinding(
@@ -103,7 +114,11 @@ def run_analysis(
                 justification="Testing downgrade path.",
                 attack_vector="",
             )
-            vuln.add(phase_id=PHASE_2_ID, phase_name=PHASE_2_NAME, finding=review)
+            vuln.add(
+                phase_id=PHASE_INITIAL_REVIEW_ID,
+                phase_name=PHASE_INITIAL_REVIEW_NAME,
+                finding=review,
+            )
         elif case == 2:
             # Finding is resolved as False Positive (Discarded)
             review = ReviewFinding(
@@ -116,12 +131,16 @@ def run_analysis(
                 justification="Testing false positive path.",
                 attack_vector="",
             )
-            vuln.add(phase_id=PHASE_2_ID, phase_name=PHASE_2_NAME, finding=review)
+            vuln.add(
+                phase_id=PHASE_INITIAL_REVIEW_ID,
+                phase_name=PHASE_INITIAL_REVIEW_NAME,
+                finding=review,
+            )
         else:
             # Finding is skipped (Omitted by reviewer -> Kept via fail-open)
             vuln.add_skipped(
-                phase_id=PHASE_2_ID,
-                phase_name=PHASE_2_NAME,
+                phase_id=PHASE_INITIAL_REVIEW_ID,
+                phase_name=PHASE_INITIAL_REVIEW_NAME,
                 justification="Omitted during mock review simulation.",
             )
 

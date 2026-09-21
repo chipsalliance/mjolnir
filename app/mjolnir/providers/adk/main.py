@@ -11,48 +11,122 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from constants import PHASE_1_ID
+from constants import (
+    PHASE_DISCOVERY_ID,
+    PHASE_EXPLORATION_ID,
+    PHASE_FINAL_REVIEW_ID,
+    PHASE_INGEST_ID,
+    PHASE_INITIAL_REVIEW_ID,
+    PIPELINE_MODE_FAST,
+    PIPELINE_MODE_FULL,
+)
 from data.vulnerability import Vulnerability
 from providers.adk.phases import (
-    audit_phase,
+    discovery_phase,
+    final_review_phase,
     ingest_report_phase,
+    initial_review_phase,
     initialize,
     project_exploration_phase,
-    review_phase,
 )
 from providers.adk.utilities.usage_tracker import UsageTracker
 from utilities.logger import logger
 
+PHASE_REGISTRY = {
+    PHASE_EXPLORATION_ID: project_exploration_phase,
+    PHASE_DISCOVERY_ID: discovery_phase,
+    PHASE_INGEST_ID: ingest_report_phase,
+    PHASE_INITIAL_REVIEW_ID: initial_review_phase,
+    PHASE_FINAL_REVIEW_ID: final_review_phase,
+}
 
-def build_audit_workflow(name: str = "MjolnirAuditWorkflow") -> Workflow:
-    """Factory builder for standard discovery and audit workflow graph."""
-    edges = [
-        ("START", initialize),
-        (initialize, project_exploration_phase),
-        (project_exploration_phase, audit_phase),
-        (audit_phase, review_phase),
-    ]
+
+def build_composable_workflow(
+    phase_ids: list[str], name: str = "MjolnirComposableWorkflow"
+) -> Workflow:
+    """Builds a workflow graph from an arbitrary ordered list of registered phase IDs."""
+    nodes = []
+    for pid in phase_ids:
+        if pid not in PHASE_REGISTRY:
+            raise ValueError(
+                f"Unknown phase ID '{pid}'. Available phases: {list(PHASE_REGISTRY.keys())}"
+            )
+        nodes.append(PHASE_REGISTRY[pid])
+
+    edges = []
+    prev = initialize
+    edges.append(("START", initialize))
+    for phase_node in nodes:
+        edges.append((prev, phase_node))
+        prev = phase_node
     return Workflow(name=name, edges=edges)
 
 
-def build_ingest_workflow(name: str = "MjolnirIngestWorkflow") -> Workflow:
+def resolve_mode_phases(mode: str, ingest_path: str | None = None) -> list[str]:
+    """Resolves the ordered phase IDs for 'fast' (classic discovery + initial review) or 'full' mode."""
+    entry_phase = PHASE_INGEST_ID if ingest_path else PHASE_DISCOVERY_ID
+    if mode == PIPELINE_MODE_FULL:
+        return [PHASE_EXPLORATION_ID, entry_phase, PHASE_INITIAL_REVIEW_ID]
+    if mode == PIPELINE_MODE_FAST:
+        return [entry_phase, PHASE_INITIAL_REVIEW_ID]
+    raise ValueError(f"Unsupported pipeline mode: '{mode}'")
+
+
+def build_audit_workflow(mode: str, name: str = "MjolnirAuditWorkflow") -> Workflow:
+    """Factory builder for discovery and review workflow graph."""
+    return build_composable_workflow(
+        resolve_mode_phases(mode=mode, ingest_path=None),
+        name=name,
+    )
+
+
+def build_ingest_workflow(mode: str, name: str = "MjolnirIngestWorkflow") -> Workflow:
     """Factory builder for report ingestion workflow graph."""
-    edges = [
-        ("START", initialize),
-        (initialize, project_exploration_phase),
-        (project_exploration_phase, ingest_report_phase),
-        (ingest_report_phase, review_phase),
-    ]
-    return Workflow(name=name, edges=edges)
+    return build_composable_workflow(
+        resolve_mode_phases(mode=mode, ingest_path="ingest"),
+        name=name,
+    )
 
 
 def build_analysis_workflow(
-    ingest_path: str | None = None, name: str = "MjolnirAnalysis"
+    mode: str,
+    ingest_path: str | None = None,
+    name: str = "MjolnirAnalysis",
 ) -> Workflow:
-    """Builds a multi-node workflow graph based on execution parameters."""
+    """Builds a multi-node workflow graph based on pipeline mode ('fast' or 'full') and ingestion state."""
     if ingest_path:
-        return build_ingest_workflow(name=name)
-    return build_audit_workflow(name=name)
+        return build_ingest_workflow(mode=mode, name=name)
+    return build_audit_workflow(mode=mode, name=name)
+
+
+def _is_vulnerability_list(output: object) -> bool:
+    """Returns True if a node output represents a list of Vulnerability objects/dicts."""
+    if not isinstance(output, list):
+        return False
+    if not output:
+        return True
+    first = output[0]
+    return isinstance(first, Vulnerability) or (
+        isinstance(first, dict) and ("title" in first or "audit_finding" in first)
+    )
+
+
+def _find_fallback_checkpoint(run_dir: str, state: dict) -> Path | None:
+    """Locates the most recent vulnerability checkpoint written before an interruption."""
+    last_cp = state.get("last_checkpoint_path")
+    if last_cp and Path(last_cp).exists():
+        return Path(last_cp)
+
+    run_path = Path(run_dir)
+    candidates = [
+        run_path / f"finding_phase_{PHASE_DISCOVERY_ID}.json",
+        run_path / f"finding_phase_{PHASE_INGEST_ID}.json",
+        run_path / "audit_findings.json",
+    ]
+    for path in candidates:
+        if path.exists():
+            return path
+    return None
 
 
 def run_analysis(
@@ -62,12 +136,13 @@ def run_analysis(
     threat_model_context: str,
     run_dir: str,
     batch_size: int,
+    mode: str,
     ingest_path: str = None,
     diff_base: str = None,
     diff_head: str = None,
 ) -> tuple[list[Vulnerability], str]:
     """ADK 2.0 provider pipeline: executes a multi-node workflow graph."""
-    logger.info("Initializing ADK 2.0 Workflow Engine...")
+    logger.info(f"Initializing ADK 2.0 Workflow Engine (mode={mode})...")
 
     try:
         from google.adk.models.google_llm import Gemini
@@ -82,8 +157,8 @@ def run_analysis(
     except Exception as e:
         logger.warning(f"Could not inspect ADK client metadata: {e}")
 
-    # Build the multi-node workflow graph dynamically via workflow builders
-    analysis_workflow = build_analysis_workflow(ingest_path=ingest_path)
+    enable_project_expert = mode == PIPELINE_MODE_FULL
+    analysis_workflow = build_analysis_workflow(mode=mode, ingest_path=ingest_path)
 
     session_service = InMemorySessionService()
     runner = Runner(
@@ -92,25 +167,31 @@ def run_analysis(
         session_service=session_service,
     )
 
-    session = asyncio.run(
-        session_service.create_session(
-            app_name="mjolnir",
-            user_id="mjolnir_user",
-        )
-    )
-
     usage_tracker = UsageTracker(run_dir=run_dir)
     initial_state = {
         "model": model,
         "code_dir": code_dir,
+        "files": files,
         "threat_model_context": threat_model_context,
         "batch_size": batch_size,
         "ingest_path": ingest_path,
         "diff_base": diff_base,
         "diff_head": diff_head,
         "run_dir": run_dir,
+        "mode": mode,
+        "enable_project_expert": enable_project_expert,
         "usage_tracker": usage_tracker,
+        "project_expert_qa_history": [],
+        "vulnerabilities": [],
     }
+
+    session = asyncio.run(
+        session_service.create_session(
+            app_name="mjolnir",
+            user_id="mjolnir_user",
+            state=initial_state,
+        )
+    )
 
     workflow_input = {
         "model": model,
@@ -122,6 +203,8 @@ def run_analysis(
         "diff_base": diff_base,
         "diff_head": diff_head,
         "run_dir": run_dir,
+        "mode": mode,
+        "enable_project_expert": enable_project_expert,
     }
 
     user_msg = types.Content(
@@ -129,7 +212,7 @@ def run_analysis(
         parts=[types.Part.from_text(text=json.dumps(workflow_input))],
     )
 
-    # Run the graph
+    # Run the graph and capture the latest vulnerability list emitted by any phase node
     status = "Success"
     vulnerabilities: list[Vulnerability] | None = None
     try:
@@ -139,7 +222,11 @@ def run_analysis(
             new_message=user_msg,
         ):
             usage_tracker.add(ev)
-            if ev.node_name == "review_phase" and ev.output is not None:
+            if (
+                ev.node_name not in ("START", "initialize", "project_exploration_phase")
+                and ev.output is not None
+                and _is_vulnerability_list(ev.output)
+            ):
                 vulnerabilities = ev.output
     except (Exception, KeyboardInterrupt) as e:
         logger.error(f"Analysis interrupted or failed: {e}\n{traceback.format_exc()}")
@@ -148,23 +235,20 @@ def run_analysis(
     # Write usage report
     usage_tracker.write_to_disk(run_dir)
 
-    # Only fall back to Phase 1 checkpoints if Phase 2 failed or was interrupted
+    # Fall back to the most recent phase checkpoint if the workflow was interrupted
     if vulnerabilities is None and run_dir:
-        audit_path = Path(run_dir) / f"finding_phase_{PHASE_1_ID}.json"
-        if not audit_path.exists():
-            audit_path = Path(run_dir) / "audit_findings.json"
-
-        if audit_path.exists():
+        checkpoint_path = _find_fallback_checkpoint(run_dir, initial_state)
+        if checkpoint_path:
             logger.warning(
-                "Falling back to unreviewed Phase 1 vulnerabilities due to Phase 2 interruption."
+                f"Falling back to checkpointed vulnerabilities at {checkpoint_path} due to pipeline interruption."
             )
             try:
-                with open(audit_path, "r", encoding="utf-8") as f:
+                with open(checkpoint_path, "r", encoding="utf-8") as f:
                     raw_vulns = json.load(f)
                 if isinstance(raw_vulns, list):
                     vulnerabilities = raw_vulns
             except Exception as e:
-                logger.error(f"Could not load fallback Phase 1 vulnerabilities: {e}")
+                logger.error(f"Could not load fallback vulnerabilities: {e}")
 
     if vulnerabilities is None:
         vulnerabilities = []
