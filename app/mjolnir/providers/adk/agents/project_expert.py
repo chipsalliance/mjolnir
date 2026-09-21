@@ -6,6 +6,7 @@ from google.adk import Agent
 from google.adk.agents.run_config import RunConfig
 from google.genai import types
 
+from agent_tools import format_tool_guidance
 from agent_tools.ast_search import ast_search
 from agent_tools.ctags_search import ctags_search
 from agent_tools.glob import glob
@@ -15,23 +16,26 @@ from constants import PROJECT_EXPERT_MAX_LLM_CALLS
 from providers.adk.agents.isolated_agent import IsolatedAgent
 from utilities.prompt_loader import prompt_registry
 
-PROJECT_EXPERT_TOOLS = [read_file, glob, grep_search, ctags_search, ast_search]
+PROJECT_EXPERT_TOOLS = [ctags_search, ast_search, grep_search, glob, read_file]
 
 
 def build_project_expert_instruction(
     threat_model_context: str = "",
     project_summary: str = "",
     qa_history: list[dict[str, str]] | None = None,
+    tools: list | None = None,
 ) -> str:
     """Builds the system instruction for the ProjectExpertAgent."""
-    instruction = prompt_registry.load_prompt("project_expert") + "\n\n"
+    active_tools = tools if tools is not None else PROJECT_EXPERT_TOOLS
+    raw_prompt = prompt_registry.load_prompt("project_expert")
+    instruction = raw_prompt.replace("{tool_guidance}", format_tool_guidance(active_tools)) + "\n\n"
 
     if threat_model_context:
         instruction += threat_model_context + "\n\n"
 
     if project_summary:
         instruction += (
-            "## Project-Wide Architectural Summary (Phase 0 Reconnaissance)\n\n"
+            "## Project-Wide Architectural Summary (Initial Reconnaissance)\n\n"
             f"{project_summary}\n\n"
         )
 
