@@ -22,6 +22,12 @@ async def initialize(ctx: Context, node_input: str) -> Union[list[str], str]:
     ctx.state["run_dir"] = input_data.get("run_dir")
     ctx.state["diff_base"] = input_data.get("diff_base")
     ctx.state["diff_head"] = input_data.get("diff_head")
+    ctx.state["files"] = input_data.get("files", [])
+    ctx.state["ingest_path"] = input_data.get("ingest_path")
+    ctx.state["mode"] = input_data["mode"]
+    ctx.state["enable_project_expert"] = input_data["enable_project_expert"]
+    ctx.state.setdefault("vulnerabilities", [])
+    ctx.state.setdefault("project_expert_qa_history", [])
 
     ingest_path = input_data.get("ingest_path")
     if ingest_path:

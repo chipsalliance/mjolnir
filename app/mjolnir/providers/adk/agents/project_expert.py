@@ -12,7 +12,12 @@ from agent_tools.ctags_search import ctags_search
 from agent_tools.glob import glob
 from agent_tools.grep_search import grep_search
 from agent_tools.read_file import read_file
-from constants import PROJECT_EXPERT_MAX_LLM_CALLS
+from constants import (
+    PROJECT_EXPERT_MAX_LLM_CALLS,
+    PROJECT_EXPERT_MEMORY_ENTRY_TEMPLATE,
+    PROJECT_EXPERT_MEMORY_SECTION_TEMPLATE,
+    PROJECT_EXPERT_RECON_SECTION_TEMPLATE,
+)
 from providers.adk.agents.isolated_agent import IsolatedAgent
 from utilities.prompt_loader import prompt_registry
 
@@ -25,32 +30,28 @@ def build_project_expert_instruction(
     qa_history: list[dict[str, str]] | None = None,
     tools: list | None = None,
 ) -> str:
-    """Builds the system instruction for the ProjectExpertAgent."""
+    """Builds the full system instruction for the ProjectExpertAgent, including accumulated memory."""
     active_tools = tools if tools is not None else PROJECT_EXPERT_TOOLS
     raw_prompt = prompt_registry.load_prompt("project_expert")
     instruction = raw_prompt.replace("{tool_guidance}", format_tool_guidance(active_tools)) + "\n\n"
 
     if threat_model_context:
-        instruction += threat_model_context + "\n\n"
+        instruction += f"{threat_model_context}\n\n"
 
     if project_summary:
-        instruction += (
-            "## Project-Wide Architectural Summary (Initial Reconnaissance)\n\n"
-            f"{project_summary}\n\n"
-        )
+        instruction += PROJECT_EXPERT_RECON_SECTION_TEMPLATE.format(project_summary=project_summary)
 
     if qa_history:
         history_entries = [
-            f"### Q{idx}: {item['question']}\n**Answer:** {item['answer']}"
+            PROJECT_EXPERT_MEMORY_ENTRY_TEMPLATE.format(
+                idx=idx, question=item["question"], answer=item["answer"]
+            )
             for idx, item in enumerate(qa_history, start=1)
             if item.get("question") and item.get("answer")
         ]
         if history_entries:
-            instruction += (
-                "## Previous Project Expert Consultations (Session Memory)\n"
-                "You have already investigated and answered the following questions earlier in this "
-                "pipeline run. Reuse these verified findings directly when applicable to avoid "
-                "redundant file exploration:\n\n" + "\n\n".join(history_entries) + "\n\n"
+            instruction += PROJECT_EXPERT_MEMORY_SECTION_TEMPLATE.format(
+                history_entries="\n\n".join(history_entries)
             )
 
     return instruction

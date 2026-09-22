@@ -4,7 +4,6 @@
 
 import asyncio
 from pathlib import Path
-from constants import SYSTEM_PROMPT
 
 
 class PromptRegistry:
@@ -18,10 +17,9 @@ class PromptRegistry:
                 Path(__file__).resolve().parent.parent / "providers" / "adk" / "prompts"
             )
 
-    def load_prompt(self, prompt_name: str) -> str:
-        """Loads prompt template markdown file by name (e.g., 'ingestion', 'auditor').
+    def load_fragment(self, prompt_name: str) -> str:
+        """Loads a markdown prompt fragment by name without prepending the global alignment header.
 
-        Prepends the global SYSTEM_PROMPT security alignment header.
         Raises FileNotFoundError if the prompt template file does not exist.
         """
         filename = prompt_name if prompt_name.endswith(".md") else f"{prompt_name}.md"
@@ -30,8 +28,17 @@ class PromptRegistry:
         if not prompt_path.exists():
             raise FileNotFoundError(f"Prompt template file not found: {prompt_path}")
 
-        content = prompt_path.read_text(encoding="utf-8").strip()
-        return f"{SYSTEM_PROMPT}\n\n{content}"
+        return prompt_path.read_text(encoding="utf-8").strip()
+
+    def load_prompt(self, prompt_name: str) -> str:
+        """Loads prompt template markdown file by name (e.g., 'ingestion', 'auditor').
+
+        Prepends the global system alignment header (`system_alignment.md`).
+        Raises FileNotFoundError if the prompt template file does not exist.
+        """
+        alignment_header = self.load_fragment("system_alignment")
+        content = self.load_fragment(prompt_name)
+        return f"{alignment_header}\n\n{content}"
 
     async def load_prompt_async(self, prompt_name: str) -> str:
         """Loads prompt template markdown file asynchronously by name."""

@@ -15,7 +15,7 @@ from agent_tools.glob import glob
 from agent_tools.grep_search import grep_search
 from agent_tools.project_expert import ask_project_expert
 from agent_tools.read_file import read_file
-from constants import AUDITOR_MAX_LLM_CALLS
+from constants import AUDITOR_MAX_LLM_CALLS, PROJECT_ARCHITECTURE_SECTION_TEMPLATE
 from data.security_report import SecurityReport
 from providers.adk.agents.isolated_agent import IsolatedAgent
 from utilities.prompt_loader import prompt_registry
@@ -23,7 +23,7 @@ from utilities.prompt_loader import prompt_registry
 AUDITOR_TOOLS = [ctags_search, ast_search, grep_search, glob, read_file]
 
 
-def get_auditor_tools(enable_project_expert: bool = True) -> list:
+def get_auditor_tools(enable_project_expert: bool = False) -> list:
     """Builds the toolset for AuditorAgent, appending optional capability tools as enabled."""
     tools = list(AUDITOR_TOOLS)
     if enable_project_expert:
@@ -37,7 +37,7 @@ def build_auditor_instruction(
     tools: list | None = None,
 ) -> str:
     """Builds the full, deterministic system instruction for the AuditorAgent."""
-    active_tools = tools if tools is not None else get_auditor_tools()
+    active_tools = tools if tools is not None else AUDITOR_TOOLS
     current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     raw_prompt = prompt_registry.load_prompt("auditor")
     instruction = raw_prompt.replace("{tool_guidance}", format_tool_guidance(active_tools)) + "\n\n"
@@ -46,7 +46,9 @@ def build_auditor_instruction(
         instruction += threat_model_context
 
     if project_expert_summary:
-        instruction += f"\n\n## Project Architecture Overview (Project Expert Summary)\n\n{project_expert_summary}\n"
+        instruction += PROJECT_ARCHITECTURE_SECTION_TEMPLATE.format(
+            project_expert_summary=project_expert_summary
+        )
 
     skills_dir = pathlib.Path(current_dir) / "skills"
     c_skill_path = skills_dir / "c-audit-skill" / "SKILL.md"
@@ -63,7 +65,7 @@ def get_auditor_agent(
     threat_model_context: str = "",
     project_expert_summary: str = "",
     cached_content: str | None = None,
-    enable_project_expert: bool = True,
+    enable_project_expert: bool = False,
 ) -> Agent:
     """Factory to create an AuditorAgent with appropriate system prompts and optional cached content."""
     tools = get_auditor_tools(enable_project_expert=enable_project_expert)
