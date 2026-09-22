@@ -69,6 +69,24 @@ def get_head_commit(code_dir: str) -> str:
         return "unknown"
 
 
+def get_head_ref(code_dir: str) -> str:
+    """Resolves the active git branch name or exact tag at HEAD, falling back to 'HEAD'."""
+    try:
+        success, branch = CommandRunner(
+            ["git", "symbolic-ref", "-q", "--short", "HEAD"], cwd=code_dir
+        ).execute()
+        if success and branch and branch.strip():
+            return branch.strip()
+        success, tag = CommandRunner(
+            ["git", "describe", "--tags", "--exact-match", "HEAD"], cwd=code_dir
+        ).execute()
+        if success and tag and tag.strip():
+            return tag.strip()
+    except Exception:
+        pass
+    return "HEAD"
+
+
 def is_binary_file(file_path: str) -> bool:
     """Returns True if the file contains binary data (e.g. NUL bytes), False if text."""
     try:

@@ -32,6 +32,8 @@ pub struct VulnerabilityV1 {
 pub struct RunMetadataV1 {
     pub repo: Option<String>,
     pub model: Option<String>,
+    #[serde(rename = "ref")]
+    pub git_ref: Option<String>,
     pub target_commit: Option<String>,
     pub timestamp: Option<String>,
     pub mode: Option<String>,
@@ -46,6 +48,15 @@ fn default_schema_version() -> String {
 }
 
 impl RunMetadataV1 {
+    pub fn formatted_ref(&self) -> Option<&str> {
+        let r = self.git_ref.as_deref()?.trim();
+        if r.is_empty() {
+            None
+        } else {
+            Some(r)
+        }
+    }
+
     pub fn formatted_pr(&self) -> Option<String> {
         let pr = self.pr.as_deref()?.trim();
         if pr.is_empty() {
@@ -423,6 +434,9 @@ fn generate_markdown_report(
 
     if let Some(pr) = meta.as_ref().and_then(RunMetadataV1::formatted_pr) {
         let _ = writeln!(md, "- **Pull Request**: {pr}");
+    }
+    if let Some(git_ref) = meta.as_ref().and_then(RunMetadataV1::formatted_ref) {
+        let _ = writeln!(md, "- **Ref (Branch/Tag)**: `{git_ref}`");
     }
     if let Some(trigger) = meta.as_ref().and_then(RunMetadataV1::formatted_trigger) {
         let _ = writeln!(md, "- **Trigger**: {trigger}");

@@ -346,6 +346,7 @@ async function fetchRunsFromGcsBucket() {
           token_usage,
           tool_usage,
           model: meta.model || "Unknown",
+          ref: meta.ref || "HEAD",
           commit: meta.target_commit || "Unknown",
           mode: meta.mode || "Discovery",
           pr: meta.pr || null,
@@ -736,6 +737,7 @@ function renderAllRunsView(container) {
       <tr class="clickable-row" onclick="window.location.hash='#/run/${r.project}/${r.job}/${r.run_id}'">
         <td><strong>${r.project}</strong>${triggerBadge ? ' ' + triggerBadge : ''}</td>
         <td>${r.job}</td>
+        <td><code>${r.ref || 'HEAD'}</code></td>
         <td><code>${r.run_id}</code></td>
         <td><span class="badge ${badgeClass}" ${badgeStyle}>${count} Findings</span></td>
         <td><span title="UTC: ${r.timestamp || 'N/A'}">${formatLocalTimestamp(r.timestamp)}</span></td>
@@ -751,6 +753,7 @@ function renderAllRunsView(container) {
             <tr>
               <th>Project</th>
               <th>Job Target</th>
+              <th>Ref</th>
               <th>Run Directory</th>
               <th>Findings</th>
               <th>Timestamp</th>
@@ -789,6 +792,7 @@ async function renderProjectView(projName, container) {
     return `
       <tr class="clickable-row" onclick="window.location.hash='#/run/${r.project}/${r.job}/${r.run_id}'">
         <td><strong>${r.job}</strong>${triggerBadge ? ' ' + triggerBadge : ''}</td>
+        <td><code>${r.ref || 'HEAD'}</code></td>
         <td><code>${r.run_id}</code></td>
         <td><span class="badge ${badgeClass}" ${badgeStyle}>${count} Findings</span></td>
         <td><span title="UTC: ${r.timestamp || 'N/A'}">${formatLocalTimestamp(r.timestamp)}</span></td>
@@ -823,6 +827,7 @@ async function renderProjectView(projName, container) {
           <thead>
             <tr>
               <th>Job Target</th>
+              <th>Ref</th>
               <th>Run Directory</th>
               <th>Findings</th>
               <th>Timestamp</th>
@@ -913,6 +918,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
     });
 
     const totalVulns = currentRunVulns.length;
+
     const prLinkHtml = meta.pr
       ? `<div class="run-meta-item">PR: ${meta.pr.startsWith("http") ? `<a href="${meta.pr}" target="_blank" rel="noopener noreferrer" class="pr-link">${meta.pr}</a>` : `<strong>${meta.pr}</strong>`}</div>`
       : "";
@@ -929,6 +935,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         ${triggerMetaItem}
         <div class="run-meta-item">Job: <strong>${job}</strong></div>
         <div class="run-meta-item">Model: <strong>${meta.model || 'Unknown'}</strong></div>
+        <div class="run-meta-item">Ref: <code>${meta.ref || 'HEAD'}</code></div>
         <div class="run-meta-item">Commit: <code>${shortCommit}</code></div>
         <div class="run-meta-item">Mode: <strong>${meta.mode || 'Discovery'}</strong></div>
         <div class="run-meta-item">Status: <strong style="color: ${statusColor};">${statusStr}</strong></div>

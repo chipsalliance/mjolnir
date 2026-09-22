@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from utilities.git import get_head_commit
+from utilities.git import get_head_commit, get_head_ref
 
 
 def write_metadata(
@@ -21,9 +21,10 @@ def write_metadata(
     pr: str = None,
     trigger: str = "manual",
 ):
-    """Resolves HEAD commit hash and dumps run metadata.json."""
+    """Resolves HEAD commit hash and branch/tag ref and dumps run metadata.json."""
     metadata_file = Path(run_dir) / "metadata.json"
     resolved_commit = get_head_commit(code_dir)
+    resolved_ref = ref if (ref and ref != "HEAD") else get_head_ref(code_dir)
 
     if ingest_path:
         mode = "Ingestion"
@@ -35,7 +36,7 @@ def write_metadata(
     metadata = {
         "repo": repo_url,
         "model": model_name,
-        "ref": ref or "HEAD",
+        "ref": resolved_ref,
         "target_commit": resolved_commit,
         "timestamp": timestamp_pretty,
         "mode": mode,
