@@ -36,11 +36,11 @@
 
 
           google-genai-latest = pkgs.python3Packages.google-genai.overridePythonAttrs (old: rec {
-            version = "2.10.0";
+            version = "2.25.0";
             src = pkgs.python3Packages.fetchPypi {
               pname = "google_genai";
               inherit version;
-              hash = "sha256-d5Es1VjNff1bdcJf0cYJ5415VN3lgzMRBAIqRuqQ+e4=";
+              hash = "sha256-q2A7ql7uAgWSatD41/k+BADfbWdlDpnDPgGrIo6hatY=";
             };
             dontCheckRuntimeDeps = true;
             catchConflicts = false;
@@ -53,12 +53,12 @@
 
           google-adk = pkgs.python3Packages.buildPythonPackage {
             pname = "google-adk";
-            version = "2.4.0";
+            version = "2.9.2";
             pyproject = true;
             src = pkgs.python3Packages.fetchPypi {
               pname = "google_adk";
-              version = "2.4.0";
-              hash = "sha256-WimWsojVkd7vyyd+7ut9qDjXIFZnV2O/71KtOzaXXd4=";
+              version = "2.9.2";
+              hash = "sha256-nUuRo8w6UqRxylgxEn5MRqwXTaDbUZtNFXoJARc32hA=";
             };
             postPatch = import ./nix/adk_telemetry_patch.nix;
             nativeBuildInputs = with pkgs.python3Packages; [
@@ -83,6 +83,12 @@
               opentelemetry-api
               opentelemetry-sdk
               packaging
+              tenacity
+              requests
+              httpx
+              starlette
+              typing-extensions
+              graphviz
             ];
             pythonImportsCheck = [ "google.adk" ];
             doCheck = false;

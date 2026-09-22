@@ -5,10 +5,13 @@
   for f in src/google/adk/telemetry/_experimental_semconv.py \
            src/google/adk/telemetry/tracing.py \
            src/google/adk/telemetry/_metrics.py \
-           src/google/adk/telemetry/_token_usage.py; do
+           src/google/adk/telemetry/_token_usage.py \
+           src/google/adk/telemetry/node_tracing.py; do
     if [ -f "$f" ]; then
       sed -i -E 's/from opentelemetry.semconv._incubating.attributes.gen_ai_attributes import.*/# otel semconv patch/g' "$f"
       sed -i -E 's/from opentelemetry.semconv._incubating.attributes import gen_ai_attributes/# otel semconv module patch/g' "$f"
+      sed -i -E 's/from opentelemetry.semconv._incubating.attributes.mcp_attributes import.*/# otel semconv patch/g' "$f"
+      sed -i -E 's/from opentelemetry.semconv._incubating.attributes.user_attributes import.*/# otel semconv patch/g' "$f"
     fi
   done
   
@@ -39,6 +42,9 @@ GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
 GEN_AI_PROVIDER_NAME = "gen_ai.provider.name"
 GEN_AI_RESPONSE_MODEL = "gen_ai.response.model"
 GEN_AI_TOKEN_TYPE = "gen_ai.token.type"
+MCP_PROTOCOL_VERSION = "mcp.protocol.version"
+MCP_SESSION_ID = "mcp.session.id"
+USER_ID = "user.id"
 class GenAiSystemValues:
     GEMINI = DummyAttr("gemini")
     VERTEX_AI = DummyAttr("vertex_ai")
@@ -47,7 +53,8 @@ EOF
   for f in src/google/adk/telemetry/_experimental_semconv.py \
            src/google/adk/telemetry/tracing.py \
            src/google/adk/telemetry/_metrics.py \
-           src/google/adk/telemetry/_token_usage.py; do
+           src/google/adk/telemetry/_token_usage.py \
+           src/google/adk/telemetry/node_tracing.py; do
     if [ -f "$f" ]; then
       substituteInPlace "$f" \
         --replace-warn "# otel semconv patch" "from ._otel_compat import *" \
@@ -56,7 +63,8 @@ EOF
   done
   substituteInPlace src/google/adk/telemetry/tracing.py \
     --replace-fail "Schemas.V1_36_0.value" "'https://opentelemetry.io/schemas/1.36.0'" \
-    --replace-fail "event_name=" "# event_name="
+    --replace-fail "event_name=" "# event_name=" \
+    --replace-fail "context=trace.set_span_in_context" "# context=trace.set_span_in_context"
   substituteInPlace src/google/adk/flows/llm_flows/basic.py \
     --replace-fail "llm_request.live_connect_config.avatar_config" "_avatar_config"
   substituteInPlace src/google/adk/agents/run_config.py \
