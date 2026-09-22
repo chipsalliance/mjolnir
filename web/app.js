@@ -843,22 +843,156 @@ async function renderProjectView(projName, container) {
   renderSankeyChart("project-sankey-chart-container", flowJson);
 }
 
+function renderReasoningLogEntries(entries) {
+  if (!entries || !Array.isArray(entries) || entries.length === 0) {
+    return `<div style="color: var(--text-muted); font-size: 0.85rem; padding: 12px;">No reasoning events recorded.</div>`;
+  }
+
+  const escapeHtml = (str) => String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  return entries.map(entry => {
+    const ag = entry.agent || "Agent";
+    if (entry.type === "thought") {
+      return `
+        <div class="reasoning-entry">
+          <div class="reasoning-header">
+            <span class="badge" style="background-color: rgba(168, 85, 247, 0.18); color: #c084fc;">Thinking</span>
+            <strong>${escapeHtml(ag)}</strong>
+          </div>
+          <pre class="reasoning-content">${escapeHtml(entry.content)}</pre>
+        </div>
+      `;
+    } else if (entry.type === "tool_call") {
+      const toolName = entry.tool || "tool";
+      const argsStr = typeof entry.args === "object" ? JSON.stringify(entry.args, null, 2) : String(entry.args || "");
+      return `
+        <div class="reasoning-entry">
+          <div class="reasoning-header">
+            <span class="badge" style="background-color: rgba(59, 130, 246, 0.18); color: #60a5fa;">Tool Call: ${escapeHtml(toolName)}</span>
+            <strong>${escapeHtml(ag)}</strong>
+          </div>
+          <pre class="reasoning-content"><code>${escapeHtml(argsStr)}</code></pre>
+        </div>
+      `;
+    } else if (entry.type === "tool_response") {
+      const toolName = entry.tool || "tool";
+      return `
+        <div class="reasoning-entry">
+          <div class="reasoning-header">
+            <span class="badge" style="background-color: rgba(16, 185, 129, 0.18); color: #34d399;">Tool Response: ${escapeHtml(toolName)}</span>
+            <strong>${escapeHtml(ag)}</strong>
+          </div>
+          <pre class="reasoning-content"><code>${escapeHtml(entry.response || "")}</code></pre>
+        </div>
+      `;
+    } else if (entry.type === "refusal") {
+      return `
+        <div class="reasoning-entry" style="border-color: rgba(244, 63, 94, 0.3);">
+          <div class="reasoning-header" style="background-color: rgba(244, 63, 94, 0.1);">
+            <span class="badge" style="background-color: rgba(244, 63, 94, 0.2); color: #f43f5e;">Refusal: ${escapeHtml(entry.finish_reason || "REJECTED")}</span>
+            <strong>${escapeHtml(ag)}</strong>
+          </div>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="reasoning-entry">
+          <div class="reasoning-header">
+            <span class="badge" style="background-color: rgba(14, 165, 233, 0.18); color: #38bdf8;">Output</span>
+            <strong>${escapeHtml(ag)}</strong>
+          </div>
+          <pre class="reasoning-content">${escapeHtml(entry.content || "")}</pre>
+        </div>
+      `;
+    }
+  }).join("");
+}
+
+function getFindingReasoningTraces(v, reasoningLog) {
+  if (!reasoningLog || !v) return [];
+  const matches = [];
+  const vFile = v.file || "";
+  const vId = v.id || "";
+
+  Object.entries(reasoningLog).forEach(([key, entries]) => {
+    let matchedPhase = null;
+    if (vId && key.includes(vId)) {
+      if (key.startsWith("initial_review")) matchedPhase = "ReviewerAgent: Initial Review";
+      else if (key.startsWith("poc_creation") || key.startsWith("exploiter")) matchedPhase = "ExploitCreationAgent: PoC & Sandbox Execution";
+      else if (key.startsWith("final_review") || key.startsWith("secondary_review")) matchedPhase = "ReviewerAgent: Secondary PoC Verification";
+      else matchedPhase = `Finding Analysis: ${key}`;
+    } else if (vFile && (key.includes(vFile) || (vFile.includes("/") && key.includes(vFile.split("/").pop())))) {
+      matchedPhase = `AuditorAgent: Discovery (${vFile})`;
+    } else if ((v.duplicate_of || v.status === "Duplicate") && key.startsWith("deduplication")) {
+      matchedPhase = "DeduplicationAgent: Cross-Run Evaluation";
+    }
+
+    if (matchedPhase && entries && entries.length > 0) {
+      matches.push({ phase: matchedPhase, key, entries });
+    }
+  });
+
+  return matches;
+}
+
+function renderRunReasoningLog(reasoningLog) {
+  const keys = Object.keys(reasoningLog || {});
+  if (keys.length === 0) {
+    return "";
+  }
+
+  const itemsHtml = keys.map(k => {
+    const entries = reasoningLog[k] || [];
+    const thoughtCount = entries.filter(e => e.type === "thought").length;
+    const toolCallCount = entries.filter(e => e.type === "tool_call").length;
+    const badgeText = `${thoughtCount} thoughts, ${toolCallCount} tools`;
+
+    return `
+      <details style="margin-bottom: 12px; border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; background: var(--bg-card);">
+        <summary style="cursor: pointer; font-weight: 600; font-size: 0.88rem; display: flex; justify-content: space-between; align-items: center; user-select: none;">
+          <span><code>${k}</code></span>
+          <span class="badge" style="background-color: rgba(168, 85, 247, 0.15); color: #c084fc;">${badgeText}</span>
+        </summary>
+        <div style="margin-top: 12px;">
+          ${renderReasoningLogEntries(entries)}
+        </div>
+      </details>
+    `;
+  }).join("");
+
+  return `
+    <details class="card" style="margin-top: 20px;">
+      <summary class="card-title" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
+        <span>Agent Chain-of-Thought & Reasoning Traces (Click to Expand)</span>
+        <span style="font-size: 13px; font-weight: normal;">Targets Recorded: <strong>${keys.length}</strong></span>
+      </summary>
+      <div style="margin-top: 15px;">
+        ${itemsHtml}
+      </div>
+    </details>
+  `;
+}
+
 async function fetchRunDetailsFromGcs(proj, job, runId) {
   const prefix = `${RUNS_SUBDIR}/${proj}/${job}/${runId}`;
-  const [metaRes, vulnRes, tokenRes, toolRes] = await Promise.all([
-
+  const [metaRes, vulnRes, tokenRes, toolRes, reasoningRes] = await Promise.all([
     fetch(getAssetUrl(`${prefix}/metadata.json`)),
     fetch(getAssetUrl(`${prefix}/vulnerabilities.json`)),
     fetch(getAssetUrl(`${prefix}/token_usage.json`)),
-    fetch(getAssetUrl(`${prefix}/tool_usage.json`))
+    fetch(getAssetUrl(`${prefix}/tool_usage.json`)),
+    fetch(getAssetUrl(`${prefix}/reasoning_log.json`)).catch(() => ({ ok: false }))
   ]);
 
   const metadata = metaRes.ok ? await metaRes.json() : {};
   const vulnerabilities = vulnRes.ok ? await vulnRes.json() : [];
   const token_usage = tokenRes.ok ? await tokenRes.json() : {};
   const tool_usage = toolRes.ok ? await toolRes.json() : {};
+  const reasoning_log = reasoningRes && reasoningRes.ok ? await reasoningRes.json() : {};
 
-  return { metadata, vulnerabilities, token_usage, tool_usage };
+  return { metadata, vulnerabilities, token_usage, tool_usage, reasoning_log };
 }
 
 async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
@@ -891,6 +1025,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
 
     const tokenUsageHtml = renderRunTokenUsage(data);
     const toolUsageHtml = renderRunToolUsage(data);
+    const reasoningLogHtml = renderRunReasoningLog(data.reasoning_log);
 
     const shortCommit = (meta.target_commit || 'Unknown').substring(0, 8);
     const statusStr = meta.status || 'Success';
@@ -1023,7 +1158,9 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
 
       ${tokenUsageHtml}
 
-      ${toolUsageHtml}`;
+      ${toolUsageHtml}
+
+      ${reasoningLogHtml}`;
 
     workerComputeRunSankeyFlow(vulnsJson).then(runFlowJson => {
       renderSankeyChart("run-sankey-chart-container", runFlowJson);
@@ -1042,6 +1179,8 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         return `<span class="badge" style="background-color: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3);">${s}</span>`;
       } else if (lower === 'closed' || lower === 'resolved' || lower === 'fixed') {
         return `<span class="badge" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">${s}</span>`;
+      } else if (lower === 'duplicate') {
+        return `<span class="badge" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3);">${s}</span>`;
       } else {
         return `<span class="badge" style="background-color: rgba(113, 113, 122, 0.15); color: #a1a1aa; border: 1px solid rgba(113, 113, 122, 0.3);">${s}</span>`;
       }
@@ -1129,6 +1268,55 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         history.replaceState(null, "", deepLinkHash);
       }
 
+      const escapeHtml = (str) => String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+      const formatMarkdownText = (str) => escapeHtml(str)
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/`([^`\n]+)`/g, "<code>$1</code>")
+        .replace(/\n/g, "<br>");
+
+      const attackVectorHtml = v.attack_vector
+        ? `<h4 style="margin-bottom: 6px; font-weight: 600;">Attack Vector</h4>
+           <p style="color: var(--text-secondary); margin-bottom: 16px; line-height: 1.55;">${formatMarkdownText(v.attack_vector)}</p>`
+        : "";
+
+      const justificationHtml = v.justification
+        ? `<h4 style="margin-bottom: 6px; font-weight: 600;">Reviewer Justification</h4>
+           <p style="color: var(--text-secondary); margin-bottom: 16px; line-height: 1.55;">${formatMarkdownText(v.justification)}</p>`
+        : "";
+
+      const findingTraces = getFindingReasoningTraces(v, data.reasoning_log || {});
+      let findingReasoningHtml = "";
+      if (findingTraces.length > 0) {
+        const traceDetails = findingTraces.map(t => `
+          <details style="margin-bottom: 10px; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; background: var(--bg-primary);">
+            <summary style="cursor: pointer; font-weight: 600; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; user-select: none;">
+              <span>${t.phase}</span>
+              <code style="font-size: 0.75rem;">${t.key}</code>
+            </summary>
+            <div style="margin-top: 10px;">
+              ${renderReasoningLogEntries(t.entries)}
+            </div>
+          </details>
+        `).join("");
+
+        findingReasoningHtml = `
+          <h4 style="margin-bottom: 6px; margin-top: 16px; font-weight: 600;">Agent Chain-of-Thought & Reasoning Traces</h4>
+          <details style="border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; background: var(--bg-card); margin-bottom: 16px;">
+            <summary style="cursor: pointer; font-weight: 600; font-size: 0.88rem; display: flex; justify-content: space-between; align-items: center; user-select: none;">
+              <span>View Step-by-Step Agent Thinking & Tool Traces</span>
+              <span class="badge" style="background-color: rgba(168, 85, 247, 0.15); color: #c084fc;">${findingTraces.length} Phase Trace(s)</span>
+            </summary>
+            <div style="margin-top: 12px;">
+              ${traceDetails}
+            </div>
+          </details>
+        `;
+      }
+
       document.getElementById("modal-title").textContent = v.title || "Finding Details";
       document.getElementById("modal-body").innerHTML = `
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
@@ -1139,10 +1327,15 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
           <button id="btn-copy-finding-link" class="btn btn-secondary" style="font-size: 0.75rem;">Copy Direct Link</button>
         </div>
         <h4 style="margin-bottom: 6px; font-weight: 600;">Description</h4>
-        <p style="color: var(--text-secondary); margin-bottom: 16px;">${v.description || 'No description provided.'}</p>
+        <p style="color: var(--text-secondary); margin-bottom: 16px; line-height: 1.55;">${formatMarkdownText(v.description || 'No description provided.')}</p>
+
+        ${attackVectorHtml}
+        ${justificationHtml}
 
         <h4 style="margin-bottom: 6px; font-weight: 600;">Recommendation</h4>
-        <p style="color: var(--text-secondary);">${v.recommendation || 'No recommendation provided.'}</p>
+        <p style="color: var(--text-secondary); line-height: 1.55;">${formatMarkdownText(v.recommendation || 'No recommendation provided.')}</p>
+
+        ${findingReasoningHtml}
       `;
 
       document.getElementById("btn-copy-finding-link").addEventListener("click", () => {

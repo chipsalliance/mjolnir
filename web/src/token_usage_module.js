@@ -52,6 +52,60 @@ window.showTokenRunsModal = function(encodedKey) {
   }
 };
 
+function countRefusalsFromGrouped(errorsGrouped) {
+  let refusals = 0;
+  Object.entries(errorsGrouped || {}).forEach(([errKey, count]) => {
+    if (/refusal|safety|recitation|blocklist|prohibited/i.test(errKey)) {
+      refusals += Number(count) || 0;
+    }
+  });
+  return refusals;
+}
+
+function classifyErrorBadge(errKey) {
+  if (/refusal|safety|recitation|blocklist|prohibited/i.test(errKey)) {
+    return `<span class="badge" style="background-color: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3);">Model Refusal</span>`;
+  }
+  if (/schema|validation/i.test(errKey)) {
+    return `<span class="badge" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3);">Schema Validation</span>`;
+  }
+  return `<span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: var(--text-secondary); border: 1px solid rgba(148, 163, 184, 0.3);">Runtime / API Error</span>`;
+}
+
+function renderGroupedErrorsTable(errorsGrouped) {
+  const entries = Object.entries(errorsGrouped || {}).sort((a, b) => (Number(b[1]) || 0) - (Number(a[1]) || 0));
+  if (entries.length === 0) {
+    return "";
+  }
+  const rows = entries.map(([errKey, count]) => `
+    <tr>
+      <td>${classifyErrorBadge(errKey)}</td>
+      <td><code>${String(errKey).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></td>
+      <td><strong>${(Number(count) || 0).toLocaleString()}</strong></td>
+    </tr>
+  `).join("");
+
+  return `
+    <div style="margin-top: 16px;">
+      <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Grouped Error & Refusal Breakdown</div>
+      <div class="table-container" style="margin-bottom: 0;">
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Error / Refusal Signature</th>
+              <th>Occurrences</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 export function extractRunTokenStats(r) {
   const tu = r.token_usage || {};
   const tot = tu.total || {};
@@ -61,6 +115,9 @@ export function extractRunTokenStats(r) {
   const comp = tot.output_tokens ?? tot.total_output_tokens ?? tot.completion_tokens ?? 0;
   const thoughts = tot.thoughts_tokens ?? 0;
   const total = tot.total_tokens ?? (prompt + comp + thoughts);
+  const errors = tot.total_errors ?? tot.errors ?? 0;
+  const errorsGrouped = tu.errors_grouped || {};
+  const refusals = countRefusalsFromGrouped(errorsGrouped);
   const cacheHitRate = prompt > 0 && cached > 0 ? `${((cached / prompt) * 100).toFixed(1)}%` : "0.0%";
 
   let modelName = r.model || "Unknown";
@@ -76,7 +133,7 @@ export function extractRunTokenStats(r) {
     }
   }
 
-  return { prompt, uncached, cached, comp, thoughts, total, cacheHitRate, modelName, tu };
+  return { prompt, uncached, cached, comp, thoughts, total, errors, refusals, errorsGrouped, cacheHitRate, modelName, tu };
 }
 
 function aggregateRunsTokenStats(runs) {
@@ -86,17 +143,26 @@ function aggregateRunsTokenStats(runs) {
   let totalOutput = 0;
   let totalThoughts = 0;
   let totalTokens = 0;
+  let totalErrors = 0;
+  let totalRefusals = 0;
+  const aggregatedErrorsGrouped = {};
   const agentModelStats = {};
   const runRows = [];
 
   (runs || []).forEach((r) => {
-    const { prompt, uncached, cached, comp, thoughts, total, cacheHitRate, modelName, tu } = extractRunTokenStats(r);
+    const { prompt, uncached, cached, comp, thoughts, total, errors, refusals, errorsGrouped, cacheHitRate, modelName, tu } = extractRunTokenStats(r);
     totalInput += prompt;
     totalUncached += uncached;
     totalCached += cached;
     totalOutput += comp;
     totalThoughts += thoughts;
     totalTokens += total;
+    totalErrors += errors;
+    totalRefusals += refusals;
+
+    Object.entries(errorsGrouped || {}).forEach(([errKey, cnt]) => {
+      aggregatedErrorsGrouped[errKey] = (aggregatedErrorsGrouped[errKey] || 0) + (Number(cnt) || 0);
+    });
 
     if (tu.by_agent && Object.keys(tu.by_agent).length > 0) {
       Object.entries(tu.by_agent).forEach(([agentName, st]) => {
@@ -113,6 +179,7 @@ function aggregateRunsTokenStats(runs) {
             output_tokens: 0,
             thoughts_tokens: 0,
             total_tokens: 0,
+            errors: 0,
             runs: [],
           };
         }
@@ -122,6 +189,7 @@ function aggregateRunsTokenStats(runs) {
         const out = st.output_tokens ?? 0;
         const th = st.thoughts_tokens ?? 0;
         const tok = st.total_tokens ?? (inp + out + th);
+        const errCount = st.errors ?? 0;
 
         agentModelStats[key].input_tokens += inp;
         agentModelStats[key].uncached_tokens += uncache;
@@ -129,6 +197,7 @@ function aggregateRunsTokenStats(runs) {
         agentModelStats[key].output_tokens += out;
         agentModelStats[key].thoughts_tokens += th;
         agentModelStats[key].total_tokens += tok;
+        agentModelStats[key].errors += errCount;
         agentModelStats[key].runs.push({
           project: r.project,
           job: r.job,
@@ -141,6 +210,7 @@ function aggregateRunsTokenStats(runs) {
           output_tokens: out,
           thoughts_tokens: th,
           total_tokens: tok,
+          errors: errCount,
           timestamp: r.timestamp || "N/A",
         });
       });
@@ -157,6 +227,7 @@ function aggregateRunsTokenStats(runs) {
           output_tokens: 0,
           thoughts_tokens: 0,
           total_tokens: 0,
+          errors: 0,
           runs: [],
         };
       }
@@ -166,6 +237,7 @@ function aggregateRunsTokenStats(runs) {
       agentModelStats[key].output_tokens += comp;
       agentModelStats[key].thoughts_tokens += thoughts;
       agentModelStats[key].total_tokens += total;
+      agentModelStats[key].errors += errors;
       agentModelStats[key].runs.push({
         project: r.project,
         job: r.job,
@@ -178,11 +250,15 @@ function aggregateRunsTokenStats(runs) {
         output_tokens: comp,
         thoughts_tokens: thoughts,
         total_tokens: total,
+        errors,
         timestamp: r.timestamp || "N/A",
       });
     }
 
-    if (total > 0) {
+    if (total > 0 || errors > 0) {
+      const errBadge = errors > 0
+        ? `<span class="badge" style="background-color: rgba(244, 63, 94, 0.15); color: #f43f5e;">${errors} (${refusals} refusals)</span>`
+        : `<span class="badge" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981;">0</span>`;
       runRows.push(`
         <tr class="clickable-row" onclick="window.location.hash='#/run/${r.project}/${r.job}/${r.run_id}'">
           <td><strong>${r.project}</strong></td>
@@ -193,6 +269,7 @@ function aggregateRunsTokenStats(runs) {
           <td>${(cached || 0).toLocaleString()} <span class="badge badge-low" style="font-size:10px;">${cacheHitRate}</span></td>
           <td>${((comp || 0) + (thoughts || 0)).toLocaleString()}</td>
           <td><strong>${total.toLocaleString()}</strong></td>
+          <td>${errBadge}</td>
           <td>${r.timestamp || "N/A"}</td>
         </tr>
       `);
@@ -204,21 +281,24 @@ function aggregateRunsTokenStats(runs) {
 
   const overallCacheRate = totalInput > 0 && totalCached > 0 ? `${((totalCached / totalInput) * 100).toFixed(1)}%` : "0.0%";
 
-  return { totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, overallCacheRate, agentModelStats, runRows };
+  return { totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, totalErrors, totalRefusals, aggregatedErrorsGrouped, overallCacheRate, agentModelStats, runRows };
 }
 
-function renderCollapsibleTokenCard(totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, overallCacheRate, tableRows, hasAssociatedRunsCol) {
-  if (totalTokens === 0 && (!tableRows || tableRows.length === 0)) {
+function renderCollapsibleTokenCard(totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, overallCacheRate, tableRows, hasAssociatedRunsCol, totalErrors = 0, totalRefusals = 0, errorsGrouped = {}) {
+  if (totalTokens === 0 && totalErrors === 0 && (!tableRows || tableRows.length === 0)) {
     return "";
   }
 
   const thExtra = hasAssociatedRunsCol ? `<th>Associated Runs</th>` : "";
+  const errSummaryBadge = totalErrors > 0
+    ? ` &nbsp;|&nbsp; Errors/Refusals: <strong style="color: var(--severity-high);">${totalErrors.toLocaleString()} (${totalRefusals.toLocaleString()} refusals)</strong>`
+    : ` &nbsp;|&nbsp; Errors/Refusals: <strong style="color: var(--status-resolved);">0</strong>`;
 
   return `
     <details class="card" style="margin-top: 20px;">
       <summary class="card-title" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
-        <span>Token Usage Breakdown (Click to Expand)</span>
-        <span style="font-size: 13px; font-weight: normal;">Total Tokens: <strong>${totalTokens.toLocaleString()}</strong></span>
+        <span>Token Usage & Error/Refusal Breakdown (Click to Expand)</span>
+        <span style="font-size: 13px; font-weight: normal;">Total Tokens: <strong>${totalTokens.toLocaleString()}</strong>${errSummaryBadge}</span>
       </summary>
       <div style="margin-top: 15px;">
         <div class="metrics-grid">
@@ -241,6 +321,11 @@ function renderCollapsibleTokenCard(totalInput, totalUncached, totalCached, tota
             <span class="metric-label">Total Tokens</span>
             <span class="metric-value" style="color: var(--accent);">${totalTokens.toLocaleString()}</span>
           </div>
+          <div class="metric-card">
+            <span class="metric-label">Errors & Refusals</span>
+            <span class="metric-value" style="color: ${totalErrors > 0 ? 'var(--severity-high)' : 'var(--status-resolved)'};">${totalErrors.toLocaleString()}</span>
+            <span style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">${totalRefusals.toLocaleString()} refusals / ${Math.max(0, totalErrors - totalRefusals).toLocaleString()} runtime & schema</span>
+          </div>
         </div>
         <div class="table-container" style="margin-bottom: 0;">
           <table>
@@ -252,6 +337,7 @@ function renderCollapsibleTokenCard(totalInput, totalUncached, totalCached, tota
                 <th>Thoughts</th>
                 <th>Output Tokens</th>
                 <th>Total Tokens</th>
+                <th>Errors</th>
                 ${thExtra}
               </tr>
             </thead>
@@ -260,6 +346,7 @@ function renderCollapsibleTokenCard(totalInput, totalUncached, totalCached, tota
             </tbody>
           </table>
         </div>
+        ${renderGroupedErrorsTable(errorsGrouped)}
       </div>
     </details>`;
 }
@@ -284,9 +371,9 @@ export function registerTokenUsageModule(navContainer, routeHandlers, renderEmpt
   if (routeHandlers) {
     routeHandlers["#/token-usage"] = async (viewport) => {
       const runs = (typeof getRuns === "function" ? getRuns() : []) || [];
-      const { totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, overallCacheRate, agentModelStats, runRows } = aggregateRunsTokenStats(runs);
+      const { totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, totalErrors, totalRefusals, aggregatedErrorsGrouped, overallCacheRate, agentModelStats, runRows } = aggregateRunsTokenStats(runs);
 
-      if (runs.length === 0 || totalTokens === 0) {
+      if (runs.length === 0 || (totalTokens === 0 && totalErrors === 0)) {
         if (renderEmptyState) {
           viewport.innerHTML = renderEmptyState(
             "No Token Usage Recorded",
@@ -298,7 +385,12 @@ export function registerTokenUsageModule(navContainer, routeHandlers, renderEmpt
         return;
       }
 
-      const byModelRows = Object.values(agentModelStats).map((m) => `
+      const byModelRows = Object.values(agentModelStats).map((m) => {
+        const errVal = m.errors || 0;
+        const errCell = errVal > 0
+          ? `<strong style="color: var(--severity-high);">${errVal.toLocaleString()}</strong>`
+          : `<span style="color: var(--status-resolved);">0</span>`;
+        return `
         <tr>
           <td><strong>${m.agent}</strong> (<code>${m.model}</code>)</td>
           <td>${(m.uncached_tokens || 0).toLocaleString()}</td>
@@ -306,11 +398,13 @@ export function registerTokenUsageModule(navContainer, routeHandlers, renderEmpt
           <td>${(m.thoughts_tokens || 0).toLocaleString()}</td>
           <td>${(m.output_tokens || 0).toLocaleString()}</td>
           <td><strong>${(m.total_tokens || 0).toLocaleString()}</strong></td>
+          <td>${errCell}</td>
           <td>
             <button class="badge-btn" onclick="window.showTokenRunsModal('${encodeURIComponent(m.key)}')">${m.runs.length} Runs</button>
           </td>
         </tr>
-      `).join("");
+      `;
+      }).join("");
 
       viewport.innerHTML = `
         <div class="metrics-grid">
@@ -333,6 +427,11 @@ export function registerTokenUsageModule(navContainer, routeHandlers, renderEmpt
             <span class="metric-label">Total Tokens</span>
             <span class="metric-value" style="color: var(--accent);">${totalTokens.toLocaleString()}</span>
           </div>
+          <div class="metric-card">
+            <span class="metric-label">Errors & Refusals</span>
+            <span class="metric-value" style="color: ${totalErrors > 0 ? 'var(--severity-high)' : 'var(--status-resolved)'};">${totalErrors.toLocaleString()}</span>
+            <span style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">${totalRefusals.toLocaleString()} refusals / ${Math.max(0, totalErrors - totalRefusals).toLocaleString()} runtime & schema</span>
+          </div>
         </div>
 
         <div class="card">
@@ -347,14 +446,16 @@ export function registerTokenUsageModule(navContainer, routeHandlers, renderEmpt
                   <th>Thoughts</th>
                   <th>Output Tokens</th>
                   <th>Total Tokens</th>
+                  <th>Errors</th>
                   <th>Associated Runs</th>
                 </tr>
               </thead>
               <tbody>
-                ${byModelRows || '<tr><td colspan="7" style="text-align:center; padding: 20px;">No token usage data recorded yet.</td></tr>'}
+                ${byModelRows || '<tr><td colspan="8" style="text-align:center; padding: 20px;">No token usage data recorded yet.</td></tr>'}
               </tbody>
             </table>
           </div>
+          ${renderGroupedErrorsTable(aggregatedErrorsGrouped)}
         </div>
 
         <div class="card">
@@ -371,11 +472,12 @@ export function registerTokenUsageModule(navContainer, routeHandlers, renderEmpt
                   <th>Cached Content</th>
                   <th>Output</th>
                   <th>Total Tokens</th>
+                  <th>Errors / Refusals</th>
                   <th>Timestamp</th>
                 </tr>
               </thead>
               <tbody>
-                ${runRows.join("") || '<tr><td colspan="9" style="text-align:center; padding: 20px;">No runs recorded.</td></tr>'}
+                ${runRows.join("") || '<tr><td colspan="10" style="text-align:center; padding: 20px;">No runs recorded.</td></tr>'}
               </tbody>
             </table>
           </div>
@@ -385,8 +487,13 @@ export function registerTokenUsageModule(navContainer, routeHandlers, renderEmpt
 }
 
 export function renderOverviewTokenUsage(runs) {
-  const { totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, overallCacheRate, agentModelStats } = aggregateRunsTokenStats(runs);
-  const rows = Object.values(agentModelStats).map((m) => `
+  const { totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, totalErrors, totalRefusals, aggregatedErrorsGrouped, overallCacheRate, agentModelStats } = aggregateRunsTokenStats(runs);
+  const rows = Object.values(agentModelStats).map((m) => {
+    const errVal = m.errors || 0;
+    const errCell = errVal > 0
+      ? `<strong style="color: var(--severity-high);">${errVal.toLocaleString()}</strong>`
+      : `<span style="color: var(--status-resolved);">0</span>`;
+    return `
     <tr>
       <td><strong>${m.agent}</strong> (<code>${m.model}</code>)</td>
       <td>${(m.uncached_tokens || 0).toLocaleString()}</td>
@@ -394,17 +501,24 @@ export function renderOverviewTokenUsage(runs) {
       <td>${(m.thoughts_tokens || 0).toLocaleString()}</td>
       <td>${(m.output_tokens || 0).toLocaleString()}</td>
       <td><strong>${(m.total_tokens || 0).toLocaleString()}</strong></td>
+      <td>${errCell}</td>
       <td>
         <button class="badge-btn" onclick="window.showTokenRunsModal('${encodeURIComponent(m.key)}')">${m.runs.length} Runs</button>
       </td>
     </tr>
-  `).join("");
-  return renderCollapsibleTokenCard(totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, overallCacheRate, rows, true);
+  `;
+  }).join("");
+  return renderCollapsibleTokenCard(totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, overallCacheRate, rows, true, totalErrors, totalRefusals, aggregatedErrorsGrouped);
 }
 
 export function renderProjectTokenUsage(projRuns) {
-  const { totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, overallCacheRate, agentModelStats } = aggregateRunsTokenStats(projRuns);
-  const rows = Object.values(agentModelStats).map((m) => `
+  const { totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, totalErrors, totalRefusals, aggregatedErrorsGrouped, overallCacheRate, agentModelStats } = aggregateRunsTokenStats(projRuns);
+  const rows = Object.values(agentModelStats).map((m) => {
+    const errVal = m.errors || 0;
+    const errCell = errVal > 0
+      ? `<strong style="color: var(--severity-high);">${errVal.toLocaleString()}</strong>`
+      : `<span style="color: var(--status-resolved);">0</span>`;
+    return `
     <tr>
       <td><strong>${m.agent}</strong> (<code>${m.model}</code>)</td>
       <td>${(m.uncached_tokens || 0).toLocaleString()}</td>
@@ -412,12 +526,14 @@ export function renderProjectTokenUsage(projRuns) {
       <td>${(m.thoughts_tokens || 0).toLocaleString()}</td>
       <td>${(m.output_tokens || 0).toLocaleString()}</td>
       <td><strong>${(m.total_tokens || 0).toLocaleString()}</strong></td>
+      <td>${errCell}</td>
       <td>
         <button class="badge-btn" onclick="window.showTokenRunsModal('${encodeURIComponent(m.key)}')">${m.runs.length} Runs</button>
       </td>
     </tr>
-  `).join("");
-  return renderCollapsibleTokenCard(totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, overallCacheRate, rows, true);
+  `;
+  }).join("");
+  return renderCollapsibleTokenCard(totalInput, totalUncached, totalCached, totalOutput, totalThoughts, totalTokens, overallCacheRate, rows, true, totalErrors, totalRefusals, aggregatedErrorsGrouped);
 }
 
 export function renderRunTokenUsage(data) {
@@ -429,6 +545,9 @@ export function renderRunTokenUsage(data) {
   const comp = tot.output_tokens ?? tot.total_output_tokens ?? tot.completion_tokens ?? 0;
   const thoughts = tot.thoughts_tokens ?? 0;
   const totalTokens = tot.total_tokens ?? (prompt + comp + thoughts);
+  const totalErrors = tot.total_errors ?? tot.errors ?? 0;
+  const errorsGrouped = tokenUsage.errors_grouped || {};
+  const refusals = countRefusalsFromGrouped(errorsGrouped);
   const cacheHitRate = prompt > 0 && cached > 0 ? `${((cached / prompt) * 100).toFixed(1)}%` : "0.0%";
   const byAgent = tokenUsage.by_agent || {};
   const byModel = tokenUsage.by_model || {};
@@ -442,6 +561,10 @@ export function renderRunTokenUsage(data) {
       const out = stats.output_tokens ?? 0;
       const th = stats.thoughts_tokens ?? 0;
       const tok = stats.total_tokens ?? (inp + out + th);
+      const errCount = stats.errors ?? 0;
+      const errCell = errCount > 0
+        ? `<strong style="color: var(--severity-high);">${errCount.toLocaleString()}</strong>`
+        : `<span style="color: var(--status-resolved);">0</span>`;
       rows.push(`
         <tr>
           <td><strong>${agentName}</strong> (<code>${stats.model || "Unknown"}</code>)</td>
@@ -450,6 +573,7 @@ export function renderRunTokenUsage(data) {
           <td>${th.toLocaleString()}</td>
           <td>${out.toLocaleString()}</td>
           <td><strong>${tok.toLocaleString()}</strong></td>
+          <td>${errCell}</td>
         </tr>
       `);
     });
@@ -466,11 +590,15 @@ export function renderRunTokenUsage(data) {
           <td>0</td>
           <td>${out.toLocaleString()}</td>
           <td><strong>${tok.toLocaleString()}</strong></td>
+          <td><span style="color: var(--status-resolved);">0</span></td>
         </tr>
       `);
     });
-  } else if (totalTokens > 0) {
+  } else if (totalTokens > 0 || totalErrors > 0) {
     const modelName = (data && data.metadata && data.metadata.model) || "Default";
+    const errCell = totalErrors > 0
+      ? `<strong style="color: var(--severity-high);">${totalErrors.toLocaleString()}</strong>`
+      : `<span style="color: var(--status-resolved);">0</span>`;
     rows.push(`
       <tr>
         <td><code>${modelName}</code></td>
@@ -479,10 +607,11 @@ export function renderRunTokenUsage(data) {
         <td>${thoughts.toLocaleString()}</td>
         <td>${comp.toLocaleString()}</td>
         <td><strong>${totalTokens.toLocaleString()}</strong></td>
+        <td>${errCell}</td>
       </tr>
     `);
   }
 
-  return renderCollapsibleTokenCard(prompt, uncached, cached, comp, thoughts, totalTokens, cacheHitRate, rows.join(""), false);
+  return renderCollapsibleTokenCard(prompt, uncached, cached, comp, thoughts, totalTokens, cacheHitRate, rows.join(""), false, totalErrors, refusals, errorsGrouped);
 }
 
