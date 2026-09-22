@@ -125,7 +125,7 @@ In your repository's `flake.nix`, add Mjolnir as an input and use `mjolnir.lib.d
           mjolnirApp = mjolnir.packages.${system}.mjolnir-app;
           projectDir = ./tools/mjolnir;
           deployPackages = {
-            inherit (mjolnir.packages.${system}) deploy-gcs-runs emit-report;
+            inherit (mjolnir.packages.${system}) deploy-gcs-runs emit-report post-pr-comments;
           };
         };
       }
@@ -170,6 +170,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   mjolnir-audit:
@@ -198,6 +199,14 @@ jobs:
             --diff-head "${{ github.event.pull_request.head.sha }}" \
             --pr "${{ github.event.pull_request.html_url }}" \
             --trigger ci
+
+      - name: Post Inline PR Review Comments
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          nix run path:.#post-pr-comments -- \
+            --output-dir "./test-out/results" \
+            --pr "${{ github.event.pull_request.html_url }}"
 
       - name: Emit Markdown Report
         run: |

@@ -173,6 +173,15 @@
             '';
           };
 
+          post-pr-comments = pkgs.writeShellApplication {
+            name = "mjolnir-post-pr-comments";
+            runtimeInputs = [ pythonEnv ];
+            text = ''
+              export PYTHONPATH="${./app}:''${PYTHONPATH:-}"
+              exec python3 "${./scripts/post_pr_comments.py}" "$@"
+            '';
+          };
+
 
         in
           discovered // {
@@ -181,7 +190,8 @@
               web-viewer
               deploy-gcs-web
               deploy-gcs-runs
-              emit-report;
+              emit-report
+              post-pr-comments;
 
             test-all = makeGroup {
               name = "test-all";
