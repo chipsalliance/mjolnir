@@ -12,7 +12,7 @@ from executors.ctags import CtagsRunner
 import providers.adk.main as adk
 import providers.mock.main as mock
 from utilities.command import run_command
-from utilities.discovery import discover_source_files
+from utilities.discovery import discover_source_files, is_file_excluded
 from utilities.git import get_diff_files, setup_repository
 from utilities.logger import logger, setup_logger
 from utilities.metadata import write_metadata
@@ -177,6 +177,8 @@ def _run_orchestrator():
 
     # Ingestion check and File discovery
     allowed_exts = set(job["extensions"])
+    exclude_dirs = job.get("excludeDirs") or []
+    exclude_patterns = job.get("excludePatterns") or []
 
     if ingest_path:
         logger.info(f"Ingestion Mode enabled. Ingesting report path: {ingest_path}")
@@ -187,7 +189,12 @@ def _run_orchestrator():
         )
         raw_diff_files = get_diff_files(code_dir, diff_base, diff_head)
         files_to_scan = [
-            f for f in raw_diff_files if Path(f).suffix.lstrip(".").lower() in allowed_exts
+            f
+            for f in raw_diff_files
+            if Path(f).suffix.lstrip(".").lower() in allowed_exts
+            and not is_file_excluded(
+                f, exclude_dirs=exclude_dirs, exclude_patterns=exclude_patterns
+            )
         ]
         if files_to_scan:
             logger.info(
@@ -205,6 +212,8 @@ def _run_orchestrator():
             src_dirs=job["srcDirs"],
             extensions=allowed_exts,
             max_files=job.get("maxFiles"),
+            exclude_dirs=exclude_dirs,
+            exclude_patterns=exclude_patterns,
         )
 
         if files_to_scan:
