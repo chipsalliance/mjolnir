@@ -21,3 +21,5 @@ class HistoricalFinding(BaseModel):
     justification: Optional[str] = None
     attack_vector: Optional[str] = None
     poc: Optional[str] = None
+    poc_verified: Optional[bool] = None
+    test_command: Optional[str] = None

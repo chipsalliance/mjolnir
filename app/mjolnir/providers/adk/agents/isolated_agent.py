@@ -11,6 +11,8 @@ from google.adk.agents.invocation_context import (
 from google.adk.agents.run_config import RunConfig
 from google.adk.models import BaseLlm, LLMRegistry, LlmRequest
 from google.adk.models.google_llm import Gemini
+from google.adk.tools.set_model_response_tool import SetModelResponseTool
+from google.adk.utils.output_schema_utils import can_use_output_schema_with_tools
 from google.genai import types
 
 from constants import (
@@ -34,12 +36,22 @@ class CachedGemini(Gemini):
     async def _preprocess_request(self, llm_request: LlmRequest) -> None:
         await super()._preprocess_request(llm_request)
         if llm_request.config:
+            resp_schema = getattr(llm_request.config, "response_schema", None)
+            if resp_schema and "set_model_response" not in llm_request.tools_dict:
+                llm_request.tools_dict["set_model_response"] = SetModelResponseTool(resp_schema)
             if getattr(llm_request.config, "thinking_config", None) is None:
                 llm_request.config.thinking_config = types.ThinkingConfig(include_thoughts=True)
             if getattr(llm_request.config, "cached_content", None):
                 llm_request.config.system_instruction = None
                 llm_request.config.tools = None
                 llm_request.config.tool_config = None
+            elif getattr(llm_request.config, "tools", None):
+                # Ensure function declarations (such as set_model_response) are never duplicated by name
+                for tool_entry in llm_request.config.tools:
+                    if fns := getattr(tool_entry, "function_declarations", None):
+                        tool_entry.function_declarations = list(
+                            {getattr(f, "name", id(f)): f for f in fns}.values()
+                        )
 
 
 def resolve_model_with_retries(model: str | BaseLlm) -> BaseLlm:

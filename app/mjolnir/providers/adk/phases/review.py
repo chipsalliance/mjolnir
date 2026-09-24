@@ -7,6 +7,7 @@ from google.adk import Context
 from google.adk.workflow import node
 
 from constants import (
+    MAX_REVIEW_POC_PROMPT_CHARS,
     PHASE_FINAL_REVIEW_ID,
     PHASE_FINAL_REVIEW_NAME,
     PHASE_INITIAL_REVIEW_ID,
@@ -93,8 +94,16 @@ async def _run_review_pass(
             exclude_fields = set() if evaluate_poc else {"poc"}
             finding_payload = vuln.model_dump_json(indent=2, exclude=exclude_fields)
             if evaluate_poc and vuln.poc:
+                poc_content = vuln.poc
+                if len(poc_content) > MAX_REVIEW_POC_PROMPT_CHARS:
+                    half = MAX_REVIEW_POC_PROMPT_CHARS // 2
+                    poc_content = (
+                        poc_content[:half]
+                        + "\n... [PoC excerpt truncated for review context window limit] ...\n"
+                        + poc_content[-half:]
+                    )
                 review_prompt = REVIEW_WITH_POC_TASK_PROMPT_TEMPLATE.format(
-                    finding_payload=finding_payload, poc=vuln.poc
+                    finding_payload=finding_payload, poc=poc_content
                 )
             else:
                 review_prompt = REVIEW_TASK_PROMPT_TEMPLATE.format(finding_payload=finding_payload)

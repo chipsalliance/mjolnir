@@ -17,6 +17,7 @@ from constants import (
     PHASE_FINAL_REVIEW_ID,
     PHASE_INGEST_ID,
     PHASE_INITIAL_REVIEW_ID,
+    PHASE_POC_CREATION_ID,
     PIPELINE_MODE_FAST,
     PIPELINE_MODE_FULL,
 )
@@ -27,6 +28,7 @@ from providers.adk.phases import (
     ingest_report_phase,
     initial_review_phase,
     initialize,
+    poc_creation_phase,
     project_exploration_phase,
 )
 from providers.adk.utilities.usage_tracker import UsageTracker
@@ -37,6 +39,7 @@ PHASE_REGISTRY = {
     PHASE_DISCOVERY_ID: discovery_phase,
     PHASE_INGEST_ID: ingest_report_phase,
     PHASE_INITIAL_REVIEW_ID: initial_review_phase,
+    PHASE_POC_CREATION_ID: poc_creation_phase,
     PHASE_FINAL_REVIEW_ID: final_review_phase,
 }
 
@@ -66,7 +69,13 @@ def resolve_mode_phases(mode: str, ingest_path: str | None = None) -> list[str]:
     """Resolves the ordered phase IDs for 'fast' (classic discovery + initial review) or 'full' mode."""
     entry_phase = PHASE_INGEST_ID if ingest_path else PHASE_DISCOVERY_ID
     if mode == PIPELINE_MODE_FULL:
-        return [PHASE_EXPLORATION_ID, entry_phase, PHASE_INITIAL_REVIEW_ID]
+        return [
+            PHASE_EXPLORATION_ID,
+            entry_phase,
+            PHASE_INITIAL_REVIEW_ID,
+            PHASE_POC_CREATION_ID,
+            PHASE_FINAL_REVIEW_ID,
+        ]
     if mode == PIPELINE_MODE_FAST:
         return [entry_phase, PHASE_INITIAL_REVIEW_ID]
     raise ValueError(f"Unsupported pipeline mode: '{mode}'")

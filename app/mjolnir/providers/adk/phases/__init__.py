@@ -9,6 +9,7 @@ from providers.adk.phases.review import (
     review_phase,
 )
 from providers.adk.phases.ingest_report import ingest_report_phase
+from providers.adk.phases.poc_creation import poc_creation_phase
 
 __all__ = [
     "initialize",
@@ -16,6 +17,7 @@ __all__ = [
     "discovery_phase",
     "audit_phase",
     "initial_review_phase",
+    "poc_creation_phase",
     "final_review_phase",
     "review_phase",
     "ingest_report_phase",

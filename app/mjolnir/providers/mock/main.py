@@ -9,12 +9,17 @@ from tqdm import tqdm
 from constants import (
     PHASE_DISCOVERY_ID,
     PHASE_DISCOVERY_NAME,
+    PHASE_FINAL_REVIEW_ID,
+    PHASE_FINAL_REVIEW_NAME,
     PHASE_INITIAL_REVIEW_ID,
     PHASE_INITIAL_REVIEW_NAME,
+    PHASE_POC_CREATION_ID,
+    PHASE_POC_CREATION_NAME,
     PIPELINE_MODE_FULL,
     PROJECT_EXPERT_SUMMARY_FILENAME,
 )
 from data.audit_finding import AuditFinding
+from data.exploit_finding import ExploitFinding
 from data.review_finding import ReviewFinding
 from data.severity import Severity
 from data.status import Status
@@ -143,6 +148,49 @@ def run_analysis(
                 phase_name=PHASE_INITIAL_REVIEW_NAME,
                 justification="Omitted during mock review simulation.",
             )
+
+        # 3 & 4. Simulate PoC Creation & Final Review in full mode
+        if mode == PIPELINE_MODE_FULL:
+            if vuln.status == Status.OPEN:
+                exploit_finding = ExploitFinding(
+                    poc="```rust\n#[test]\nfn test_mock_poc() { assert_eq!(1, 1); }\n```",
+                    test_command="cargo test test_mock_poc",
+                    test_output="running 1 test\ntest test_mock_poc ... ok",
+                    poc_verified=True,
+                    justification="Mock PoC synthesized and verified in isolated worktree.",
+                )
+                vuln.add(
+                    phase_id=PHASE_POC_CREATION_ID,
+                    phase_name=PHASE_POC_CREATION_NAME,
+                    finding=exploit_finding,
+                )
+
+                final_review = ReviewFinding(
+                    title=vuln.title,
+                    severity=vuln.severity,
+                    location=vuln.location,
+                    description=vuln.description,
+                    recommendation=vuln.recommendation,
+                    verdict=vuln.verdict or Verdict.EXPLOITABLE,
+                    justification="Mock Final Review confirmed PoC authenticity and execution output.",
+                    attack_vector=vuln.attack_vector,
+                )
+                vuln.add(
+                    phase_id=PHASE_FINAL_REVIEW_ID,
+                    phase_name=PHASE_FINAL_REVIEW_NAME,
+                    finding=final_review,
+                )
+            else:
+                vuln.add_skipped(
+                    phase_id=PHASE_POC_CREATION_ID,
+                    phase_name=PHASE_POC_CREATION_NAME,
+                    justification=f"Skipped: Status is {vuln.status}",
+                )
+                vuln.add_skipped(
+                    phase_id=PHASE_FINAL_REVIEW_ID,
+                    phase_name=PHASE_FINAL_REVIEW_NAME,
+                    justification=f"Skipped: Status is {vuln.status}",
+                )
 
         all_vulnerabilities.append(vuln)
 

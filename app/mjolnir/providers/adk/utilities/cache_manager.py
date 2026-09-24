@@ -11,6 +11,7 @@ from constants import (
 )
 from google.adk.tools import FunctionTool
 from google.adk.tools.set_model_response_tool import SetModelResponseTool
+from google.adk.utils.output_schema_utils import can_use_output_schema_with_tools
 from google.genai import Client, types
 from utilities.logger import logger
 
@@ -29,7 +30,7 @@ class PhaseContextCache:
     ):
         self.model = model
         self.tools = list(tools or [])
-        if output_schema and self.tools:
+        if output_schema and self.tools and not can_use_output_schema_with_tools(model):
             self.tools.append(SetModelResponseTool(output_schema))
             self.instruction = f"{instruction}\n\n{SET_MODEL_RESPONSE_INSTRUCTION}"
         else:
