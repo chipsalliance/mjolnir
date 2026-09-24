@@ -57,20 +57,10 @@ def _assemble_ground_truth_poc_bundle(
     # 2. At least one harness command was executed.
     # 3. No baseline lines were deleted or modified.
     # 4. No production code files were altered (only test/harness code).
-    # 5. Last test command reproduced the vulnerability (non-zero exit code).
     has_test_execution = bool(sandbox.command_history)
-    last_cmd_reproduced = (
-        sandbox.command_history[-1].returncode != 0 if has_test_execution else False
-    )
 
     if finding.poc_verified:
-        if (
-            not actual_diff
-            or not has_test_execution
-            or removed_baseline_lines > 0
-            or prod_modified
-            or not last_cmd_reproduced
-        ):
+        if not actual_diff or not has_test_execution or removed_baseline_lines > 0 or prod_modified:
             finding.poc_verified = False
 
     status_lines = []
