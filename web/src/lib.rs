@@ -684,14 +684,16 @@ pub fn build_phase_sankey_rows(vulns: &[serde_json::Value]) -> String {
             }
         }
 
+        for node_name in phase_node_names.values() {
+            *node_counts.entry(node_name.clone()).or_insert(0) += 1;
+        }
+
         for i in 0..(phase_keys.len() - 1) {
             let p1 = &phase_keys[i];
             let p2 = &phase_keys[i + 1];
 
             if let (Some(base1), Some(base2)) = (phase_node_names.get(p1), phase_node_names.get(p2))
             {
-                *node_counts.entry(base1.clone()).or_insert(0) += 1;
-                *node_counts.entry(base2.clone()).or_insert(0) += 1;
                 record_bases.push((base1.clone(), base2.clone()));
             }
         }
@@ -1029,5 +1031,51 @@ mod tests {
         let rows = build_phase_sankey_rows(&vulns);
         assert!(rows.contains("Phase 1: Report Ingestion - High (count: 1)"));
         assert!(rows.contains("Phase 2: Initial Review - Medium (count: 1)"));
+    }
+
+    #[test]
+    fn test_build_phase_sankey_rows_intermediate_node_counts_not_doubled() {
+        let vulns: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[
+                {
+                    "title": "Finding 1",
+                    "severity": "High",
+                    "status": "Open",
+                    "history": [
+                        {
+                            "phase_id": "discovery",
+                            "phase_name": "Discovery",
+                            "severity": "High",
+                            "status": "Open"
+                        },
+                        {
+                            "phase_id": "initial_review",
+                            "phase_name": "Initial Review",
+                            "severity": "High",
+                            "status": "Open"
+                        },
+                        {
+                            "phase_id": "poc_creation",
+                            "phase_name": "PoC Creation",
+                            "severity": "High",
+                            "status": "Open"
+                        },
+                        {
+                            "phase_id": "final_review",
+                            "phase_name": "Final Review",
+                            "severity": "High",
+                            "status": "Open"
+                        }
+                    ]
+                }
+            ]"#,
+        )
+        .unwrap();
+
+        let rows = build_phase_sankey_rows(&vulns);
+        assert!(rows.contains("Phase 1: Discovery - High (count: 1)"));
+        assert!(rows.contains("Phase 2: Initial Review - High (count: 1)"));
+        assert!(rows.contains("Phase 3: PoC Creation - High (count: 1)"));
+        assert!(rows.contains("Phase 4: Final Review - High (count: 1)"));
     }
 }

@@ -1020,11 +1020,38 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
 
     let errorsHtml = "";
     if (errorKeys.length > 0) {
-      const errorItems = errorKeys.map(k => `<li><strong>${k}</strong>: ${errorsGrouped[k]} error(s)</li>`).join("");
+      const escapeHtml = (str) =>
+        String(str || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      const totalErrCount = Object.values(errorsGrouped).reduce(
+        (a, b) => a + (Number(b) || 0),
+        0
+      );
+      const errorItems = errorKeys
+        .map(
+          k =>
+            `<li><strong>${escapeHtml(k)}</strong>: ${errorsGrouped[k]} error(s)</li>`
+        )
+        .join("");
       errorsHtml = `
         <div class="run-errors-card">
-          <h4>Run Errors & Warnings</h4>
-          <ul class="run-errors-list">${errorItems}</ul>
+          <div class="run-errors-card-header" onclick="this.closest('.run-errors-card').classList.toggle('expanded')">
+            <h4>
+              <span>⚠️ Run Errors & Warnings</span>
+              <span class="run-errors-badge">${errorKeys.length} signature(s) / ${totalErrCount} error(s)</span>
+            </h4>
+            <button type="button" class="run-errors-toggle-btn" onclick="event.stopPropagation(); this.closest('.run-errors-card').classList.toggle('expanded')">
+              <span class="toggle-text-collapsed">Show More ▼</span>
+              <span class="toggle-text-expanded">Show Less ▲</span>
+            </button>
+          </div>
+          <div class="run-errors-content">
+            <ul class="run-errors-list">${errorItems}</ul>
+          </div>
         </div>`;
     }
 
@@ -1280,10 +1307,26 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
-      const formatMarkdownText = (str) => escapeHtml(str)
-        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-        .replace(/`([^`\n]+)`/g, "<code>$1</code>")
-        .replace(/\n/g, "<br>");
+      const formatMarkdownText = (str) => {
+        if (!str) return "";
+        let res = escapeHtml(str);
+
+        // Render fenced code blocks ```lang\ncode\n```
+        res = res.replace(/```(?:[a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g, (_match, code) => {
+          return `<pre style="background: var(--bg-main, #0f172a); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--border, #334155); overflow-x: auto; font-size: 0.85rem; color: var(--text-primary); margin: 10px 0; font-family: monospace; white-space: pre;"><code>${code.trim()}</code></pre>`;
+        });
+
+        // Inline bold and code
+        res = res.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+        res = res.replace(/`([^`\n]+)`/g, "<code>$1</code>");
+
+        // Convert newlines to <br> outside <pre> blocks
+        const parts = res.split(/(<pre[\s\S]*?<\/pre>)/g);
+        for (let i = 0; i < parts.length; i += 2) {
+          parts[i] = parts[i].replace(/\n/g, "<br>");
+        }
+        return parts.join("");
+      };
 
       const attackVectorHtml = v.attack_vector
         ? `<h4 style="margin-bottom: 6px; font-weight: 600;">Attack Vector</h4>

@@ -613,16 +613,79 @@ tr:last-child td {
 
 .run-errors-card {
   margin-bottom: 20px;
-  padding: 14px 18px;
+  padding: 12px 18px;
   border-radius: 8px;
   border: 1px solid var(--severity-critical);
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.08);
 }
 
-.run-errors-card h4 {
+.run-errors-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.run-errors-card-header h4 {
   color: var(--severity-critical);
-  margin-bottom: 8px;
+  margin: 0;
   font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.run-errors-badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.18);
+  color: var(--severity-critical);
+}
+
+.run-errors-toggle-btn {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--text-primary);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.run-errors-toggle-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.run-errors-card:not(.expanded) .toggle-text-expanded {
+  display: none;
+}
+
+.run-errors-card.expanded .toggle-text-collapsed {
+  display: none;
+}
+
+.run-errors-content {
+  position: relative;
+  margin-top: 10px;
+  transition: max-height 0.25s ease-out;
+}
+
+/* Collapsed by default: only show ~5 lines with a smooth bottom fade */
+.run-errors-card:not(.expanded) .run-errors-content {
+  max-height: 115px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, black 65%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 65%, transparent 100%);
+}
+
+.run-errors-card.expanded .run-errors-content {
+  max-height: 600px;
+  overflow-y: auto;
 }
 
 .run-errors-list {
@@ -630,6 +693,12 @@ tr:last-child td {
   padding-left: 20px;
   color: var(--text-primary);
   font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.run-errors-list li {
+  margin-bottom: 6px;
+  word-break: break-word;
 }
 
 /* Tree View */
