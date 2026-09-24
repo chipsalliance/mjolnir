@@ -26,6 +26,7 @@ DEFAULT_DISPATCH_STAGGER_SECONDS = 0.25
 PROJECT_EXPERT_MAX_LLM_CALLS = 150
 AUDITOR_MAX_LLM_CALLS = 150
 REVIEWER_MAX_LLM_CALLS = 200
+EXPLOITER_MAX_LLM_CALLS = 150
 INGESTION_MAX_LLM_CALLS = 150
 
 # --- Tool Execution & Output Limits ---
@@ -33,6 +34,12 @@ DEFAULT_TOOL_OUTPUT_MAX_CHARS = 40000
 PROJECT_EXPERT_QUERY_LOG_PREVIEW_CHARS = 100
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 BINARY_CHECK_CHUNK_BYTES = 8192
+HARNESS_COMMAND_TIMEOUT_SECONDS = 900
+MAX_POC_OUTPUT_EXCERPT_CHARS = 24000
+POC_OUTPUT_TRUNCATION_MARKER = "\n...[truncated]...\n"
+MAX_POC_DIFF_EXCERPT_CHARS = 24000
+POC_DIFF_TRUNCATION_MARKER = "\n...[truncated diff]...\n"
+MAX_REVIEW_POC_PROMPT_CHARS = 50000
 
 # --- Pipeline Modes, Phases & Artifacts ---
 PIPELINE_MODE_FAST = "fast"
@@ -53,6 +60,75 @@ PHASE_INITIAL_REVIEW_NAME = "Initial Review"
 
 PHASE_POC_CREATION_ID = "poc_creation"
 PHASE_POC_CREATION_NAME = "PoC Creation"
+POC_WORKTREES_SUBDIR = "poc_worktrees"
+POC_ARTIFACTS_SUBDIR = "poc_artifacts"
+CARGO_TARGET_CACHE_SUBDIR = ".cargo_target_cache"
+SANDBOX_IGNORED_DIRS = frozenset(
+    {
+        "target",
+        "bazel-bin",
+        "bazel-out",
+        "bazel-testlogs",
+        POC_WORKTREES_SUBDIR,
+        POC_ARTIFACTS_SUBDIR,
+    }
+)
+POC_VERIFIED_TRUE_MARKER = "`poc_verified`: `True`"
+
+# --- Worktree Sandbox & Anti-Cheat Gate Constants ---
+TEST_DIRECTORY_NAMES = frozenset({"tests", "test", "testing", "spec", "specs", "fuzz", "benches"})
+
+TEST_FILE_SUFFIXES = (
+    "_test.rs",
+    "_test.go",
+    "_test.py",
+    "_test.c",
+    "_test.cpp",
+    "_test.cc",
+    "test.rs",
+    "test.py",
+    "test.go",
+    "test.java",
+    ".spec.ts",
+    ".test.ts",
+    ".spec.js",
+    ".test.js",
+)
+
+BUILD_CONFIGURATION_FILES = frozenset(
+    {
+        "cargo.toml",
+        "cargo.lock",
+        "build",
+        "build.bazel",
+        "cmakelists.txt",
+        "makefile",
+    }
+)
+
+SANDBOX_ALLOWED_ENV_VARS = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "USER",
+        "SHELL",
+        "LANG",
+        "LC_ALL",
+        "TERM",
+        "TMPDIR",
+        "CARGO_HOME",
+        "RUSTUP_HOME",
+        "GOPATH",
+        "GOROOT",
+        "CC",
+        "CXX",
+        "CFLAGS",
+        "CXXFLAGS",
+        "LDFLAGS",
+        "CMAKE_GENERATOR",
+        "NIX_BUILD_TOP",
+    }
+)
 
 PHASE_FINAL_REVIEW_ID = "final_review"
 PHASE_FINAL_REVIEW_NAME = "Final Review"
@@ -90,6 +166,29 @@ TOOL_PROMPT_GUIDANCE: dict[str, str] = {
         "Expert when you need clarification on project-level architectural conventions, "
         "cross-subsystem trust boundaries, hardware/ePMP/OTP guarantees, or whether an omitted "
         "check is intentionally enforced by hardware or an earlier boot stage."
+    ),
+    "patch_worktree_file": (
+        "**`patch_worktree_file` (Targeted Test Patching in Sandbox):** Insert or update a unit "
+        "test or harness case in an existing file inside the isolated sandbox by replacing an "
+        "exact `target_content` snippet."
+    ),
+    "write_worktree_file": (
+        "**`write_worktree_file` (Create/Write File in Sandbox):** Create or write a standalone "
+        "test or harness file inside the isolated sandbox."
+    ),
+    "run_harness_command": (
+        "**`run_harness_command` (Execute Scoped Test Harness in Sandbox):** Compile and run your "
+        "synthesized unit test inside the isolated sandbox scoped to the specific target binary "
+        "or test filter, and capture its exit status and output."
+    ),
+    "get_worktree_diff": (
+        "**`get_worktree_diff` (Inspect Unified Sandbox Patch):** Retrieve the unified diff of "
+        "all touched files in the sandbox to confirm your patch only adds/modifies test harness "
+        "code and leaves production logic unmodified."
+    ),
+    "reset_worktree": (
+        "**`reset_worktree` (Revert Sandbox to Baseline):** Discard all edits in the isolated "
+        "sandbox and restore the clean baseline if you need to start fresh."
     ),
 }
 
@@ -149,6 +248,36 @@ REVIEW_TASK_PROMPT_TEMPLATE = "Audit Finding:\n{finding_payload}"
 REVIEW_WITH_POC_TASK_PROMPT_TEMPLATE = (
     "### Candidate Vulnerability & History:\n{finding_payload}\n\n"
     "### Generated Proof-of-Concept (PoC) to Verify:\n```\n{poc}\n```"
+)
+
+POC_CREATION_TASK_PROMPT_TEMPLATE = (
+    "Synthesize and execute a Proof-of-Concept (PoC) unit test in your isolated "
+    "sandbox to verify the following security finding:\n\n"
+    "{finding_payload}"
+)
+POC_VERIFICATION_STATUS_SECTION_TEMPLATE = (
+    "### Verification Status\n"
+    "- **Agent Reported `poc_verified`**: `{poc_verified}`\n"
+    "- **Worktree Patch Present**: `{patch_present}`\n"
+    "- **Harness Commands Executed**: `{commands_executed}`"
+)
+POC_SYNTHESIZED_OVERVIEW_SECTION_TEMPLATE = "### Synthesized PoC Overview\n{poc}"
+POC_PATCH_PRESENT_SECTION_TEMPLATE = (
+    "### Ground-Truth Sandbox Patch (Unified Diff)\n```diff\n{actual_diff}\n```"
+)
+POC_PATCH_EMPTY_SECTION = (
+    "### Ground-Truth Sandbox Patch (Unified Diff)\n"
+    "`[NO SANDBOX DIFF GENERATED — No files were modified in the sandbox]`"
+)
+POC_EXECUTION_PRESENT_SECTION_TEMPLATE = (
+    "### Ground-Truth Harness Execution\n"
+    "- **Command**: `{command}`\n"
+    "- **Exit Code**: `{returncode}`\n"
+    "```text\n{output}\n```"
+)
+POC_EXECUTION_EMPTY_SECTION = (
+    "### Ground-Truth Harness Execution\n"
+    "`[NO HARNESS COMMAND EXECUTED — run_harness_command was never called]`"
 )
 
 # --- Event & Tool Error Detection ---

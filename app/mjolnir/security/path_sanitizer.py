@@ -4,12 +4,17 @@
 
 from pathlib import Path
 
+from utilities.worktree_sandbox import current_worktree_sandbox
+
 
 def resolve_workspace_path(
     user_path: str | Path,
     base_dir: str | Path | None = None,
 ) -> Path:
     """Resolves user_path relative to base_dir and validates path traversal boundaries.
+
+    When called inside an active WorktreeSandbox context (e.g. during PoC synthesis),
+    paths automatically resolve relative to the isolated git worktree directory.
 
     Args:
         user_path: Target path requested by a tool.
@@ -21,7 +26,11 @@ def resolve_workspace_path(
     Raises:
         ValueError: If path resolution fails or path traversal outside base_dir is detected.
     """
-    root = Path(base_dir or ".").resolve()
+    active_sandbox = current_worktree_sandbox.get()
+    if active_sandbox is not None:
+        root = active_sandbox.worktree_dir.resolve()
+    else:
+        root = Path(base_dir or ".").resolve()
 
     try:
         target = (root / user_path).resolve()

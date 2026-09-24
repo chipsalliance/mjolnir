@@ -35,6 +35,8 @@ def upload_single_run(
     for file_path in sorted(run_dir.rglob("*")):
         if file_path.is_file():
             rel_file = file_path.relative_to(run_dir)
+            if ".cargo_target_cache" in rel_file.parts or "poc_worktrees" in rel_file.parts:
+                continue
             blob_name = f"{gcs_run_prefix}/{rel_file}"
             mime, _ = mimetypes.guess_type(str(file_path))
             if not mime:
