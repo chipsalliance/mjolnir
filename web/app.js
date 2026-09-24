@@ -1228,14 +1228,19 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
               <tbody id="vuln-table-body">
                 ${(!filtered || filtered.length === 0)
                   ? `<tr><td colspan="4" style="text-align:center; color: var(--text-muted); padding: 30px;">No matching findings found.</td></tr>`
-                  : filtered.map((v, idx) => `
+                  : filtered.map((v, idx) => {
+                    const pocBadge = v.poc_verified === true
+                      ? ` <span class="badge" style="background-color: rgba(16, 185, 129, 0.18); color: #10b981; margin-left: 6px; font-size: 0.7rem;">PoC Verified</span>`
+                      : (v.poc ? ` <span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: var(--text-secondary); margin-left: 6px; font-size: 0.7rem;">PoC Attempted</span>` : "");
+                    return `
                     <tr class="clickable-row" onclick="window.showFindingModal(${idx})">
                       <td><span class="badge badge-${v.severity || 'LOW'}">${v.severity || 'LOW'}</span></td>
-                      <td><strong>${v.title || 'Untitled Security Finding'}</strong></td>
+                      <td><strong>${v.title || 'Untitled Security Finding'}</strong>${pocBadge}</td>
                       <td><code>${v.file || ''}${v.location ? ':' + v.location : ''}</code></td>
                       <td>${renderStatusBadge(v.status)}</td>
                     </tr>
-                  `).join("")
+                  `;
+                  }).join("")
                 }
               </tbody>
             </table>
@@ -1285,14 +1290,33 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         .replace(/`([^`\n]+)`/g, "<code>$1</code>")
         .replace(/\n/g, "<br>");
 
+      const pocBadgeHtml = v.poc_verified === true
+        ? `<span class="badge" style="background-color: rgba(16, 185, 129, 0.18); color: #10b981; margin-left: 8px;">PoC Verified</span>`
+        : (v.poc_verified === false ? `<span class="badge" style="background-color: rgba(245, 158, 11, 0.18); color: #f59e0b; margin-left: 8px;">PoC Unverified (Static/Harness Limit)</span>` : "");
+
+      const artifactPrefix = `${RUNS_SUBDIR}/${proj}/${job}/${runId}/poc_artifacts/${v.id}`;
+      const artifactLinksHtml = (v.id && v.poc)
+        ? `<div style="margin-bottom: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+             <a href="${getAssetUrl(`${artifactPrefix}/poc_patch.diff`)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="font-size: 0.75rem; text-decoration: none;">Download poc_patch.diff</a>
+             <a href="${getAssetUrl(`${artifactPrefix}/reproduce.sh`)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="font-size: 0.75rem; text-decoration: none;">Download reproduce.sh</a>
+             <a href="${getAssetUrl(`${artifactPrefix}/harness_commands.log`)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="font-size: 0.75rem; text-decoration: none;">View harness_commands.log</a>
+           </div>`
+        : "";
+
       const attackVectorHtml = v.attack_vector
         ? `<h4 style="margin-bottom: 6px; font-weight: 600;">Attack Vector</h4>
            <p style="color: var(--text-secondary); margin-bottom: 16px; line-height: 1.55;">${formatMarkdownText(v.attack_vector)}</p>`
         : "";
 
       const justificationHtml = v.justification
-        ? `<h4 style="margin-bottom: 6px; font-weight: 600;">Reviewer Justification</h4>
+        ? `<h4 style="margin-bottom: 6px; font-weight: 600;">Reviewer & Verification Justification</h4>
            <p style="color: var(--text-secondary); margin-bottom: 16px; line-height: 1.55;">${formatMarkdownText(v.justification)}</p>`
+        : "";
+
+      const pocHtml = v.poc
+        ? `<h4 style="margin-bottom: 6px; margin-top: 16px; font-weight: 600;">Proof of Concept (PoC) & Sandbox Execution</h4>
+           ${artifactLinksHtml}
+           <pre style="background: var(--bg-main, #0f172a); padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 0.8rem; color: var(--text-primary); white-space: pre-wrap;"><code>${escapeHtml(v.poc)}</code></pre>`
         : "";
 
       const findingTraces = getFindingReasoningTraces(v, data.reasoning_log || {});
@@ -1329,6 +1353,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
           <div>
             <span class="badge badge-${v.severity}">${v.severity}</span>
+            ${pocBadgeHtml}
             <code style="margin-left: 8px;">${v.file || ''}${v.location ? ':' + v.location : ''}</code>
           </div>
           <button id="btn-copy-finding-link" class="btn btn-secondary" style="font-size: 0.75rem;">Copy Direct Link</button>
@@ -1342,6 +1367,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         <h4 style="margin-bottom: 6px; font-weight: 600;">Recommendation</h4>
         <p style="color: var(--text-secondary); line-height: 1.55;">${formatMarkdownText(v.recommendation || 'No recommendation provided.')}</p>
 
+        ${pocHtml}
         ${findingReasoningHtml}
       `;
 

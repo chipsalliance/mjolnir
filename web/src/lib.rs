@@ -17,6 +17,7 @@ pub fn get_supported_schemas() -> String {
 /// Schema V1 definition for Mjolnir Vulnerability Findings
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct VulnerabilityV1 {
+    pub id: Option<String>,
     pub title: Option<String>,
     pub severity: Option<String>,
     pub location: Option<String>,
@@ -25,6 +26,11 @@ pub struct VulnerabilityV1 {
     pub file: Option<String>,
     pub status: Option<String>,
     pub rule_id: Option<String>,
+    pub attack_vector: Option<String>,
+    pub justification: Option<String>,
+    pub poc: Option<String>,
+    pub poc_verified: Option<bool>,
+    pub test_command: Option<String>,
 }
 
 /// Schema V1 Metadata definition
@@ -98,6 +104,7 @@ impl RunMetadataV1 {
 /// All frontend views (tables, Sankey flow, filters) render this normalized model.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct NormalizedVulnerability {
+    pub id: String,
     pub title: String,
     pub severity: String,
     pub location: String,
@@ -106,6 +113,11 @@ pub struct NormalizedVulnerability {
     pub file: String,
     pub status: String,
     pub rule_id: String,
+    pub attack_vector: String,
+    pub justification: String,
+    pub poc: String,
+    pub poc_verified: Option<bool>,
+    pub test_command: String,
     pub schema_version: String,
 }
 
@@ -161,13 +173,31 @@ impl NormalizedVulnerability {
 
         let _ = writeln!(out, "### {index}. [{}] {}", self.severity, self.title);
         let _ = writeln!(out, "- **Location**: `{loc}`");
-        let _ = writeln!(out, "- **Status**: {status}\n");
+        let _ = writeln!(out, "- **Status**: {status}");
+        if let Some(verified) = self.poc_verified {
+            let cmd_suffix = if !self.test_command.is_empty() {
+                format!(" (`{}`)", self.test_command)
+            } else {
+                String::new()
+            };
+            let _ = writeln!(out, "- **PoC Verified**: `{verified}`{cmd_suffix}");
+        }
+        out.push('\n');
 
         if !self.description.is_empty() {
             let _ = writeln!(out, "**Description**:\n{}\n", self.description);
         }
+        if !self.attack_vector.is_empty() {
+            let _ = writeln!(out, "**Attack Vector**:\n{}\n", self.attack_vector);
+        }
+        if !self.justification.is_empty() {
+            let _ = writeln!(out, "**Reviewer Justification**:\n{}\n", self.justification);
+        }
         if !self.recommendation.is_empty() {
             let _ = writeln!(out, "**Recommendation**:\n{}\n", self.recommendation);
+        }
+        if !self.poc.is_empty() {
+            let _ = writeln!(out, "**Proof of Concept (PoC)**:\n{}\n", self.poc);
         }
         out.push_str("---\n\n");
     }
@@ -207,7 +237,18 @@ impl NormalizedVulnerability {
 
 impl From<VulnerabilityV1> for NormalizedVulnerability {
     fn from(v: VulnerabilityV1) -> Self {
+        let poc_str = v.poc.unwrap_or_default();
+        let inferred_verified = v.poc_verified.or_else(|| {
+            if poc_str.contains("`poc_verified`: `True`") {
+                Some(true)
+            } else if poc_str.contains("`poc_verified`: `False`") {
+                Some(false)
+            } else {
+                None
+            }
+        });
         Self {
+            id: v.id.unwrap_or_default(),
             title: v
                 .title
                 .unwrap_or_else(|| "Untitled Security Finding".to_string()),
@@ -221,6 +262,11 @@ impl From<VulnerabilityV1> for NormalizedVulnerability {
             file: v.file.unwrap_or_default(),
             status: v.status.unwrap_or_else(|| "Open".to_string()),
             rule_id: v.rule_id.unwrap_or_default(),
+            attack_vector: v.attack_vector.unwrap_or_default(),
+            justification: v.justification.unwrap_or_default(),
+            poc: poc_str,
+            poc_verified: inferred_verified,
+            test_command: v.test_command.unwrap_or_default(),
             schema_version: "v1".to_string(),
         }
     }
@@ -389,8 +435,35 @@ fn parse_vulnerabilities(vulnerabilities_json: &str) -> Vec<NormalizedVulnerabil
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
+                let id = val
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let attack_vector = val
+                    .get("attack_vector")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let justification = val
+                    .get("justification")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let poc = val
+                    .get("poc")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let poc_verified = val.get("poc_verified").and_then(|v| v.as_bool());
+                let test_command = val
+                    .get("test_command")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
 
                 NormalizedVulnerability {
+                    id,
                     title,
                     severity,
                     location,
@@ -399,6 +472,11 @@ fn parse_vulnerabilities(vulnerabilities_json: &str) -> Vec<NormalizedVulnerabil
                     file,
                     status,
                     rule_id,
+                    attack_vector,
+                    justification,
+                    poc,
+                    poc_verified,
+                    test_command,
                     schema_version: "v1".to_string(),
                 }
             })
