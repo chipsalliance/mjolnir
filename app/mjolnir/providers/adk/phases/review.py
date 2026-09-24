@@ -63,11 +63,15 @@ async def _run_review_pass(
         Vulnerability.model_validate(v) if isinstance(v, dict) else v for v in vulnerabilities
     ]
     has_eligible = any(
-        getattr(v, "status", Status.OPEN) == Status.OPEN and (not evaluate_poc or bool(v.poc))
+        getattr(v, "status", Status.OPEN) == Status.OPEN
+        and (not evaluate_poc or bool(v.poc))
+        and not (not evaluate_poc and any(h.phase_id == phase_id for h in v.history))
         for v in vulnerabilities
     )
     if not has_eligible:
         for v in vulnerabilities:
+            if not evaluate_poc and any(h.phase_id == phase_id for h in v.history):
+                continue
             if getattr(v, "status", Status.OPEN) != Status.OPEN:
                 v.add_skipped(phase_id, phase_name, f"Skipped: Status is {v.status}")
             else:
@@ -106,6 +110,9 @@ async def _run_review_pass(
 
             if getattr(vuln, "status", Status.OPEN) != Status.OPEN:
                 vuln.add_skipped(phase_id, phase_name, f"Skipped: Status is {vuln.status}")
+                return vuln
+
+            if not evaluate_poc and any(h.phase_id == phase_id for h in vuln.history):
                 return vuln
 
             if evaluate_poc and not vuln.poc:
