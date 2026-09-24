@@ -60,6 +60,11 @@ def _run_orchestrator():
         "--bucket",
         help="Optional GCS bucket name, URI, or local bucket path for inter-run deduplication against historical Open findings",
     )
+    parser.add_argument(
+        "--min-poc-severity",
+        choices=["Informational", "Low", "Medium", "High", "Critical", "None"],
+        help="Minimum finding severity required to synthesize a PoC in full mode (default: Medium)",
+    )
     args, unknown_args = parser.parse_known_args()
 
     if not args.spec:
@@ -230,6 +235,7 @@ def _run_orchestrator():
 
     # Execute analysis via selected model
     pipeline_mode = args.mode or job.get("mode")
+    min_poc_severity = args.min_poc_severity or job.get("minPocSeverity") or "Medium"
     bucket = (
         args.bucket
         or job.get("bucket")
@@ -237,7 +243,9 @@ def _run_orchestrator():
         or os.environ.get("MJOLNIR_GCS_BUCKET")
     )
     project_output_dir = config.get("projectOutputDir")
-    logger.info(f"Executing analysis (model={model_name}, mode={pipeline_mode}).")
+    logger.info(
+        f"Executing analysis (model={model_name}, mode={pipeline_mode}, min_poc_severity={min_poc_severity})."
+    )
 
     batch_size = job.get("batchSize")
 
@@ -251,6 +259,7 @@ def _run_orchestrator():
             batch_size,
             pipeline_mode,
             ingest_path=ingest_path,
+            min_poc_severity=min_poc_severity,
             bucket=bucket,
             project_name=repo_name,
             project_output_dir=project_output_dir,
@@ -267,6 +276,7 @@ def _run_orchestrator():
             ingest_path=ingest_path,
             diff_base=diff_base,
             diff_head=diff_head,
+            min_poc_severity=min_poc_severity,
             bucket=bucket,
             project_name=repo_name,
             project_output_dir=project_output_dir,

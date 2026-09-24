@@ -73,10 +73,19 @@ def _assemble_ground_truth_poc_bundle(
         ):
             finding.poc_verified = False
 
-    status_lines = [
-        f"- **Baseline Lines Modified/Deleted**: `{removed_baseline_lines}`",
-        f"- **Production Code Modified**: `{prod_modified}`",
-    ]
+    status_lines = []
+    if getattr(finding, "cwe", None):
+        status_lines.append(f"- **MITRE CWE**: `{finding.cwe}`")
+    if getattr(finding, "attack_boundary", None):
+        status_lines.append(f"- **Attack Boundary**: `{finding.attack_boundary}`")
+    if getattr(finding, "demonstrated_impact", None):
+        status_lines.append(f"- **Demonstrated Impact**: `{finding.demonstrated_impact}`")
+    status_lines.extend(
+        [
+            f"- **Baseline Lines Modified/Deleted**: `{removed_baseline_lines}`",
+            f"- **Production Code Modified**: `{prod_modified}`",
+        ]
+    )
     if has_test_execution:
         status_lines.append(
             f"- **Final Command Exit Code**: `{sandbox.command_history[-1].returncode}`"
@@ -148,6 +157,29 @@ async def poc_creation_phase(
     batch_size = ctx.state["batch_size"]
     code_dir = ctx.state.get("code_dir", "target")
     run_dir = ctx.state.get("run_dir") or "."
+    min_poc_severity = ctx.state.get("min_poc_severity", "Medium")
+
+    vulnerabilities = [
+        Vulnerability.model_validate(v) if isinstance(v, dict) else v for v in vulnerabilities
+    ]
+    has_eligible = any(
+        getattr(v, "status", Status.OPEN) == Status.OPEN
+        and v.severity.meets_threshold(min_poc_severity)
+        for v in vulnerabilities
+    )
+    if not has_eligible:
+        for v in vulnerabilities:
+            if getattr(v, "status", Status.OPEN) != Status.OPEN:
+                v.add_skipped(phase_id, phase_name, f"Skipped: Status is {v.status}")
+            else:
+                v.add_skipped(
+                    phase_id,
+                    phase_name,
+                    f"Skipped: Severity ({v.severity.value}) is below minimum PoC threshold ({min_poc_severity}).",
+                )
+        ctx.state["vulnerabilities"] = vulnerabilities
+        checkpoint_audit_findings(ctx, vulnerabilities, phase_id)
+        return vulnerabilities
 
     exploiter_tools = get_exploiter_tools(enable_project_expert=enable_project_expert)
     exploiter_instruction = build_exploiter_instruction(
@@ -177,6 +209,14 @@ async def poc_creation_phase(
 
             if getattr(vuln, "status", Status.OPEN) != Status.OPEN:
                 vuln.add_skipped(phase_id, phase_name, f"Skipped: Status is {vuln.status}")
+                return vuln
+
+            if not vuln.severity.meets_threshold(min_poc_severity):
+                vuln.add_skipped(
+                    phase_id,
+                    phase_name,
+                    f"Skipped: Severity ({vuln.severity.value}) is below minimum PoC threshold ({min_poc_severity}).",
+                )
                 return vuln
 
             finding_payload = vuln.model_dump_json(indent=2, exclude={"poc"})

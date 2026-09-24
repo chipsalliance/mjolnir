@@ -59,6 +59,23 @@ async def _run_review_pass(
     code_dir = ctx.state.get("code_dir", "target")
     run_dir = ctx.state.get("run_dir")
 
+    vulnerabilities = [
+        Vulnerability.model_validate(v) if isinstance(v, dict) else v for v in vulnerabilities
+    ]
+    has_eligible = any(
+        getattr(v, "status", Status.OPEN) == Status.OPEN and (not evaluate_poc or bool(v.poc))
+        for v in vulnerabilities
+    )
+    if not has_eligible:
+        for v in vulnerabilities:
+            if getattr(v, "status", Status.OPEN) != Status.OPEN:
+                v.add_skipped(phase_id, phase_name, f"Skipped: Status is {v.status}")
+            else:
+                v.add_skipped(phase_id, phase_name, "Skipped: No PoC generated for this finding.")
+        ctx.state["vulnerabilities"] = vulnerabilities
+        checkpoint_audit_findings(ctx, vulnerabilities, phase_id)
+        return vulnerabilities
+
     reviewer_tools = get_reviewer_tools(enable_project_expert=enable_project_expert)
     reviewer_instruction = build_reviewer_instruction(
         threat_model,
@@ -89,6 +106,14 @@ async def _run_review_pass(
 
             if getattr(vuln, "status", Status.OPEN) != Status.OPEN:
                 vuln.add_skipped(phase_id, phase_name, f"Skipped: Status is {vuln.status}")
+                return vuln
+
+            if evaluate_poc and not vuln.poc:
+                vuln.add_skipped(
+                    phase_id,
+                    phase_name,
+                    "Skipped: No PoC generated for this finding.",
+                )
                 return vuln
 
             exclude_fields = set() if evaluate_poc else {"poc"}
