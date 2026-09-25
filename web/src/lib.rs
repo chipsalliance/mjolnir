@@ -15,7 +15,7 @@ pub fn get_supported_schemas() -> String {
 }
 
 /// Schema V1 definition for Mjolnir Vulnerability Findings
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct VulnerabilityV1 {
     pub id: Option<String>,
     pub title: Option<String>,
@@ -31,6 +31,14 @@ pub struct VulnerabilityV1 {
     pub poc: Option<String>,
     pub poc_verified: Option<bool>,
     pub test_command: Option<String>,
+    pub cwe: Option<String>,
+    pub attack_boundary: Option<String>,
+    pub demonstrated_impact: Option<String>,
+    pub verdict: Option<String>,
+    pub cvss_score: Option<f64>,
+    pub cvss_vector: Option<String>,
+    pub security_objective_violation: Option<String>,
+    pub history: Option<Vec<serde_json::Value>>,
     pub duplicate_of: Option<String>,
 }
 
@@ -103,7 +111,7 @@ impl RunMetadataV1 {
 
 /// Unified presentation item - Decouples UI rendering from underlying schema versions.
 /// All frontend views (tables, Sankey flow, filters) render this normalized model.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct NormalizedVulnerability {
     pub id: String,
     pub title: String,
@@ -119,6 +127,14 @@ pub struct NormalizedVulnerability {
     pub poc: String,
     pub poc_verified: Option<bool>,
     pub test_command: String,
+    pub cwe: Option<String>,
+    pub attack_boundary: Option<String>,
+    pub demonstrated_impact: Option<String>,
+    pub verdict: Option<String>,
+    pub cvss_score: Option<f64>,
+    pub cvss_vector: Option<String>,
+    pub security_objective_violation: Option<String>,
+    pub history: Option<Vec<serde_json::Value>>,
     #[serde(default)]
     pub duplicate_of: String,
     pub schema_version: String,
@@ -270,6 +286,14 @@ impl From<VulnerabilityV1> for NormalizedVulnerability {
             poc: poc_str,
             poc_verified: inferred_verified,
             test_command: v.test_command.unwrap_or_default(),
+            cwe: v.cwe,
+            attack_boundary: v.attack_boundary,
+            demonstrated_impact: v.demonstrated_impact,
+            verdict: v.verdict,
+            cvss_score: v.cvss_score,
+            cvss_vector: v.cvss_vector,
+            security_objective_violation: v.security_objective_violation,
+            history: v.history,
             duplicate_of: v.duplicate_of.unwrap_or_default(),
             schema_version: "v1".to_string(),
         }
@@ -466,6 +490,32 @@ fn parse_vulnerabilities(vulnerabilities_json: &str) -> Vec<NormalizedVulnerabil
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
+                let cwe = val
+                    .get("cwe")
+                    .and_then(|v| v.as_str())
+                    .map(ToString::to_string);
+                let attack_boundary = val
+                    .get("attack_boundary")
+                    .and_then(|v| v.as_str())
+                    .map(ToString::to_string);
+                let demonstrated_impact = val
+                    .get("demonstrated_impact")
+                    .and_then(|v| v.as_str())
+                    .map(ToString::to_string);
+                let verdict = val
+                    .get("verdict")
+                    .and_then(|v| v.as_str())
+                    .map(ToString::to_string);
+                let cvss_score = val.get("cvss_score").and_then(|v| v.as_f64());
+                let cvss_vector = val
+                    .get("cvss_vector")
+                    .and_then(|v| v.as_str())
+                    .map(ToString::to_string);
+                let security_objective_violation = val
+                    .get("security_objective_violation")
+                    .and_then(|v| v.as_str())
+                    .map(ToString::to_string);
+                let history = val.get("history").and_then(|v| v.as_array()).cloned();
                 let duplicate_of = val
                     .get("duplicate_of")
                     .and_then(|v| v.as_str())
@@ -487,6 +537,14 @@ fn parse_vulnerabilities(vulnerabilities_json: &str) -> Vec<NormalizedVulnerabil
                     poc,
                     poc_verified,
                     test_command,
+                    cwe,
+                    attack_boundary,
+                    demonstrated_impact,
+                    verdict,
+                    cvss_score,
+                    cvss_vector,
+                    security_objective_violation,
+                    history,
                     duplicate_of,
                     schema_version: "v1".to_string(),
                 }
