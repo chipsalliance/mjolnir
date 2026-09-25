@@ -7,6 +7,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 
@@ -17,11 +18,21 @@ from constants import (
     POC_ARTIFACTS_SUBDIR,
     POC_WORKTREES_SUBDIR,
     SANDBOX_ALLOWED_ENV_VARS,
-    TEST_DIRECTORY_NAMES,
-    TEST_FILE_SUFFIXES,
+    TEST_PATH_TOKENS,
 )
 from utilities.command import run_command_capture
 from utilities.logger import logger
+
+# Splits path segments and filename stems into individual word tokens across
+# non-alphanumeric delimiters ('_', '-', '.'), CamelCase, and acronym boundaries:
+#   - [A-Z]?[a-z]+       : lowercase or TitleCase words (e.g. "test", "Foo", "Test")
+#   - [A-Z]+(?=[A-Z]|$)  : uppercase acronyms before another Capitalized word or end (e.g. "HTTP" in "HTTPTest")
+#   - [0-9]+             : numeric runs (e.g. "10" in "ast10x0")
+# Examples:
+#   "foo_test.spec" -> ["foo", "test", "spec"]
+#   "HTTPTest"      -> ["HTTP", "Test"]
+#   "dpe_attest"    -> ["dpe", "attest"]
+PATH_WORD_TOKEN_RE = re.compile(r"[A-Z]?[a-z]+|[A-Z]+(?=[A-Z]|$)|[0-9]+")
 
 
 @dataclass
@@ -240,14 +251,18 @@ class WorktreeSandbox:
 
     def is_test_or_harness_path(self, rel_path: str) -> bool:
         """Checks if a file path belongs to a test suite or harness/build configuration."""
-        p = Path(rel_path.lower())
-        if any(p.name.startswith(prefix) for prefix in (".mjolnir_tags", "tags")):
+        p = Path(rel_path)
+        lower_name = p.name.lower()
+        if lower_name.startswith((".mjolnir_tags", "tags")):
             return True
-        if any(part in TEST_DIRECTORY_NAMES for part in p.parts):
+        if lower_name in BUILD_CONFIGURATION_FILES:
             return True
-        if any(p.name.endswith(suffix) for suffix in TEST_FILE_SUFFIXES):
-            return True
-        return p.name in BUILD_CONFIGURATION_FILES
+        tokens = {
+            tok.lower()
+            for part in (*p.parts[:-1], p.stem)
+            for tok in PATH_WORD_TOKEN_RE.findall(part)
+        }
+        return bool(tokens & TEST_PATH_TOKENS)
 
     def has_production_code_modifications(self) -> bool:
         """Returns True if any non-test, non-harness production source file was modified or added."""
