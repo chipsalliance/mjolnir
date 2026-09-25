@@ -4,6 +4,6 @@
   name = "adk-gemini-test";
   srcDirs = [ "src" ];
   maxFiles = 5;
-  model = "gemini-3.6-flash";
+  model = "gemini-3.8-flash";
   extensions = [ "rs" ];
 }

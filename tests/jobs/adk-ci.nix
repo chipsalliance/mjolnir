@@ -4,5 +4,5 @@
   name = "adk-ci-test";
   diffBase = "HEAD~1";
   diffHead = "HEAD";
-  model = "gemini-3.6-flash";
+  model = "gemini-3.8-flash";
 }

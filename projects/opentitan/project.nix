@@ -8,7 +8,7 @@
   outputDir = "./test-out/results";
   workspaceDir = "./test-out/workspace";
 
-  defaultModel = "gemini-3.6-flash";
+  defaultModel = "gemini-3.8-flash";
   defaultRef = "earlgrey_1.0.0";
   defaultBatchSize = 64;
   defaultExtensions = [ "rs" "c" "h" "sv" ];
