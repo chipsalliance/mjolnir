@@ -7,6 +7,8 @@ import uuid
 from tqdm import tqdm
 
 from constants import (
+    PHASE_DEDUPLICATION_ID,
+    PHASE_DEDUPLICATION_NAME,
     PHASE_DISCOVERY_ID,
     PHASE_DISCOVERY_NAME,
     PHASE_FINAL_REVIEW_ID,
@@ -37,7 +39,10 @@ def run_analysis(
     batch_size: int,
     mode: str,
     ingest_path: str = None,
-) -> list:
+    bucket: str = None,
+    project_name: str = None,
+    project_output_dir: str = None,
+) -> tuple[list, str]:
     """Instantly returns hardcoded mock findings and compiles a mock flow history for testing."""
 
     if mode == PIPELINE_MODE_FULL:
@@ -86,8 +91,41 @@ def run_analysis(
             finding=audit_finding,
         )
 
-        # 2. Simulate Initial Review
-        # We vary status to test all flow branches (kept, downgraded, FP/discarded, skipped/kept)
+        # 2. Simulate Upfront Deduplication (Phase 2)
+        from data.deduplication_finding import DeduplicationFinding
+
+        # Every 5th finding is simulated as a duplicate
+        if idx > 0 and idx % 5 == 0:
+            vuln.add(
+                phase_id=PHASE_DEDUPLICATION_ID,
+                phase_name=PHASE_DEDUPLICATION_NAME,
+                finding=DeduplicationFinding(
+                    status=Status.DUPLICATE,
+                    duplicate_of="historical/mock_run/vuln_0",
+                    justification="Mock duplicate of prior run finding.",
+                ),
+            )
+        else:
+            vuln.add(
+                phase_id=PHASE_DEDUPLICATION_ID,
+                phase_name=PHASE_DEDUPLICATION_NAME,
+                finding=DeduplicationFinding(
+                    status=Status.OPEN,
+                    duplicate_of=None,
+                    justification="Unique mock finding.",
+                ),
+            )
+
+        # 3. Simulate Initial Review (only if still Open!)
+        if vuln.status != Status.OPEN:
+            vuln.add_skipped(
+                phase_id=PHASE_INITIAL_REVIEW_ID,
+                phase_name=PHASE_INITIAL_REVIEW_NAME,
+                justification=f"Skipped: Status is {vuln.status}",
+            )
+            all_vulnerabilities.append(vuln)
+            continue
+
         case = idx % 4
 
         if case == 0:

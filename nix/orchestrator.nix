@@ -29,6 +29,7 @@ let
       diffBase = job.diffBase or null;
       diffHead = job.diffHead or "HEAD";
       localDir = job.localDir or null;
+      bucket = job.bucket or project.bucket or null;
     };
 
     config = {

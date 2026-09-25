@@ -253,6 +253,16 @@ REVIEW_WITH_POC_TASK_PROMPT_TEMPLATE = (
     "### Generated Proof-of-Concept (PoC) to Verify:\n```\n{poc}\n```"
 )
 
+DEDUPLICATION_TASK_PROMPT_TEMPLATE = """Evaluate candidate vulnerabilities from the current scan against historical Open findings (if any) and intra-run occurrences.
+
+### Historical Open Vulnerabilities:
+{historical_open_json}
+
+### Current Candidate Findings:
+{current_open_json}
+
+Produce a DeduplicationReport declaring whether each candidate finding duplicates an existing canonical finding or is unique."""
+
 POC_CREATION_TASK_PROMPT_TEMPLATE = (
     "Synthesize and execute a Proof-of-Concept (PoC) unit test in your isolated "
     "sandbox to verify the following security finding:\n\n"
@@ -291,3 +301,5 @@ TOOL_ERROR_PREFIXES = ("Error:", "Error executing", "Error ")
 API_VERSION = "v1"
 RUNS_SUBDIR = f"{API_VERSION}/runs"
 WEB_SUBDIR = "web"
+VULNERABILITIES_FILENAME = "vulnerabilities.json"
+VULNERABILITIES_MINIMAL_FILENAME = "vulnerabilities_minimal.json"
