@@ -20,6 +20,12 @@ class HistoricalFinding(BaseModel):
     verdict: Optional[Verdict] = None
     justification: Optional[str] = None
     attack_vector: Optional[str] = None
+    cwe: Optional[str] = None
+    attack_boundary: Optional[str] = None
+    demonstrated_impact: Optional[str] = None
+    cvss_score: Optional[float] = None
+    cvss_vector: Optional[str] = None
+    security_objective_violation: Optional[str] = None
     poc: Optional[str] = None
     poc_verified: Optional[bool] = None
     test_command: Optional[str] = None
