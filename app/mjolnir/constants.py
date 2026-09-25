@@ -79,23 +79,22 @@ SANDBOX_IGNORED_DIRS = frozenset(
 POC_VERIFIED_TRUE_MARKER = "`poc_verified`: `True`"
 
 # --- Worktree Sandbox & Anti-Cheat Gate Constants ---
-TEST_DIRECTORY_NAMES = frozenset({"tests", "test", "testing", "spec", "specs", "fuzz", "benches"})
-
-TEST_FILE_SUFFIXES = (
-    "_test.rs",
-    "_test.go",
-    "_test.py",
-    "_test.c",
-    "_test.cpp",
-    "_test.cc",
-    "test.rs",
-    "test.py",
-    "test.go",
-    "test.java",
-    ".spec.ts",
-    ".test.ts",
-    ".spec.js",
-    ".test.js",
+TEST_PATH_TOKENS = frozenset(
+    {
+        "test",
+        "tests",
+        "testing",
+        "unittest",
+        "unittests",
+        "spec",
+        "specs",
+        "fuzz",
+        "bench",
+        "benches",
+        "mock",
+        "mocks",
+        "harness",
+    }
 )
 
 BUILD_CONFIGURATION_FILES = frozenset(
