@@ -31,6 +31,7 @@ pub struct VulnerabilityV1 {
     pub poc: Option<String>,
     pub poc_verified: Option<bool>,
     pub test_command: Option<String>,
+    pub duplicate_of: Option<String>,
 }
 
 /// Schema V1 Metadata definition
@@ -118,6 +119,8 @@ pub struct NormalizedVulnerability {
     pub poc: String,
     pub poc_verified: Option<bool>,
     pub test_command: String,
+    #[serde(default)]
+    pub duplicate_of: String,
     pub schema_version: String,
 }
 
@@ -267,6 +270,7 @@ impl From<VulnerabilityV1> for NormalizedVulnerability {
             poc: poc_str,
             poc_verified: inferred_verified,
             test_command: v.test_command.unwrap_or_default(),
+            duplicate_of: v.duplicate_of.unwrap_or_default(),
             schema_version: "v1".to_string(),
         }
     }
@@ -341,6 +345,7 @@ impl std::ops::Deref for VulnerabilityFindings {
 pub struct RunSummary {
     pub total: usize,
     pub open: usize,
+    pub duplicate: usize,
     pub critical: usize,
     pub high: usize,
     pub medium: usize,
@@ -461,6 +466,11 @@ fn parse_vulnerabilities(vulnerabilities_json: &str) -> Vec<NormalizedVulnerabil
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
+                let duplicate_of = val
+                    .get("duplicate_of")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
 
                 NormalizedVulnerability {
                     id,
@@ -477,6 +487,7 @@ fn parse_vulnerabilities(vulnerabilities_json: &str) -> Vec<NormalizedVulnerabil
                     poc,
                     poc_verified,
                     test_command,
+                    duplicate_of,
                     schema_version: "v1".to_string(),
                 }
             })
@@ -591,9 +602,14 @@ pub fn compute_summary(vulnerabilities_json: &str) -> String {
         schema_version: "v1".to_string(),
         ..Default::default()
     };
-    summary.total = vulns.len();
-
     for v in &vulns {
+        if v.status.eq_ignore_ascii_case("Duplicate") {
+            summary.duplicate += 1;
+            continue;
+        }
+
+        summary.total += 1;
+
         if v.status.eq_ignore_ascii_case("Open") {
             summary.open += 1;
         }
@@ -637,16 +653,18 @@ pub fn filter_vulnerabilities(
     let mut filtered: Vec<NormalizedVulnerability> = vulns
         .into_iter()
         .filter(|v| {
-            // Status check
-            if !status_target.is_empty() && status_target != "all" {
-                let v_stat = v.status.to_lowercase();
-                if status_target == "closed" || status_target == "resolved" {
-                    if v_stat == "open" {
-                        return false;
-                    }
-                } else if v_stat != status_target {
+            let v_stat = v.status.to_lowercase();
+            // Status check: hide duplicates by default unless explicitly filtering for "duplicate"
+            if status_target.is_empty() || status_target == "all" {
+                if v_stat == "duplicate" {
                     return false;
                 }
+            } else if status_target == "closed" || status_target == "resolved" {
+                if v_stat == "open" || v_stat == "duplicate" {
+                    return false;
+                }
+            } else if v_stat != status_target {
+                return false;
             }
 
             // Severity check
@@ -1155,5 +1173,63 @@ mod tests {
         assert!(rows.contains("Phase 2: Initial Review - High (count: 1)"));
         assert!(rows.contains("Phase 3: PoC Creation - High (count: 1)"));
         assert!(rows.contains("Phase 4: Final Review - High (count: 1)"));
+    }
+
+    #[test]
+    fn test_duplicates_hidden_by_default_in_summary_and_filters() {
+        let vulns_json = r#"[
+            {
+                "title": "Canonical Vulnerability",
+                "severity": "High",
+                "file": "src/auth.rs",
+                "status": "Open"
+            },
+            {
+                "title": "Duplicate Vulnerability",
+                "severity": "High",
+                "file": "src/auth.rs",
+                "status": "Duplicate",
+                "duplicate_of": "job_a/run_123/vuln_1"
+            },
+            {
+                "title": "Closed Vulnerability",
+                "severity": "Medium",
+                "file": "src/lib.rs",
+                "status": "Closed"
+            }
+        ]"#;
+
+        let summary_str = compute_summary(vulns_json);
+        let summary: RunSummary = serde_json::from_str(&summary_str).unwrap();
+        assert_eq!(summary.total, 2);
+        assert_eq!(summary.open, 1);
+        assert_eq!(summary.high, 1);
+        assert_eq!(summary.medium, 1);
+        assert_eq!(summary.duplicate, 1);
+
+        // Default "all" filter hides Duplicate findings
+        let default_filtered: Vec<NormalizedVulnerability> = serde_json::from_str(
+            &filter_vulnerabilities(vulns_json, "", "ALL", "all", "sev-desc"),
+        )
+        .unwrap();
+        assert_eq!(default_filtered.len(), 2);
+        assert!(default_filtered.iter().all(|v| v.status != "Duplicate"));
+
+        // "closed" filter also hides Duplicate findings
+        let closed_filtered: Vec<NormalizedVulnerability> = serde_json::from_str(
+            &filter_vulnerabilities(vulns_json, "", "ALL", "closed", "sev-desc"),
+        )
+        .unwrap();
+        assert_eq!(closed_filtered.len(), 1);
+        assert_eq!(closed_filtered[0].status, "Closed");
+
+        // Explicit "duplicate" filter reveals Duplicate findings
+        let dup_filtered: Vec<NormalizedVulnerability> = serde_json::from_str(
+            &filter_vulnerabilities(vulns_json, "", "ALL", "duplicate", "sev-desc"),
+        )
+        .unwrap();
+        assert_eq!(dup_filtered.len(), 1);
+        assert_eq!(dup_filtered[0].status, "Duplicate");
+        assert_eq!(dup_filtered[0].duplicate_of, "job_a/run_123/vuln_1");
     }
 }

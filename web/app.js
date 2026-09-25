@@ -1156,6 +1156,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
           <option value="all" selected>All Statuses</option>
           <option value="open">Open</option>
           <option value="closed">Closed / Resolved</option>
+          <option value="duplicate">Duplicates</option>
         </select>
         <select id="sort-select" class="select-input">
           <option value="sev-desc" selected>Sort: Severity High-Low</option>
@@ -1391,6 +1392,12 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         `;
       }
 
+      const duplicateBannerHtml = v.duplicate_of
+        ? `<div style="margin-bottom: 14px; padding: 8px 12px; border-radius: 6px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3);">
+             <strong style="color: #f59e0b;">Duplicate Of:</strong> <code>${escapeHtml(v.duplicate_of)}</code>
+           </div>`
+        : "";
+
       document.getElementById("modal-title").textContent = v.title || "Finding Details";
       document.getElementById("modal-body").innerHTML = `
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
@@ -1401,6 +1408,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
           </div>
           <button id="btn-copy-finding-link" class="btn btn-secondary" style="font-size: 0.75rem;">Copy Direct Link</button>
         </div>
+        ${duplicateBannerHtml}
         <h4 style="margin-bottom: 6px; font-weight: 600;">Description</h4>
         <p style="color: var(--text-secondary); margin-bottom: 16px; line-height: 1.55;">${formatMarkdownText(v.description || 'No description provided.')}</p>
 
