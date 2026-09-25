@@ -60,6 +60,9 @@ PHASE_INITIAL_REVIEW_NAME = "Initial Review"
 
 PHASE_POC_CREATION_ID = "poc_creation"
 PHASE_POC_CREATION_NAME = "PoC Creation"
+
+PHASE_DEDUPLICATION_ID = "deduplication"
+PHASE_DEDUPLICATION_NAME = "Deduplication"
 POC_WORKTREES_SUBDIR = "poc_worktrees"
 POC_ARTIFACTS_SUBDIR = "poc_artifacts"
 CARGO_TARGET_CACHE_SUBDIR = ".cargo_target_cache"

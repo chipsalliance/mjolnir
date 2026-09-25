@@ -23,3 +23,4 @@ class HistoricalFinding(BaseModel):
     poc: Optional[str] = None
     poc_verified: Optional[bool] = None
     test_command: Optional[str] = None
+    duplicate_of: Optional[str] = None
