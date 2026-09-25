@@ -56,6 +56,11 @@ def _run_orchestrator():
         choices=["fast", "full"],
         help="Pipeline depth mode: 'fast' (discovery + initial review) or 'full' (adds project expert and deep verification)",
     )
+    parser.add_argument(
+        "--min-poc-severity",
+        choices=["Informational", "Low", "Medium", "High", "Critical", "None"],
+        help="Minimum finding severity required to synthesize a PoC in full mode (default: Medium)",
+    )
     args, unknown_args = parser.parse_known_args()
 
     if not args.spec:
@@ -226,7 +231,10 @@ def _run_orchestrator():
 
     # Execute analysis via selected model
     pipeline_mode = args.mode or job.get("mode")
-    logger.info(f"Executing analysis (model={model_name}, mode={pipeline_mode}).")
+    min_poc_severity = args.min_poc_severity or job.get("minPocSeverity") or "Medium"
+    logger.info(
+        f"Executing analysis (model={model_name}, mode={pipeline_mode}, min_poc_severity={min_poc_severity})."
+    )
 
     batch_size = job.get("batchSize")
 
@@ -240,6 +248,7 @@ def _run_orchestrator():
             batch_size,
             pipeline_mode,
             ingest_path=ingest_path,
+            min_poc_severity=min_poc_severity,
         )
     else:
         vulnerabilities, status = adk.run_analysis(
@@ -253,6 +262,7 @@ def _run_orchestrator():
             ingest_path=ingest_path,
             diff_base=diff_base,
             diff_head=diff_head,
+            min_poc_severity=min_poc_severity,
         )
 
     # Update metadata with status

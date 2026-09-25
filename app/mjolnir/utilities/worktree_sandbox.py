@@ -251,7 +251,26 @@ class WorktreeSandbox:
 
     def has_production_code_modifications(self) -> bool:
         """Returns True if any non-test, non-harness production source file was modified or added."""
-        return any(not self.is_test_or_harness_path(rel) for rel in self.get_modified_files())
+        for rel in self.get_modified_files():
+            if self.is_test_or_harness_path(rel):
+                continue
+            # If a source file was modified, verify that no existing baseline lines were removed
+            diff = self._run_git("diff", "HEAD", "--", rel).stdout
+            if any(
+                line.startswith("-") and not line.startswith("---") for line in diff.splitlines()
+            ):
+                return True
+            # In languages like Rust, tests can be inline (e.g. #[cfg(test)] mod tests).
+            # If all additions belong to test modules/functions, treat as test code.
+            if (
+                "#[test]" in diff
+                or "#[cfg(test)]" in diff
+                or "mod tests" in diff
+                or "mod test" in diff
+            ):
+                continue
+            return True
+        return False
 
     def count_removed_baseline_lines(self) -> int:
         """Counts existing baseline lines deleted or modified in non-test production files."""

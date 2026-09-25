@@ -149,6 +149,7 @@ def run_analysis(
     ingest_path: str = None,
     diff_base: str = None,
     diff_head: str = None,
+    min_poc_severity: str = "Medium",
 ) -> tuple[list[Vulnerability], str]:
     """ADK 2.0 provider pipeline: executes a multi-node workflow graph."""
     logger.info(f"Initializing ADK 2.0 Workflow Engine (mode={mode})...")
@@ -188,6 +189,7 @@ def run_analysis(
         "diff_head": diff_head,
         "run_dir": run_dir,
         "mode": mode,
+        "min_poc_severity": min_poc_severity,
         "enable_project_expert": enable_project_expert,
         "usage_tracker": usage_tracker,
         "project_expert_qa_history": [],
@@ -213,6 +215,7 @@ def run_analysis(
         "diff_head": diff_head,
         "run_dir": run_dir,
         "mode": mode,
+        "min_poc_severity": min_poc_severity,
         "enable_project_expert": enable_project_expert,
     }
 

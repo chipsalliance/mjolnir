@@ -10,6 +10,7 @@ let
 
   ref = job.ref or project.defaultRef or project.ref or job.commit or job.branch or job.tag or project.commit or "HEAD";
   mode = job.mode or project.defaultMode or "fast";
+  minPocSeverity = job.minPocSeverity or project.defaultMinPocSeverity or "Medium";
 
   jobSpec = {
     project = {
@@ -19,7 +20,7 @@ let
 
     job = {
       inherit (job) name;
-      inherit model batchSize extensions ref mode;
+      inherit model batchSize extensions ref mode minPocSeverity;
       srcDirs = job.srcDirs or [ "." ];
       excludeDirs = job.excludeDirs or project.defaultExcludeDirs or [ ];
       excludePatterns = job.excludePatterns or project.defaultExcludePatterns or [ ];

@@ -1256,9 +1256,12 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
                 ${(!filtered || filtered.length === 0)
                   ? `<tr><td colspan="4" style="text-align:center; color: var(--text-muted); padding: 30px;">No matching findings found.</td></tr>`
                   : filtered.map((v, idx) => {
+                    const pocSkipped = !v.poc && (v.history || []).some(h => h.phase_id === "poc_creation" && h.severity === "Skipped");
                     const pocBadge = v.poc_verified === true
                       ? ` <span class="badge" style="background-color: rgba(16, 185, 129, 0.18); color: #10b981; margin-left: 6px; font-size: 0.7rem;">PoC Verified</span>`
-                      : (v.poc ? ` <span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: var(--text-secondary); margin-left: 6px; font-size: 0.7rem;">PoC Attempted</span>` : "");
+                      : (v.poc
+                        ? ` <span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: var(--text-secondary); margin-left: 6px; font-size: 0.7rem;">PoC Attempted</span>`
+                        : (pocSkipped ? ` <span class="badge" style="background-color: rgba(148, 163, 184, 0.12); color: var(--text-muted); margin-left: 6px; font-size: 0.7rem;">No PoC (Skipped)</span>` : ""));
                     return `
                     <tr class="clickable-row" onclick="window.showFindingModal(${idx})">
                       <td><span class="badge badge-${v.severity || 'LOW'}">${v.severity || 'LOW'}</span></td>
@@ -1333,9 +1336,12 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         return parts.join("");
       };
 
+      const pocSkipped = !v.poc && (v.history || []).some(h => h.phase_id === "poc_creation" && h.severity === "Skipped");
       const pocBadgeHtml = v.poc_verified === true
         ? `<span class="badge" style="background-color: rgba(16, 185, 129, 0.18); color: #10b981; margin-left: 8px;">PoC Verified</span>`
-        : (v.poc_verified === false ? `<span class="badge" style="background-color: rgba(245, 158, 11, 0.18); color: #f59e0b; margin-left: 8px;">PoC Unverified (Static/Harness Limit)</span>` : "");
+        : (v.poc_verified === false
+          ? `<span class="badge" style="background-color: rgba(245, 158, 11, 0.18); color: #f59e0b; margin-left: 8px;">PoC Unverified (Static/Harness Limit)</span>`
+          : (pocSkipped ? `<span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: var(--text-muted); margin-left: 8px;">No PoC (Skipped)</span>` : ""));
 
       const artifactPrefix = `${RUNS_SUBDIR}/${proj}/${job}/${runId}/poc_artifacts/${v.id}`;
       const artifactLinksHtml = (v.id && v.poc)

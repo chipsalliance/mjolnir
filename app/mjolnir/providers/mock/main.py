@@ -37,6 +37,7 @@ def run_analysis(
     batch_size: int,
     mode: str,
     ingest_path: str = None,
+    min_poc_severity: str = "Medium",
 ) -> list:
     """Instantly returns hardcoded mock findings and compiles a mock flow history for testing."""
 
@@ -151,7 +152,29 @@ def run_analysis(
 
         # 3 & 4. Simulate PoC Creation & Final Review in full mode
         if mode == PIPELINE_MODE_FULL:
-            if vuln.status == Status.OPEN:
+            if vuln.status != Status.OPEN:
+                vuln.add_skipped(
+                    phase_id=PHASE_POC_CREATION_ID,
+                    phase_name=PHASE_POC_CREATION_NAME,
+                    justification=f"Skipped: Status is {vuln.status}",
+                )
+                vuln.add_skipped(
+                    phase_id=PHASE_FINAL_REVIEW_ID,
+                    phase_name=PHASE_FINAL_REVIEW_NAME,
+                    justification=f"Skipped: Status is {vuln.status}",
+                )
+            elif not vuln.severity.meets_threshold(min_poc_severity):
+                vuln.add_skipped(
+                    phase_id=PHASE_POC_CREATION_ID,
+                    phase_name=PHASE_POC_CREATION_NAME,
+                    justification=f"Skipped: Severity ({vuln.severity.value}) is below minimum PoC threshold ({min_poc_severity}).",
+                )
+                vuln.add_skipped(
+                    phase_id=PHASE_FINAL_REVIEW_ID,
+                    phase_name=PHASE_FINAL_REVIEW_NAME,
+                    justification="Skipped: No PoC generated for this finding.",
+                )
+            else:
                 exploit_finding = ExploitFinding(
                     poc="```rust\n#[test]\nfn test_mock_poc() { assert_eq!(1, 1); }\n```",
                     test_command="cargo test test_mock_poc",
@@ -179,17 +202,6 @@ def run_analysis(
                     phase_id=PHASE_FINAL_REVIEW_ID,
                     phase_name=PHASE_FINAL_REVIEW_NAME,
                     finding=final_review,
-                )
-            else:
-                vuln.add_skipped(
-                    phase_id=PHASE_POC_CREATION_ID,
-                    phase_name=PHASE_POC_CREATION_NAME,
-                    justification=f"Skipped: Status is {vuln.status}",
-                )
-                vuln.add_skipped(
-                    phase_id=PHASE_FINAL_REVIEW_ID,
-                    phase_name=PHASE_FINAL_REVIEW_NAME,
-                    justification=f"Skipped: Status is {vuln.status}",
                 )
 
         all_vulnerabilities.append(vuln)
