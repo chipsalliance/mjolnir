@@ -17,6 +17,7 @@ DEFAULT_IGNORE_FILENAMES = [
     "MODULE.bazel.lock",
     "Cargo.lock",
     "package.json",
+    "cwe_catalog.json",
     ".gitignore",
     ".bazelignore",
     ".bazelversion",

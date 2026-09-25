@@ -1156,6 +1156,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
           <option value="all" selected>All Statuses</option>
           <option value="open">Open</option>
           <option value="closed">Closed / Resolved</option>
+          <option value="duplicate">Duplicates</option>
         </select>
         <select id="sort-select" class="select-input">
           <option value="sev-desc" selected>Sort: Severity High-Low</option>
@@ -1256,9 +1257,12 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
                 ${(!filtered || filtered.length === 0)
                   ? `<tr><td colspan="4" style="text-align:center; color: var(--text-muted); padding: 30px;">No matching findings found.</td></tr>`
                   : filtered.map((v, idx) => {
+                    const pocSkipped = !v.poc && (v.history || []).some(h => h.phase_id === "poc_creation" && h.severity === "Skipped");
                     const pocBadge = v.poc_verified === true
                       ? ` <span class="badge" style="background-color: rgba(16, 185, 129, 0.18); color: #10b981; margin-left: 6px; font-size: 0.7rem;">PoC Verified</span>`
-                      : (v.poc ? ` <span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: var(--text-secondary); margin-left: 6px; font-size: 0.7rem;">PoC Attempted</span>` : "");
+                      : (v.poc
+                        ? ` <span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: var(--text-secondary); margin-left: 6px; font-size: 0.7rem;">PoC Attempted</span>`
+                        : (pocSkipped ? ` <span class="badge" style="background-color: rgba(148, 163, 184, 0.12); color: var(--text-muted); margin-left: 6px; font-size: 0.7rem;">No PoC (Skipped)</span>` : ""));
                     return `
                     <tr class="clickable-row" onclick="window.showFindingModal(${idx})">
                       <td><span class="badge badge-${v.severity || 'LOW'}">${v.severity || 'LOW'}</span></td>
@@ -1333,9 +1337,12 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         return parts.join("");
       };
 
+      const pocSkipped = !v.poc && (v.history || []).some(h => h.phase_id === "poc_creation" && h.severity === "Skipped");
       const pocBadgeHtml = v.poc_verified === true
         ? `<span class="badge" style="background-color: rgba(16, 185, 129, 0.18); color: #10b981; margin-left: 8px;">PoC Verified</span>`
-        : (v.poc_verified === false ? `<span class="badge" style="background-color: rgba(245, 158, 11, 0.18); color: #f59e0b; margin-left: 8px;">PoC Unverified (Static/Harness Limit)</span>` : "");
+        : (v.poc_verified === false
+          ? `<span class="badge" style="background-color: rgba(245, 158, 11, 0.18); color: #f59e0b; margin-left: 8px;">PoC Unverified (Static/Harness Limit)</span>`
+          : (pocSkipped ? `<span class="badge" style="background-color: rgba(148, 163, 184, 0.15); color: var(--text-muted); margin-left: 8px;">No PoC (Skipped)</span>` : ""));
 
       const artifactPrefix = `${RUNS_SUBDIR}/${proj}/${job}/${runId}/poc_artifacts/${v.id}`;
       const artifactLinksHtml = (v.id && v.poc)
@@ -1391,16 +1398,87 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         `;
       }
 
+      const duplicateBannerHtml = v.duplicate_of
+        ? `<div style="margin-bottom: 14px; padding: 8px 12px; border-radius: 6px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3);">
+             <strong style="color: #f59e0b;">Duplicate Of:</strong> <code>${escapeHtml(v.duplicate_of)}</code>
+           </div>`
+        : "";
+
+      const cvssBadgeHtml = (v.cvss_score !== null && v.cvss_score !== undefined)
+        ? `<span class="badge" style="background-color: ${v.cvss_score >= 9.0 ? 'rgba(239, 68, 68, 0.2)' : v.cvss_score >= 7.0 ? 'rgba(249, 115, 22, 0.2)' : v.cvss_score >= 4.0 ? 'rgba(234, 179, 8, 0.2)' : 'rgba(59, 130, 246, 0.2)'}; color: ${v.cvss_score >= 9.0 ? 'var(--severity-critical)' : v.cvss_score >= 7.0 ? 'var(--severity-high)' : v.cvss_score >= 4.0 ? 'var(--severity-medium)' : 'var(--severity-low)'}; font-weight: 700; margin-left: 8px;" title="${escapeHtml(v.cvss_vector || '')}">CVSS ${Number(v.cvss_score).toFixed(1)}</span>`
+        : "";
+
+
+      // Classification & Metadata Grid (Always rendered)
+      const metaItems = [
+        `<div><span style="color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 2px;">Finding ID</span><code style="font-size: 0.78rem;">${escapeHtml(v.id || 'N/A')}</code></div>`,
+        `<div><span style="color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 2px;">Status</span>${renderStatusBadge(v.status || 'Open')}</div>`,
+        `<div><span style="color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 2px;">Verdict</span><span class="badge" style="background-color: rgba(99, 102, 241, 0.18); color: #818cf8;">${escapeHtml(v.verdict || 'Not Explicitly Reviewed')}</span></div>`,
+        `<div><span style="color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 2px;">CVSS v3.1</span>${(v.cvss_score !== null && v.cvss_score !== undefined) ? `<span class="badge" style="background-color: rgba(239, 68, 68, 0.15); color: #f87171; font-weight: 700;">${Number(v.cvss_score).toFixed(1)}</span> ${v.cvss_vector ? `<code style="font-size: 0.68rem; margin-left: 4px; word-break: break-all;">${escapeHtml(v.cvss_vector)}</code>` : ''}` : `<span style="color: var(--text-muted); font-size: 0.8rem;">Unscored</span>`}</div>`,
+        `<div><span style="color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 2px;">MITRE CWE</span>${v.cwe ? `<span class="badge" style="background-color: rgba(59, 130, 246, 0.18); color: #60a5fa; font-weight: 600;">${escapeHtml(v.cwe)}</span>` : `<span style="color: var(--text-muted); font-size: 0.8rem;">Unclassified</span>`}</div>`,
+        `<div><span style="color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 2px;">Root Security Objective</span>${v.security_objective_violation ? `<span class="badge" style="background-color: rgba(220, 38, 38, 0.2); color: #fca5a5; font-weight: 700;">${escapeHtml(v.security_objective_violation)}</span>` : `<span style="color: var(--text-muted); font-size: 0.8rem;">Unassigned</span>`}</div>`,
+        `<div><span style="color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 2px;">Attack Boundary</span>${v.attack_boundary ? `<span class="badge" style="background-color: rgba(234, 179, 8, 0.15); color: #facc15;">${escapeHtml(v.attack_boundary)}</span>` : `<span style="color: var(--text-muted); font-size: 0.8rem;">Unassigned</span>`}</div>`,
+        `<div><span style="color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 2px;">Demonstrated Impact</span>${v.demonstrated_impact ? `<span class="badge" style="background-color: rgba(239, 68, 68, 0.18); color: #f87171;">${escapeHtml(v.demonstrated_impact)}</span>` : `<span style="color: var(--text-muted); font-size: 0.8rem;">Unassigned</span>`}</div>`
+      ];
+
+
+      const metadataGridHtml = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 18px;">
+          ${metaItems.join("")}
+        </div>`;
+
+      const testCommandHtml = v.test_command
+        ? `<h4 style="margin-bottom: 6px; margin-top: 16px; font-weight: 600;">Reproducer Test Command</h4>
+           <div style="background: var(--bg-main, #0f172a); padding: 10px 14px; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 16px;">
+             <code style="font-size: 0.8rem; color: #38bdf8; word-break: break-all;">${escapeHtml(v.test_command)}</code>
+           </div>`
+        : "";
+
+      let historyHtml = "";
+      if (v.history && v.history.length > 0) {
+        const historyRows = v.history.map(h => {
+          const statusBadge = h.status ? renderStatusBadge(h.status) : "";
+          const sevBadge = h.severity ? `<span class="badge badge-${h.severity}" style="font-size: 0.7rem;">${h.severity}</span>` : "";
+          return `
+            <tr style="border-bottom: 1px solid var(--border); font-size: 0.8rem;">
+              <td style="padding: 6px 10px; font-weight: 600; color: var(--text-primary);">${escapeHtml(h.phase_name || h.phase_id)}</td>
+              <td style="padding: 6px 10px;">${statusBadge} ${sevBadge}</td>
+              <td style="padding: 6px 10px; color: var(--text-secondary);">${escapeHtml(h.justification || h.verdict || '-')}</td>
+            </tr>
+          `;
+        }).join("");
+
+        historyHtml = `
+          <h4 style="margin-bottom: 6px; margin-top: 16px; font-weight: 600;">Phase Progression & Lifecycle</h4>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--bg-card);">
+            <thead>
+              <tr style="background: var(--bg-primary); text-align: left; font-size: 0.75rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">
+                <th style="padding: 6px 10px;">Phase</th>
+                <th style="padding: 6px 10px;">Status / Severity</th>
+                <th style="padding: 6px 10px;">Verdict / Rationale</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${historyRows}
+            </tbody>
+          </table>
+        `;
+      }
+
       document.getElementById("modal-title").textContent = v.title || "Finding Details";
       document.getElementById("modal-body").innerHTML = `
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-          <div>
+          <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
             <span class="badge badge-${v.severity}">${v.severity}</span>
+            ${cvssBadgeHtml}
             ${pocBadgeHtml}
             <code style="margin-left: 8px;">${v.file || ''}${v.location ? ':' + v.location : ''}</code>
           </div>
           <button id="btn-copy-finding-link" class="btn btn-secondary" style="font-size: 0.75rem;">Copy Direct Link</button>
         </div>
+        ${duplicateBannerHtml}
+        ${metadataGridHtml}
+
         <h4 style="margin-bottom: 6px; font-weight: 600;">Description</h4>
         <p style="color: var(--text-secondary); margin-bottom: 16px; line-height: 1.55;">${formatMarkdownText(v.description || 'No description provided.')}</p>
 
@@ -1410,7 +1488,9 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
         <h4 style="margin-bottom: 6px; font-weight: 600;">Recommendation</h4>
         <p style="color: var(--text-secondary); line-height: 1.55;">${formatMarkdownText(v.recommendation || 'No recommendation provided.')}</p>
 
+        ${testCommandHtml}
         ${pocHtml}
+        ${historyHtml}
         ${findingReasoningHtml}
       `;
 

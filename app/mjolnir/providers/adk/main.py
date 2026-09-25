@@ -12,6 +12,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
 from constants import (
+    PHASE_DEDUPLICATION_ID,
     PHASE_DISCOVERY_ID,
     PHASE_EXPLORATION_ID,
     PHASE_FINAL_REVIEW_ID,
@@ -23,6 +24,7 @@ from constants import (
 )
 from data.vulnerability import Vulnerability
 from providers.adk.phases import (
+    deduplication_phase,
     discovery_phase,
     final_review_phase,
     ingest_report_phase,
@@ -38,6 +40,7 @@ PHASE_REGISTRY = {
     PHASE_EXPLORATION_ID: project_exploration_phase,
     PHASE_DISCOVERY_ID: discovery_phase,
     PHASE_INGEST_ID: ingest_report_phase,
+    PHASE_DEDUPLICATION_ID: deduplication_phase,
     PHASE_INITIAL_REVIEW_ID: initial_review_phase,
     PHASE_POC_CREATION_ID: poc_creation_phase,
     PHASE_FINAL_REVIEW_ID: final_review_phase,
@@ -66,18 +69,23 @@ def build_composable_workflow(
 
 
 def resolve_mode_phases(mode: str, ingest_path: str | None = None) -> list[str]:
-    """Resolves the ordered phase IDs for 'fast' (classic discovery + initial review) or 'full' mode."""
+    """Resolves the ordered phase IDs for 'fast' or 'full' mode with upfront deduplication."""
     entry_phase = PHASE_INGEST_ID if ingest_path else PHASE_DISCOVERY_ID
     if mode == PIPELINE_MODE_FULL:
         return [
             PHASE_EXPLORATION_ID,
             entry_phase,
+            PHASE_DEDUPLICATION_ID,
             PHASE_INITIAL_REVIEW_ID,
             PHASE_POC_CREATION_ID,
             PHASE_FINAL_REVIEW_ID,
         ]
     if mode == PIPELINE_MODE_FAST:
-        return [entry_phase, PHASE_INITIAL_REVIEW_ID]
+        return [
+            entry_phase,
+            PHASE_DEDUPLICATION_ID,
+            PHASE_INITIAL_REVIEW_ID,
+        ]
     raise ValueError(f"Unsupported pipeline mode: '{mode}'")
 
 
@@ -149,6 +157,10 @@ def run_analysis(
     ingest_path: str = None,
     diff_base: str = None,
     diff_head: str = None,
+    min_poc_severity: str = "Medium",
+    bucket: str = None,
+    project_name: str = None,
+    project_output_dir: str = None,
 ) -> tuple[list[Vulnerability], str]:
     """ADK 2.0 provider pipeline: executes a multi-node workflow graph."""
     logger.info(f"Initializing ADK 2.0 Workflow Engine (mode={mode})...")
@@ -188,6 +200,10 @@ def run_analysis(
         "diff_head": diff_head,
         "run_dir": run_dir,
         "mode": mode,
+        "min_poc_severity": min_poc_severity,
+        "bucket": bucket,
+        "project_name": project_name,
+        "project_output_dir": project_output_dir,
         "enable_project_expert": enable_project_expert,
         "usage_tracker": usage_tracker,
         "project_expert_qa_history": [],
@@ -213,6 +229,10 @@ def run_analysis(
         "diff_head": diff_head,
         "run_dir": run_dir,
         "mode": mode,
+        "min_poc_severity": min_poc_severity,
+        "bucket": bucket,
+        "project_name": project_name,
+        "project_output_dir": project_output_dir,
         "enable_project_expert": enable_project_expert,
     }
 

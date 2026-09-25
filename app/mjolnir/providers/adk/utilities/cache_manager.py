@@ -19,6 +19,9 @@ from utilities.logger import logger
 class PhaseContextCache:
     """Manages the lifecycle of an explicit Vertex AI / Gemini context cache for an ADK phase."""
 
+    _instances: dict[str, "PhaseContextCache"] = {}
+    _replacements: dict[str, Optional[str]] = {}
+
     def __init__(
         self,
         model: str,
@@ -86,6 +89,7 @@ class PhaseContextCache:
                 config=cache_config,
             )
             self.cache_name = cached_content.name
+            self._instances[self.cache_name] = self
             logger.info(
                 f"Created explicit context cache ({cached_content.name}) for {self.model} (TTL={self.ttl_seconds}s)"
             )
@@ -110,6 +114,7 @@ class PhaseContextCache:
             except Exception as e:
                 logger.debug(f"Failed to delete context cache {self.cache_name}: {e}")
             finally:
+                self._instances.pop(self.cache_name, None)
                 self.cache_name = None
 
     def __enter__(self):

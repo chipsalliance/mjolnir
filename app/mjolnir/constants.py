@@ -60,6 +60,9 @@ PHASE_INITIAL_REVIEW_NAME = "Initial Review"
 
 PHASE_POC_CREATION_ID = "poc_creation"
 PHASE_POC_CREATION_NAME = "PoC Creation"
+
+PHASE_DEDUPLICATION_ID = "deduplication"
+PHASE_DEDUPLICATION_NAME = "Deduplication"
 POC_WORKTREES_SUBDIR = "poc_worktrees"
 POC_ARTIFACTS_SUBDIR = "poc_artifacts"
 CARGO_TARGET_CACHE_SUBDIR = ".cargo_target_cache"
@@ -76,23 +79,22 @@ SANDBOX_IGNORED_DIRS = frozenset(
 POC_VERIFIED_TRUE_MARKER = "`poc_verified`: `True`"
 
 # --- Worktree Sandbox & Anti-Cheat Gate Constants ---
-TEST_DIRECTORY_NAMES = frozenset({"tests", "test", "testing", "spec", "specs", "fuzz", "benches"})
-
-TEST_FILE_SUFFIXES = (
-    "_test.rs",
-    "_test.go",
-    "_test.py",
-    "_test.c",
-    "_test.cpp",
-    "_test.cc",
-    "test.rs",
-    "test.py",
-    "test.go",
-    "test.java",
-    ".spec.ts",
-    ".test.ts",
-    ".spec.js",
-    ".test.js",
+TEST_PATH_TOKENS = frozenset(
+    {
+        "test",
+        "tests",
+        "testing",
+        "unittest",
+        "unittests",
+        "spec",
+        "specs",
+        "fuzz",
+        "bench",
+        "benches",
+        "mock",
+        "mocks",
+        "harness",
+    }
 )
 
 BUILD_CONFIGURATION_FILES = frozenset(
@@ -166,6 +168,10 @@ TOOL_PROMPT_GUIDANCE: dict[str, str] = {
         "Expert when you need clarification on project-level architectural conventions, "
         "cross-subsystem trust boundaries, hardware/ePMP/OTP guarantees, or whether an omitted "
         "check is intentionally enforced by hardware or an earlier boot stage."
+    ),
+    "search_cwe": (
+        "**`search_cwe` (Search MITRE CWE Catalog):** Search the official MITRE CWE catalog "
+        "by keyword to find precise CWE IDs and definitions when classifying a vulnerability."
     ),
     "patch_worktree_file": (
         "**`patch_worktree_file` (Targeted Test Patching in Sandbox):** Insert or update a unit "
@@ -250,6 +256,16 @@ REVIEW_WITH_POC_TASK_PROMPT_TEMPLATE = (
     "### Generated Proof-of-Concept (PoC) to Verify:\n```\n{poc}\n```"
 )
 
+DEDUPLICATION_TASK_PROMPT_TEMPLATE = """Evaluate candidate vulnerabilities from the current scan against historical Open findings (if any) and intra-run occurrences.
+
+### Historical Open Vulnerabilities:
+{historical_open_json}
+
+### Current Candidate Findings:
+{current_open_json}
+
+Produce a DeduplicationReport declaring whether each candidate finding duplicates an existing canonical finding or is unique."""
+
 POC_CREATION_TASK_PROMPT_TEMPLATE = (
     "Synthesize and execute a Proof-of-Concept (PoC) unit test in your isolated "
     "sandbox to verify the following security finding:\n\n"
@@ -288,3 +304,5 @@ TOOL_ERROR_PREFIXES = ("Error:", "Error executing", "Error ")
 API_VERSION = "v1"
 RUNS_SUBDIR = f"{API_VERSION}/runs"
 WEB_SUBDIR = "web"
+VULNERABILITIES_FILENAME = "vulnerabilities.json"
+VULNERABILITIES_MINIMAL_FILENAME = "vulnerabilities_minimal.json"

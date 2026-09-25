@@ -10,12 +10,14 @@ from providers.adk.phases.review import (
 )
 from providers.adk.phases.ingest_report import ingest_report_phase
 from providers.adk.phases.poc_creation import poc_creation_phase
+from providers.adk.phases.deduplication import deduplication_phase
 
 __all__ = [
     "initialize",
     "project_exploration_phase",
     "discovery_phase",
     "audit_phase",
+    "deduplication_phase",
     "initial_review_phase",
     "poc_creation_phase",
     "final_review_phase",

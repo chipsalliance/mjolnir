@@ -13,16 +13,35 @@ You have access to the following codebase research tools to verify the candidate
 
 ## Methodology & Areas of Focus
 
-### 1. Exploitability Analysis
+### 1. Exploitability Analysis & Exploit Path
 
-- **Concrete Attack Vector:** Determine whether a real-world attacker can trigger the vulnerability from an untrusted interface to achieve a security-relevant impact.
-- **Preconditions & Impact:** Specify the exact inputs, hardware states, or event sequences required, and identify the ultimate impact (e.g., Arbitrary Code Execution, Denial of Service, Information Leakage).
-- **Non-Exploitable Flaws:** If no plausible attack vector exists despite a code defect, classify the finding accordingly rather than rating it as exploitable.
+- **Structured Exploit Path (`attack_vector`):** You must structure `attack_vector` into four explicit stages rather than vague narrative:
+  1. **Prerequisites & Access Level:** What access level or adversary capability is required? (e.g., Unauthenticated I3C bus master, untrusted SoC mailbox caller, compromised userspace process, physical side-channel probe).
+  2. **Trigger Mechanism:** Exactly what packet, syscall, mailbox command opcode, or parameter sequence initiates the vulnerable code path?
+  3. **State Deviation / Invariant Break:** Exactly what memory, struct field, hardware register, or execution state is corrupted or violated? (e.g., dangling pointer on task stack dereferenced as trait vtable, AXI DMA length wraps around SRAM boundary).
+  4. **Adversary Payoff / End State:** What does the attacker concretely achieve? (e.g., arbitrary code execution prior to firmware signature verification, extraction of CDI/LDevID silicon keys, permanent device brick).
+- **CVSS v3.1 Quantitative Vector Calibration (`cvss_vector`):** Construct a precise CVSS v3.1 vector string (e.g. `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H`). Rigorously calibrate each metric based on the exploit path:
+  - `AV` (Attack Vector): `N` (Network), `A` (Adjacent/Bus), `L` (Local/Mailbox/Syscall), `P` (Physical/Fault injection).
+  - `AC` (Attack Complexity): `L` (deterministic exploit path) vs `H` (timing/race/memory layout dependent).
+  - `PR` (Privileges Required): `N` (unauthenticated/external), `L` (low privilege/untrusted SoC caller), `H` (high privilege/manager).
+  - `UI` (User Interaction): `N` (none) vs `R` (required).
+  - `S` (Scope): `U` (unchanged) vs `C` (changed, e.g. root-of-trust breach crossing into host SoC or hardware boundary).
+  - `C/I/A` (Confidentiality, Integrity, Availability): `H` (High), `L` (Low), `N` (None).
+    _(Note: The numeric `cvss_score` will be computed deterministically from your vector string using the official CVSS 3.1 equation; you may provide `cvss_score` or leave it None)._
+
+- **Root-of-Trust Security Objective Violation (`security_objective_violation`):** Explicitly categorize the primary security objective breached from:
+  - `SECURE_BOOT_BYPASS` — execution of unauthenticated or tampered firmware images.
+  - `KEY_EXFILTRATION` — leakage or derivation compromise of UDS, CDI, IDEVID/LDEVID, or DPE keys.
+  - `ANTI_ROLLBACK_BYPASS` — unauthorized downgrade of security version numbers (SVN) across eFuse/OTP.
+  - `PERSISTENT_DENIAL_OF_SERVICE` — unrecoverable silicon lockup, memory bus deadlock, or flash corruption.
+  - `PRIVILEGE_ESCALATION` — transition from unprivileged userspace/capsule to kernel supervisor/machine mode.
+  - `DEFENSE_IN_DEPTH` — architectural hardening or logic flaw with no direct standalone exploit path.
+- **Non-Exploitable Flaws:** If no plausible attack vector exists despite a code defect, classify the finding as `NOT_EXPLOITABLE` rather than rating it as exploitable.
 
 ### 2. False Positive Identification
 
 - **Execution Feasibility:** Verify whether the code actually executes in the suspected way or whether the vulnerable state is unreachable in practice.
-- **System & Hardware Mitigations:** Check whether the issue is already mitigated by hardware state machines, memory protection, or earlier boot stages.
+- **System & Hardware Mitigations:** Check whether the issue is already mitigated by hardware state machines, memory protection (ePMP/PMP/MPU), or earlier boot stages.
 - **Semantic Accuracy:** Determine whether the auditor misinterpreted a language feature, macro invariant, or hardware register behavior.
 
 ### 3. Severity Re-assessment

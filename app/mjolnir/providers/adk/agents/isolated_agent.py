@@ -12,7 +12,6 @@ from google.adk.agents.run_config import RunConfig
 from google.adk.models import BaseLlm, LLMRegistry, LlmRequest
 from google.adk.models.google_llm import Gemini
 from google.adk.tools.set_model_response_tool import SetModelResponseTool
-from google.adk.utils.output_schema_utils import can_use_output_schema_with_tools
 from google.genai import types
 
 from constants import (
@@ -20,6 +19,7 @@ from constants import (
     DEFAULT_RETRY_INITIAL_DELAY,
     DEFAULT_RETRY_MAX_DELAY,
 )
+from providers.adk.utilities.cache_manager import PhaseContextCache
 from utilities.logger import logger
 
 # Default transport-level retry configuration for LLM calls (exponential backoff with jitter)
@@ -36,6 +36,8 @@ class CachedGemini(Gemini):
     async def _preprocess_request(self, llm_request: LlmRequest) -> None:
         await super()._preprocess_request(llm_request)
         if llm_request.config:
+            if cc := getattr(llm_request.config, "cached_content", None):
+                llm_request.config.cached_content = PhaseContextCache._replacements.get(cc, cc)
             resp_schema = getattr(llm_request.config, "response_schema", None)
             if resp_schema and "set_model_response" not in llm_request.tools_dict:
                 llm_request.tools_dict["set_model_response"] = SetModelResponseTool(resp_schema)
@@ -52,6 +54,36 @@ class CachedGemini(Gemini):
                         tool_entry.function_declarations = list(
                             {getattr(f, "name", id(f)): f for f in fns}.values()
                         )
+
+    async def generate_content_async(self, llm_request: LlmRequest, stream: bool = False):
+        cfg = llm_request.config
+        orig_si = getattr(cfg, "system_instruction", None)
+        orig_tools = getattr(cfg, "tools", None)
+        orig_tool_cfg = getattr(cfg, "tool_config", None)
+        try:
+            async for resp in super().generate_content_async(llm_request, stream=stream):
+                yield resp
+        except Exception as e:
+            cache_id = getattr(cfg, "cached_content", None)
+            if not cache_id or "is expired" not in str(e).lower():
+                raise
+            cache = PhaseContextCache._instances.get(cache_id)
+            new_cache_id = cache.create() if cache else None
+            PhaseContextCache._replacements[cache_id] = new_cache_id
+            logger.warning(
+                f"Context cache {cache_id} expired; "
+                + (
+                    f"re-initialized as {new_cache_id}"
+                    if new_cache_id
+                    else "falling back to uncached inference"
+                )
+            )
+            cfg.cached_content = new_cache_id
+            cfg.system_instruction = orig_si
+            cfg.tools = orig_tools
+            cfg.tool_config = orig_tool_cfg
+            async for resp in super().generate_content_async(llm_request, stream=stream):
+                yield resp
 
 
 def resolve_model_with_retries(model: str | BaseLlm) -> BaseLlm:
@@ -91,6 +123,16 @@ class IsolatedAgent(Agent):
         if self.run_config:
             ctx.run_config = self.run_config
         return ctx
+
+    async def canonical_instruction(self, ctx: Any) -> tuple[str, bool]:
+        """Bypasses ADK session state template substitution on instruction string.
+
+        ADK attempts regex {var} variable substitution on agent instruction strings by default,
+        which raises KeyError when code snippets containing curly braces appear in instructions.
+        Returning bypass_state_injection=True disables this behavior.
+        """
+        raw_si, _ = await super().canonical_instruction(ctx)
+        return raw_si, True
 
     def _is_final_model_text_event(self, event: Any) -> bool:
         """Returns True if event is a completed final model response requiring schema validation."""

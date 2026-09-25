@@ -52,7 +52,7 @@ The `project.nix` file defines the repository and global settings for the projec
 - **`outputDir`** (String, Required): Relative path where audit results are stored (e.g. `"./test-out/results"`).
 - **`workspaceDir`** (String, Required): Relative path where temporary analysis workspaces are created (e.g. `"./test-out/workspace"`).
 
-- **`defaultModel`** (String, Required unless set in job): Default AI foundation model (e.g. `"gemini-3.6-flash"`).
+- **`defaultModel`** (String, Required unless set in job): Default AI foundation model (e.g. `"gemini-3.8-flash"`).
 - **`defaultRef`** (String, Optional): Default git ref (commit hash, branch, or tag) to checkout (defaults to `"HEAD"`).
 - **`defaultBatchSize`** (Integer, Required unless set in job): Default batch window size for agent analysis (e.g. `64`).
 - **`defaultExtensions`** (List of Strings, Required unless set in job): Default source file extensions to audit (e.g. `["rs", "c", "h"]`).
@@ -68,7 +68,7 @@ The `project.nix` file defines the repository and global settings for the projec
   outputDir = "./test-out/results";
   workspaceDir = "./test-out/workspace";
 
-  defaultModel = "gemini-3.6-flash";
+  defaultModel = "gemini-3.8-flash";
   defaultRef = "main";
   defaultBatchSize = 64;
   defaultExtensions = [ "rs" "c" "h" ];

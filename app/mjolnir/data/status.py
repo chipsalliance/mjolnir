@@ -6,3 +6,4 @@ from enum import Enum
 class Status(str, Enum):
     OPEN = "Open"
     CLOSED = "Closed"
+    DUPLICATE = "Duplicate"
