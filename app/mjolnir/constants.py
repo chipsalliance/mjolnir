@@ -170,6 +170,10 @@ TOOL_PROMPT_GUIDANCE: dict[str, str] = {
         "cross-subsystem trust boundaries, hardware/ePMP/OTP guarantees, or whether an omitted "
         "check is intentionally enforced by hardware or an earlier boot stage."
     ),
+    "search_cwe": (
+        "**`search_cwe` (Search MITRE CWE Catalog):** Search the official MITRE CWE catalog "
+        "by keyword to find precise CWE IDs and definitions when classifying a vulnerability."
+    ),
     "patch_worktree_file": (
         "**`patch_worktree_file` (Targeted Test Patching in Sandbox):** Insert or update a unit "
         "test or harness case in an existing file inside the isolated sandbox by replacing an "
