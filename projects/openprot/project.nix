@@ -1,15 +1,15 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 {
-  name = "OpenTitan";
-  repoName = "opentitan";
-  repoUrl = "https://github.com/lowrisc/opentitan.git";
+  name = "OpenPRoT";
+  repoName = "openprot";
+  repoUrl = "https://github.com/OpenPRoT/openprot.git";
   threatModel = ./threat_model.md;
   outputDir = "./test-out/results";
   workspaceDir = "./test-out/workspace";
 
   defaultModel = "gemini-3.8-flash";
-  defaultRef = "earlgrey_1.0.0";
+  defaultRef = "main";
   defaultBatchSize = 64;
-  defaultExtensions = [ "rs" "c" "h" "sv" ];
+  defaultExtensions = [ "rs" "c" "h" ];
 }
