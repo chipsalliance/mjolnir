@@ -8,12 +8,13 @@ from google.adk.agents.run_config import RunConfig
 from agent_tools import format_tool_guidance
 from agent_tools.glob import glob
 from agent_tools.read_file import read_file
+from agent_tools.search_cwe import search_cwe
 from constants import INGESTION_MAX_LLM_CALLS
 from data.security_report import SecurityReport
 from providers.adk.agents.isolated_agent import IsolatedAgent
 from utilities.prompt_loader import prompt_registry
 
-INGESTION_TOOLS = [glob, read_file]
+INGESTION_TOOLS = [glob, read_file, search_cwe]
 
 
 def get_ingestion_agent(model: str) -> Agent:

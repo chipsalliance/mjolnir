@@ -14,12 +14,13 @@ from agent_tools.glob import glob
 from agent_tools.grep_search import grep_search
 from agent_tools.project_expert import ask_project_expert
 from agent_tools.read_file import read_file
+from agent_tools.search_cwe import search_cwe
 from constants import PROJECT_ARCHITECTURE_SECTION_TEMPLATE, REVIEWER_MAX_LLM_CALLS
 from data.review_finding import ReviewFinding
 from providers.adk.agents.isolated_agent import IsolatedAgent
 from utilities.prompt_loader import prompt_registry
 
-REVIEWER_TOOLS = [ctags_search, ast_search, grep_search, glob, read_file]
+REVIEWER_TOOLS = [ctags_search, ast_search, grep_search, glob, read_file, search_cwe]
 
 
 def get_reviewer_tools(enable_project_expert: bool = False) -> list:

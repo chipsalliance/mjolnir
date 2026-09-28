@@ -23,4 +23,5 @@ For every identified finding across the ingested document(s), populate the follo
 - **`location`:** Extract the exact line range, line number, or function name where the bug occurs.
 - **`description`:** Detailed technical explanation of the vulnerability and its potential impact.
 - **`recommendation`:** The suggested fix, remediation, or mitigation.
+- **`cwe`:** The standard MITRE CWE identifier and title (use `search_cwe` to map or verify the CWE ID from the report).
 - **`file`:** The relative file path of the source code file being analyzed (e.g., `src/auth.c` or `lib/utils.rs`). If not explicitly mentioned, default to `unknown_file`.

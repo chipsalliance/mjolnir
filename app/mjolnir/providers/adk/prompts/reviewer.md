@@ -36,6 +36,7 @@ You have access to the following codebase research tools to verify the candidate
   - `PERSISTENT_DENIAL_OF_SERVICE` — unrecoverable silicon lockup, memory bus deadlock, or flash corruption.
   - `PRIVILEGE_ESCALATION` — transition from unprivileged userspace/capsule to kernel supervisor/machine mode.
   - `DEFENSE_IN_DEPTH` — architectural hardening or logic flaw with no direct standalone exploit path.
+- **MITRE CWE Classification (`cwe`):** Verify or refine the finding's `cwe` identifier using the `search_cwe` tool so it accurately reflects the underlying weakness in the official MITRE CWE catalog.
 - **Non-Exploitable Flaws:** If no plausible attack vector exists despite a code defect, classify the finding as `NOT_EXPLOITABLE` rather than rating it as exploitable.
 
 ### 2. False Positive Identification

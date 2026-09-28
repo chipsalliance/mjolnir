@@ -11,4 +11,7 @@ Python-based tools which can be used by agents to analyze code.
 - **`ctags_search.py`**: Finds definitions of symbols (functions, structs, macros, variables) across the codebase using Universal Ctags.
 - **`glob.py`**: Discovers files matching specific patterns or extensions in the workspace.
 - **`grep_search.py`**: Executes fast regex keyword searches inside files using ripgrep.
+- **`project_expert.py`**: Consults the ProjectExpertAgent for cross-subsystem architectural and threat-model context.
 - **`read_file.py`**: Allows agents to safely view source file contents.
+- **`search_cwe.py`**: Searches the bundled official MITRE CWE catalog by keyword to verify CWE IDs and definitions.
+- **`worktree.py`**: Provides isolated git worktree sandbox tools for PoC synthesis and verification.
