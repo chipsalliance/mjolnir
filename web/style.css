@@ -500,8 +500,9 @@ tr:last-child td {
 #project-sankey-chart-container,
 #run-sankey-chart-container {
   width: 100%;
-  min-height: 260px;
-  overflow: hidden;
+  min-height: 360px;
+  padding: 14px 0;
+  overflow: visible;
   box-sizing: border-box;
 }
 
@@ -509,6 +510,7 @@ tr:last-child td {
 #project-sankey-chart-container svg,
 #run-sankey-chart-container svg {
   max-width: 100% !important;
+  overflow: visible !important;
   box-sizing: border-box;
 }
 

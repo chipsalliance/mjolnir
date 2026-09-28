@@ -712,17 +712,15 @@ pub fn filter_vulnerabilities(
         .into_iter()
         .filter(|v| {
             let v_stat = v.status.to_lowercase();
-            // Status check: hide duplicates by default unless explicitly filtering for "duplicate"
-            if status_target.is_empty() || status_target == "all" {
-                if v_stat == "duplicate" {
+            // Status check
+            if !status_target.is_empty() && status_target != "all" {
+                if status_target == "closed" || status_target == "resolved" {
+                    if v_stat == "open" || v_stat == "duplicate" {
+                        return false;
+                    }
+                } else if v_stat != status_target {
                     return false;
                 }
-            } else if status_target == "closed" || status_target == "resolved" {
-                if v_stat == "open" || v_stat == "duplicate" {
-                    return false;
-                }
-            } else if v_stat != status_target {
-                return false;
             }
 
             // Severity check
@@ -755,6 +753,94 @@ pub fn filter_vulnerabilities(
     serde_json::to_string(&filtered).unwrap_or_else(|_| "[]".to_string())
 }
 
+enum PhaseState {
+    Discovery,
+    InitialReview,
+    PocCreation,
+    FinalReview,
+    Deduplication,
+    Other(String),
+}
+
+struct ParsedPhase {
+    state: PhaseState,
+    name: String,
+}
+
+impl ParsedPhase {
+    fn from_raw_components(raw_id: &str, raw_name: &str) -> Self {
+        let pid = raw_id.trim_matches('"').trim();
+        let pname = raw_name.trim();
+        match pid {
+            "1" | "discovery" => Self {
+                state: PhaseState::Discovery,
+                name: if pname.is_empty()
+                    || pname == "Phase"
+                    || pname.eq_ignore_ascii_case("Source File Exploration")
+                {
+                    "Source File Discovery".to_string()
+                } else {
+                    pname.to_string()
+                },
+            },
+            "2" | "initial_review" => Self {
+                state: PhaseState::InitialReview,
+                name: if pname.is_empty() || pname == "Phase" {
+                    "Initial Review".to_string()
+                } else {
+                    pname.to_string()
+                },
+            },
+            "3" | "poc_creation" => Self {
+                state: PhaseState::PocCreation,
+                name: if pname.is_empty() || pname == "Phase" {
+                    "PoC Creation".to_string()
+                } else {
+                    pname.to_string()
+                },
+            },
+            "4" | "final_review" => Self {
+                state: PhaseState::FinalReview,
+                name: if pname.is_empty() || pname == "Phase" {
+                    "Final Review".to_string()
+                } else {
+                    pname.to_string()
+                },
+            },
+            "5" | "deduplication" => Self {
+                state: PhaseState::Deduplication,
+                name: if pname.is_empty() || pname == "Phase" {
+                    "Deduplication".to_string()
+                } else {
+                    pname.to_string()
+                },
+            },
+            _ => Self {
+                state: PhaseState::Other(pid.to_string()),
+                name: if pname.is_empty() {
+                    "Phase".to_string()
+                } else {
+                    pname.to_string()
+                },
+            },
+        }
+    }
+}
+
+impl From<ParsedPhase> for (String, String) {
+    fn from(parsed: ParsedPhase) -> Self {
+        let id = match parsed.state {
+            PhaseState::Discovery => "discovery".to_string(),
+            PhaseState::InitialReview => "initial_review".to_string(),
+            PhaseState::PocCreation => "poc_creation".to_string(),
+            PhaseState::FinalReview => "final_review".to_string(),
+            PhaseState::Deduplication => "deduplication".to_string(),
+            PhaseState::Other(raw) => raw,
+        };
+        (id, parsed.name)
+    }
+}
+
 pub fn build_phase_sankey_rows(vulns: &[serde_json::Value]) -> String {
     if vulns.is_empty() {
         return "[]".to_string();
@@ -766,23 +852,30 @@ pub fn build_phase_sankey_rows(vulns: &[serde_json::Value]) -> String {
 
     for v in vulns {
         if let Some(hist) = v.get("history").and_then(|h| h.as_array()) {
+            let mut prev_pid: Option<String> = None;
             for h in hist {
-                let pid_str = h
-                    .get("phase_id")
-                    .map(|p| p.to_string().trim_matches('"').to_string())
-                    .unwrap_or_default();
+                let raw_id = h.get("phase_id").map(|p| p.to_string()).unwrap_or_default();
+                let raw_name = h
+                    .get("phase_name")
+                    .and_then(|p| p.as_str())
+                    .unwrap_or("Phase");
+                let (pid_str, pname) = ParsedPhase::from_raw_components(&raw_id, raw_name).into();
                 if pid_str.is_empty() {
                     continue;
                 }
-                let pname = h
-                    .get("phase_name")
-                    .and_then(|p| p.as_str())
-                    .unwrap_or("Phase")
-                    .to_string();
                 if !phase_map.contains_key(&pid_str) {
-                    phase_keys.push(pid_str.clone());
+                    if let Some(ref prev) = prev_pid {
+                        if let Some(idx) = phase_keys.iter().position(|k| k == prev) {
+                            phase_keys.insert(idx + 1, pid_str.clone());
+                        } else {
+                            phase_keys.push(pid_str.clone());
+                        }
+                    } else {
+                        phase_keys.push(pid_str.clone());
+                    }
+                    phase_map.insert(pid_str.clone(), pname);
                 }
-                phase_map.insert(pid_str, pname);
+                prev_pid = Some(pid_str);
             }
         }
     }
@@ -797,59 +890,62 @@ pub fn build_phase_sankey_rows(vulns: &[serde_json::Value]) -> String {
 
     for v in vulns {
         let hist = match v.get("history").and_then(|h| h.as_array()) {
-            Some(h) => h,
-            None => continue,
+            Some(h) if !h.is_empty() => h,
+            _ => continue,
         };
 
-        let mut phase_node_names: HashMap<String, String> = HashMap::new();
+        let mut snapshots_by_phase: HashMap<String, &serde_json::Value> = HashMap::new();
+        for h in hist {
+            let raw_id = h.get("phase_id").map(|p| p.to_string()).unwrap_or_default();
+            let (pid_str, _) = ParsedPhase::from_raw_components(&raw_id, "").into();
+            if !pid_str.is_empty() {
+                snapshots_by_phase.insert(pid_str, h);
+            }
+        }
+
+        if snapshots_by_phase.is_empty() {
+            continue;
+        }
+
+        let mut finding_nodes: Vec<String> = Vec::with_capacity(phase_keys.len());
+        let mut last_terminal_state: Option<&str> = None;
 
         for (step_idx, p_key) in phase_keys.iter().enumerate() {
-            let snap = hist.iter().find(|h| {
-                let pid_str = h
-                    .get("phase_id")
-                    .map(|p| p.to_string().trim_matches('"').to_string())
-                    .unwrap_or_default();
-                &pid_str == p_key
-            });
+            let phase_name = phase_map
+                .get(p_key)
+                .cloned()
+                .unwrap_or_else(|| format!("Phase {}", step_idx + 1));
+            let phase_label = format!("Phase {}: {}", step_idx + 1, phase_name);
 
-            if let Some(s) = snap {
-                let phase_name = phase_map
-                    .get(p_key)
-                    .cloned()
-                    .unwrap_or_else(|| format!("Phase {}", step_idx + 1));
-                let phase_label = if let Ok(num) = p_key.parse::<i32>() {
-                    format!("Phase {}: {}", num, phase_name)
-                } else {
-                    format!("Phase {}: {}", step_idx + 1, phase_name)
-                };
+            let node_name = if let Some(s) = snapshots_by_phase.get(p_key) {
                 let severity = s
                     .get("severity")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
-                let node_name = if is_closed_status(s) {
+                if is_closed_status(s) {
+                    last_terminal_state = Some("Closed");
                     format!("{} - Closed", phase_label)
+                } else if is_duplicate_status(s) {
+                    last_terminal_state = Some("Duplicate");
+                    format!("{} - Duplicate", phase_label)
                 } else if severity.eq_ignore_ascii_case("Skipped") {
                     format!("{} - Skipped", phase_label)
                 } else {
+                    last_terminal_state = None;
                     format!("{} - {}", phase_label, severity)
-                };
+                }
+            } else if let Some(term) = last_terminal_state {
+                format!("{} - {}", phase_label, term)
+            } else {
+                format!("{} - Skipped", phase_label)
+            };
 
-                phase_node_names.insert(p_key.clone(), node_name);
-            }
-        }
-
-        for node_name in phase_node_names.values() {
             *node_counts.entry(node_name.clone()).or_insert(0) += 1;
+            finding_nodes.push(node_name);
         }
 
-        for i in 0..(phase_keys.len() - 1) {
-            let p1 = &phase_keys[i];
-            let p2 = &phase_keys[i + 1];
-
-            if let (Some(base1), Some(base2)) = (phase_node_names.get(p1), phase_node_names.get(p2))
-            {
-                record_bases.push((base1.clone(), base2.clone()));
-            }
+        for pair in finding_nodes.windows(2) {
+            record_bases.push((pair[0].clone(), pair[1].clone()));
         }
     }
 
@@ -875,7 +971,19 @@ pub fn build_phase_sankey_rows(vulns: &[serde_json::Value]) -> String {
         result_rows.push((src, dst, weight));
     }
 
-    result_rows.sort_by_key(|(src, dst, _)| (sankey_rank(dst), sankey_rank(src)));
+    result_rows.sort_by(|(src_a, dst_a, _), (src_b, dst_b, _)| {
+        let ra_src = sankey_rank(src_a);
+        let ra_dst = sankey_rank(dst_a);
+        let rb_src = sankey_rank(src_b);
+        let rb_dst = sankey_rank(dst_b);
+        (ra_src.max(ra_dst), ra_src, ra_dst, src_a, dst_a).cmp(&(
+            rb_src.max(rb_dst),
+            rb_src,
+            rb_dst,
+            src_b,
+            dst_b,
+        ))
+    });
 
     serde_json::to_string(&result_rows).unwrap_or_else(|_| "[]".to_string())
 }
@@ -890,24 +998,37 @@ fn is_closed_status(v: &serde_json::Value) -> bool {
     status_str == "closed"
 }
 
+fn is_duplicate_status(v: &serde_json::Value) -> bool {
+    let status_str = v
+        .get("status")
+        .and_then(|s| s.as_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    status_str == "duplicate"
+}
+
 fn sankey_rank(node_name: &str) -> usize {
-    let name_upper = node_name.to_uppercase();
-    if name_upper.contains("INFO") {
+    let suffix = node_name.rsplit(" - ").next().unwrap_or(node_name);
+    let name_upper = suffix.to_uppercase();
+    if name_upper.contains("CRITICAL") {
         1
-    } else if name_upper.contains("LOW") {
+    } else if name_upper.contains("HIGH") {
         2
     } else if name_upper.contains("MEDIUM") {
         3
-    } else if name_upper.contains("HIGH") {
+    } else if name_upper.contains("LOW") {
         4
-    } else if name_upper.contains("CRITICAL") {
+    } else if name_upper.contains("INFO") {
         5
-    } else if name_upper.contains("CLOSED") {
+    } else if name_upper.contains("DUPLICATE") {
         6
-    } else if name_upper.contains("SKIPPED") {
+    } else if name_upper.contains("CLOSED") {
         7
-    } else {
+    } else if name_upper.contains("SKIPPED") {
         8
+    } else {
+        9
     }
 }
 
@@ -932,6 +1053,8 @@ fn fallback_sankey_rows(vulns: &[serde_json::Value]) -> String {
 
         if is_closed_status(v) {
             rows.push((source, "Closed".to_string(), 1));
+        } else if is_duplicate_status(v) {
+            rows.push((source, "Duplicate".to_string(), 1));
         } else {
             rows.push((source, sev.to_string(), 1));
         }
@@ -1265,15 +1388,22 @@ mod tests {
         assert_eq!(summary.medium, 1);
         assert_eq!(summary.duplicate, 1);
 
-        // Default "all" filter hides Duplicate findings
-        let default_filtered: Vec<NormalizedVulnerability> = serde_json::from_str(
+        // UI default "open" filter shows only Open findings
+        let open_filtered: Vec<NormalizedVulnerability> = serde_json::from_str(
+            &filter_vulnerabilities(vulns_json, "", "ALL", "open", "sev-desc"),
+        )
+        .unwrap();
+        assert_eq!(open_filtered.len(), 1);
+        assert_eq!(open_filtered[0].status, "Open");
+
+        // "all" filter includes all statuses (Open, Closed, Duplicate)
+        let all_filtered: Vec<NormalizedVulnerability> = serde_json::from_str(
             &filter_vulnerabilities(vulns_json, "", "ALL", "all", "sev-desc"),
         )
         .unwrap();
-        assert_eq!(default_filtered.len(), 2);
-        assert!(default_filtered.iter().all(|v| v.status != "Duplicate"));
+        assert_eq!(all_filtered.len(), 3);
 
-        // "closed" filter also hides Duplicate findings
+        // "closed" filter hides Open and Duplicate findings
         let closed_filtered: Vec<NormalizedVulnerability> = serde_json::from_str(
             &filter_vulnerabilities(vulns_json, "", "ALL", "closed", "sev-desc"),
         )
@@ -1289,5 +1419,97 @@ mod tests {
         assert_eq!(dup_filtered.len(), 1);
         assert_eq!(dup_filtered[0].status, "Duplicate");
         assert_eq!(dup_filtered[0].duplicate_of, "job_a/run_123/vuln_1");
+    }
+
+    #[test]
+    fn test_build_phase_sankey_rows_duplicate_status() {
+        let vulns: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[
+                {
+                    "title": "Duplicate Finding",
+                    "severity": "High",
+                    "status": "Duplicate",
+                    "history": [
+                        {
+                            "phase_id": "discovery",
+                            "phase_name": "Discovery",
+                            "severity": "High",
+                            "status": "Open"
+                        },
+                        {
+                            "phase_id": "deduplication",
+                            "phase_name": "Cross-Run Deduplication",
+                            "severity": "High",
+                            "status": "Duplicate"
+                        }
+                    ]
+                }
+            ]"#,
+        )
+        .unwrap();
+
+        let rows = build_phase_sankey_rows(&vulns);
+        assert!(rows.contains("Phase 1: Discovery - High (count: 1)"));
+        assert!(rows.contains("Phase 2: Cross-Run Deduplication - Duplicate (count: 1)"));
+    }
+    #[test]
+    fn test_build_phase_sankey_rows_legacy_and_missing_phases() {
+        let vulns: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[
+                {
+                    "title": "Modern Finding",
+                    "severity": "High",
+                    "status": "Open",
+                    "history": [
+                        {
+                            "phase_id": "discovery",
+                            "phase_name": "Source File Discovery",
+                            "severity": "High",
+                            "status": "Open"
+                        },
+                        {
+                            "phase_id": "initial_review",
+                            "phase_name": "Initial Review",
+                            "severity": "High",
+                            "status": "Open"
+                        },
+                        {
+                            "phase_id": "poc_creation",
+                            "phase_name": "PoC Creation",
+                            "severity": "High",
+                            "status": "Open"
+                        }
+                    ]
+                },
+                {
+                    "title": "Legacy Fast Finding",
+                    "severity": "High",
+                    "status": "Closed",
+                    "history": [
+                        {
+                            "phase_id": 1,
+                            "phase_name": "Source File Exploration",
+                            "severity": "High",
+                            "status": "Open"
+                        },
+                        {
+                            "phase_id": 2,
+                            "phase_name": "Initial Review",
+                            "severity": "High",
+                            "status": "Closed"
+                        }
+                    ]
+                }
+            ]"#,
+        )
+        .unwrap();
+
+        let rows = build_phase_sankey_rows(&vulns);
+        assert!(!rows.contains("Source File Exploration"));
+        assert!(rows.contains("Phase 1: Source File Discovery - High (count: 2)"));
+        assert!(rows.contains("Phase 2: Initial Review - High (count: 1)"));
+        assert!(rows.contains("Phase 2: Initial Review - Closed (count: 1)"));
+        assert!(rows.contains("Phase 3: PoC Creation - High (count: 1)"));
+        assert!(rows.contains("Phase 3: PoC Creation - Closed (count: 1)"));
     }
 }

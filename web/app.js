@@ -1153,8 +1153,8 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
           <option value="LOW">Low</option>
         </select>
         <select id="status-select" class="select-input">
-          <option value="all" selected>All Statuses</option>
-          <option value="open">Open</option>
+          <option value="all">All Statuses</option>
+          <option value="open" selected>Open</option>
           <option value="closed">Closed / Resolved</option>
           <option value="duplicate">Duplicates</option>
         </select>
@@ -1632,8 +1632,8 @@ function drawGoogleSankey(rows, container) {
       }
     });
 
-    const calculatedHeight = Math.max(320, (maxNodesInColumn * 42) + 40);
-    container.style.height = calculatedHeight + 'px';
+    const calculatedHeight = Math.max(420, (maxNodesInColumn * 68) + 80);
+    container.style.height = (calculatedHeight + 28) + 'px';
 
     // Map severity names to matching theme colors
     const nodeColors = uniqueNodes.map(nodeName => {
@@ -1643,6 +1643,7 @@ function drawGoogleSankey(rows, container) {
       if (u.includes('MEDIUM')) return '#eab308';
       if (u.includes('LOW')) return '#3b82f6';
       if (u.includes('INFO')) return '#38bdf8';
+      if (u.includes('DUPLICATE')) return '#f59e0b';
       if (u.includes('CLOSED')) return '#71717a';
       if (u.includes('SKIPPED')) return '#a1a1aa';
       return '#38bdf8';
@@ -1657,7 +1658,7 @@ function drawGoogleSankey(rows, container) {
         iterations: 0,
         node: {
           colors: nodeColors,
-          nodePadding: 16,
+          nodePadding: 22,
           width: 18,
           label: {
             fontName: 'Segoe UI',
