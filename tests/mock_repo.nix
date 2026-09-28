@@ -33,13 +33,19 @@ fn main() {
 }
 EOF
 
-  echo '// Mock file 3' > src/file3.rs
+  cat << 'EOF' > src/file3.rs
+// Calls shared helper in main.rs
+pub fn derive_offset(len: usize) -> usize {
+    crate::process_key(len)
+}
+EOF
   echo '// Mock file 4' > src/file4.rs
 
   cat << 'EOF' > mock_report.csv
 title,severity,location,description,recommendation,file
 Buffer Overflow in parse_config,HIGH,src/lib.rs:3,A buffer overflow exists in parse_config due to unsafe string copy.,Use strncpy instead.,src/lib.rs
 Integer Underflow in key_len,MEDIUM,src/main.rs:3,An integer underflow can happen if key_len is zero.,Add bound checks.,src/main.rs
+Arithmetic wrap in derive_offset,MEDIUM,src/file3.rs:2,Calling derive_offset(0) delegates to an unnamed helper in another file that wraps around.,Validate len before calling helper.,src/file3.rs
 EOF
 
   git add .

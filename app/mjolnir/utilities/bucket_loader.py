@@ -32,6 +32,7 @@ def _extract_open_findings(
                     "location": item.get("location", ""),
                     "title": item.get("title", ""),
                     "severity": item.get("severity", ""),
+                    "cwe": item.get("cwe", ""),
                     "description": item.get("description", ""),
                     "attack_vector": item.get("attack_vector", ""),
                 }

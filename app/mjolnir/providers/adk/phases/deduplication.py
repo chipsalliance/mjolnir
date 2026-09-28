@@ -34,6 +34,7 @@ def _serialize_candidate_vuln(vuln: Vulnerability) -> dict[str, Any]:
         "location": vuln.location,
         "title": vuln.title,
         "severity": vuln.severity.value if hasattr(vuln.severity, "value") else str(vuln.severity),
+        "cwe": vuln.cwe,
         "description": vuln.description,
         "recommendation": vuln.recommendation,
     }
@@ -136,11 +137,13 @@ async def deduplication_phase(ctx: Context, node_input: Any = None) -> list[Vuln
     model = ctx.state["model"]
     threat_model = ctx.state.get("threat_model_context", "")
     project_summary = ctx.state.get("project_expert_summary", "")
+    enable_project_expert = ctx.state.get("enable_project_expert", False)
 
     deduplicator_agent = get_deduplicator_agent(
         model=model,
         threat_model_context=threat_model,
         project_expert_summary=project_summary,
+        enable_project_expert=enable_project_expert,
     )
 
     task_prompt = DEDUPLICATION_TASK_PROMPT_TEMPLATE.format(
