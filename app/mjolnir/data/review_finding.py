@@ -1,7 +1,7 @@
 # Licensed under the Apache-2.0 license
 # SPDX-License-Identifier: Apache-2.0
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from data.severity import Severity
 from data.verdict import Verdict
 
@@ -18,6 +18,14 @@ class ReviewFinding(BaseModel):
     attack_vector: str = Field(
         default="",
         description="Detailed exploit path detailing prerequisites, trigger mechanism, state corruption, and adversary payoff.",
+    )
+    cwe: str = Field(
+        default="",
+        description=(
+            "Standard MITRE CWE ID and title (e.g., 'CWE-20: Improper Input Validation', "
+            "'CWE-190: Integer Overflow', 'CWE-1256: Improper Restriction of Software Interfaces "
+            "to Hardware Features'). Use the search_cwe tool to verify the authentic MITRE CWE ID."
+        ),
     )
 
     cvss_score: Optional[float] = Field(
@@ -39,3 +47,10 @@ class ReviewFinding(BaseModel):
             "reviewing this finding, state the exact reason here."
         ),
     )
+
+    @field_validator("cwe", mode="before")
+    @classmethod
+    def validate_cwe_identifier(cls, v: str) -> str:
+        from data.cwe_validator import normalize_and_validate_cwe
+
+        return normalize_and_validate_cwe(v)
