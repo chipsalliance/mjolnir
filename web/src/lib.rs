@@ -369,11 +369,13 @@ impl std::ops::Deref for VulnerabilityFindings {
 pub struct RunSummary {
     pub total: usize,
     pub open: usize,
+    pub closed: usize,
     pub duplicate: usize,
     pub critical: usize,
     pub high: usize,
     pub medium: usize,
     pub low: usize,
+    pub info: usize,
     pub schema_version: String,
 }
 
@@ -668,16 +670,22 @@ pub fn compute_summary(vulnerabilities_json: &str) -> String {
 
         summary.total += 1;
 
-        if v.status.eq_ignore_ascii_case("Open") {
-            summary.open += 1;
+        if matches!(
+            v.status.to_lowercase().as_str(),
+            "closed" | "fixed" | "resolved"
+        ) {
+            summary.closed += 1;
+            continue;
         }
+
+        summary.open += 1;
 
         match v.severity.as_str() {
             "CRITICAL" => summary.critical += 1,
             "HIGH" => summary.high += 1,
             "MEDIUM" => summary.medium += 1,
             "LOW" => summary.low += 1,
-            _ => {}
+            _ => summary.info += 1,
         }
     }
 
@@ -1384,8 +1392,9 @@ mod tests {
         let summary: RunSummary = serde_json::from_str(&summary_str).unwrap();
         assert_eq!(summary.total, 2);
         assert_eq!(summary.open, 1);
+        assert_eq!(summary.closed, 1);
         assert_eq!(summary.high, 1);
-        assert_eq!(summary.medium, 1);
+        assert_eq!(summary.medium, 0);
         assert_eq!(summary.duplicate, 1);
 
         // UI default "open" filter shows only Open findings

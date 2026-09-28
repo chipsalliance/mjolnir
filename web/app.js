@@ -315,34 +315,25 @@ async function fetchRunsFromGcsBucket() {
         const job = meta.job || parts[3] || "default";
         const run_id = meta.run_id || parts[4] || "unknown";
 
-        let critical = 0, high = 0, medium = 0, low = 0, open_count = 0, closed_count = 0;
-        if (Array.isArray(vulns)) {
-          vulns.forEach(v => {
-            const sev = String(v.severity || v.severity_level || "LOW").toUpperCase();
-            if (sev === "CRITICAL") critical++;
-            else if (sev === "HIGH") high++;
-            else if (sev === "MEDIUM") medium++;
-            else low++;
-
-            const st = String(v.status || v.state || "Open").toLowerCase();
-            if (["closed", "fixed", "resolved"].includes(st)) closed_count++;
-            else open_count++;
-          });
-        }
+        const vulnList = Array.isArray(vulns) ? vulns : [];
+        const summaryJson = await workerComputeSummary(JSON.stringify(vulnList));
+        const summary = JSON.parse(summaryJson || "{}");
 
         return {
           project,
           job,
           run_id,
           timestamp: meta.timestamp || run_id,
-          vuln_count: Array.isArray(vulns) ? vulns.length : 0,
-          critical_count: critical,
-          high_count: high,
-          medium_count: medium,
-          low_count: low,
-          open_count,
-          closed_count,
-          vulnerabilities: Array.isArray(vulns) ? vulns : [],
+          vuln_count: summary.total ?? 0,
+          critical_count: summary.critical ?? 0,
+          high_count: summary.high ?? 0,
+          medium_count: summary.medium ?? 0,
+          low_count: summary.low ?? 0,
+          info_count: summary.info ?? 0,
+          open_count: summary.open ?? 0,
+          closed_count: summary.closed ?? 0,
+          duplicate_count: summary.duplicate ?? 0,
+          vulnerabilities: vulnList,
           token_usage,
           tool_usage,
           model: meta.model || "Unknown",
@@ -538,37 +529,12 @@ async function renderGlobalView(container) {
     }
     projMap[p].runs += 1;
     projMap[p].total += (r.vuln_count || 0);
-
-    let crit = r.critical_count ?? 0;
-    let high = r.high_count ?? 0;
-    let med = r.medium_count ?? 0;
-    let low = r.low_count ?? 0;
-    let info = r.info_count ?? 0;
-    let closed = r.closed_count ?? 0;
-
-    if (Array.isArray(r.vulnerabilities) && r.vulnerabilities.length > 0) {
-      crit = 0; high = 0; med = 0; low = 0; info = 0; closed = 0;
-      r.vulnerabilities.forEach(v => {
-        const st = String(v.status || v.state || "Open").toLowerCase();
-        if (["closed", "fixed", "resolved"].includes(st)) {
-          closed += 1;
-          return;
-        }
-        const sev = (v.severity || '').toString().toUpperCase();
-        if (sev === 'CRITICAL') crit += 1;
-        else if (sev === 'HIGH') high += 1;
-        else if (sev === 'MEDIUM') med += 1;
-        else if (sev === 'LOW') low += 1;
-        else info += 1;
-      });
-    }
-
-    projMap[p].crit += crit;
-    projMap[p].high += high;
-    projMap[p].med += med;
-    projMap[p].low += low;
-    projMap[p].info += info;
-    projMap[p].closed += closed;
+    projMap[p].crit += (r.critical_count ?? 0);
+    projMap[p].high += (r.high_count ?? 0);
+    projMap[p].med += (r.medium_count ?? 0);
+    projMap[p].low += (r.low_count ?? 0);
+    projMap[p].info += (r.info_count ?? 0);
+    projMap[p].closed += (r.closed_count ?? 0);
   });
 
   const projRowsHtml = Object.keys(projMap).sort().map(pName => {
@@ -781,7 +747,7 @@ async function renderProjectView(projName, container) {
   }
 
   let totalVulns = 0;
-  projRuns.forEach(r => totalVulns += (r.vuln_count || 0));
+  projRuns.forEach(r => totalVulns += (r.open_count ?? r.vuln_count ?? 0));
 
   let rowsHtml = projRuns.map(r => {
     const count = r.vuln_count ?? 0;
@@ -1063,23 +1029,15 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
     const statusStr = meta.status || 'Success';
     const statusColor = statusStr === 'Failed' ? 'var(--severity-critical)' : 'var(--status-resolved)';
 
-    // Compute consistent severity breakdown matching total findings
-    let critCount = 0, highCount = 0, medCount = 0, lowCount = 0, infoCount = 0, closedCount = 0;
-    currentRunVulns.forEach(v => {
-      const st = String(v.status || "Open").toLowerCase();
-      if (st === "closed") {
-        closedCount++;
-        return;
-      }
-      const sev = String(v.severity || "LOW").toUpperCase();
-      if (sev === "CRITICAL") critCount++;
-      else if (sev === "HIGH") highCount++;
-      else if (sev === "MEDIUM") medCount++;
-      else if (sev === "LOW") lowCount++;
-      else infoCount++;
-    });
-
-    const totalVulns = currentRunVulns.length;
+    const runSummaryJson = await workerComputeSummary(vulnsJson);
+    const runSummary = JSON.parse(runSummaryJson || "{}");
+    const totalVulns = runSummary.total ?? 0;
+    const critCount = runSummary.critical ?? 0;
+    const highCount = runSummary.high ?? 0;
+    const medCount = runSummary.medium ?? 0;
+    const lowCount = runSummary.low ?? 0;
+    const infoCount = runSummary.info ?? 0;
+    const closedCount = runSummary.closed ?? 0;
 
     const prLinkHtml = meta.pr
       ? `<div class="run-meta-item">PR: ${meta.pr.startsWith("http") ? `<a href="${meta.pr}" target="_blank" rel="noopener noreferrer" class="pr-link">${meta.pr}</a>` : `<strong>${meta.pr}</strong>`}</div>`
