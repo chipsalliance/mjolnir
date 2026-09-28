@@ -3,6 +3,7 @@
 
 import init, {
   compute_summary,
+  summarize_run_errors,
   filter_vulnerabilities,
   compute_sankey_flow,
   compute_project_sankey_flow,
@@ -980,35 +981,18 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
     currentRunVulns = data.vulnerabilities || [];
     const meta = data.metadata || {};
     const tokenUsage = data.token_usage || {};
-    const toolUsage = data.tool_usage || {};
-    const errorsGrouped = tokenUsage.errors_grouped || {};
-    const errorKeys = Object.keys(errorsGrouped);
+
+    await ensureMainThreadWasm();
+    const errorsSummary = JSON.parse(summarize_run_errors(JSON.stringify(tokenUsage)) || "{}");
 
     let errorsHtml = "";
-    if (errorKeys.length > 0) {
-      const escapeHtml = (str) =>
-        String(str || "")
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#039;");
-      const totalErrCount = Object.values(errorsGrouped).reduce(
-        (a, b) => a + (Number(b) || 0),
-        0
-      );
-      const errorItems = errorKeys
-        .map(
-          k =>
-            `<li><strong>${escapeHtml(k)}</strong>: ${errorsGrouped[k]} error(s)</li>`
-        )
-        .join("");
+    if ((errorsSummary.signature_count || 0) > 0) {
       errorsHtml = `
         <div class="run-errors-card">
           <div class="run-errors-card-header" onclick="this.closest('.run-errors-card').classList.toggle('expanded')">
             <h4>
               <span>⚠️ Run Errors & Warnings</span>
-              <span class="run-errors-badge">${errorKeys.length} signature(s) / ${totalErrCount} error(s)</span>
+              <span class="run-errors-badge">${errorsSummary.signature_count} signature(s) / ${errorsSummary.total_errors} error(s)</span>
             </h4>
             <button type="button" class="run-errors-toggle-btn" onclick="event.stopPropagation(); this.closest('.run-errors-card').classList.toggle('expanded')">
               <span class="toggle-text-collapsed">Show More ▼</span>
@@ -1016,7 +1000,7 @@ async function renderRunView(proj, job, runId, deepLinkFindingIdx, container) {
             </button>
           </div>
           <div class="run-errors-content">
-            <ul class="run-errors-list">${errorItems}</ul>
+            <ul class="run-errors-list">${errorsSummary.list_html}</ul>
           </div>
         </div>`;
     }

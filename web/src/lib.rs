@@ -654,6 +654,50 @@ pub fn generate_report(
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct RunErrorsSummary {
+    pub signature_count: usize,
+    pub total_errors: usize,
+    pub list_html: String,
+}
+
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#039;")
+}
+
+#[wasm_bindgen]
+pub fn summarize_run_errors(token_usage_json: &str) -> String {
+    let val: serde_json::Value = serde_json::from_str(token_usage_json).unwrap_or_default();
+    let mut list_html = String::new();
+    let mut signature_count = 0;
+    let mut total_errors = 0;
+
+    if let Some(grouped) = val.get("errors_grouped").and_then(|v| v.as_object()) {
+        signature_count = grouped.len();
+        for (sig, count_val) in grouped {
+            let count = count_val.as_u64().unwrap_or(0) as usize;
+            total_errors += count;
+            let _ = write!(
+                list_html,
+                "<li><strong>{}</strong>: {} error(s)</li>",
+                escape_html(sig),
+                count
+            );
+        }
+    }
+
+    let summary = RunErrorsSummary {
+        signature_count,
+        total_errors,
+        list_html,
+    };
+    serde_json::to_string(&summary).unwrap_or_default()
+}
+
 #[wasm_bindgen]
 pub fn compute_summary(vulnerabilities_json: &str) -> String {
     let vulns = parse_vulnerabilities(vulnerabilities_json);
@@ -1520,5 +1564,17 @@ mod tests {
         assert!(rows.contains("Phase 2: Initial Review - Closed (count: 1)"));
         assert!(rows.contains("Phase 3: PoC Creation - High (count: 1)"));
         assert!(rows.contains("Phase 3: PoC Creation - Closed (count: 1)"));
+    }
+
+    #[test]
+    fn test_summarize_run_errors() {
+        let token_usage = r#"{"errors_grouped":{"429 <Resource>":3,"Timeout":1}}"#;
+        let res: RunErrorsSummary =
+            serde_json::from_str(&summarize_run_errors(token_usage)).unwrap();
+        assert_eq!(res.signature_count, 2);
+        assert_eq!(res.total_errors, 4);
+        assert!(res
+            .list_html
+            .contains("<li><strong>429 &lt;Resource&gt;</strong>: 3 error(s)</li>"));
     }
 }
