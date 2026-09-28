@@ -6,9 +6,11 @@ import functools
 import json
 from pathlib import Path
 import re
+import string
 from typing import Optional
 
 CWE_CATALOG_FILE = Path(__file__).resolve().parent / "cwe_catalog.json"
+_PUNCT_TO_SPACE = str.maketrans(string.punctuation, " " * len(string.punctuation))
 
 
 @functools.lru_cache(maxsize=1)
@@ -71,7 +73,9 @@ def search_cwe_catalog(query: str, limit: int = 5) -> list[dict]:
     if not catalog or not query:
         return []
 
-    tokens = [t.lower() for t in query.split() if len(t) > 1]
+    tokens = [
+        t for t in query.lower().translate(_PUNCT_TO_SPACE).split() if len(t) > 1 and t != "cwe"
+    ]
     if not tokens:
         return []
 
@@ -82,7 +86,7 @@ def search_cwe_catalog(query: str, limit: int = 5) -> list[dict]:
 
         score = 0
         for t in tokens:
-            if t in cwe_id.lower():
+            if f"cwe-{t}" == cwe_id.lower():
                 score += 10
             if t in name:
                 score += 5
