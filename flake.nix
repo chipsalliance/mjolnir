@@ -216,6 +216,7 @@
                 discovered.opentitan-manuf
                 discovered.opentitan-rom
                 discovered.opentitan-rom_ext
+                discovered.opentitan-rtl
               ];
             };
           }

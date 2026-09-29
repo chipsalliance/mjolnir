@@ -21,6 +21,7 @@
     "sigverify_tests"
     "dv"
     "fuzz"
+    "fpv"
   ];
   defaultExcludePatterns = [
     "*_test.c"
@@ -41,5 +42,7 @@
     "mock_*.h"
     "test_*.c"
     "test_*.h"
+    "*_reg_top.sv"
+    "*_reg_pkg.sv"
   ];
 }

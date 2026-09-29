@@ -16,3 +16,4 @@ Audit targets and job specifications for the OpenTitan repository.
   - `manuf.nix`: Scans `sw/device/silicon_creator/manuf/` code on the `earlgrey_1.0.0` branch.
   - `rom.nix`: Scans `sw/device/silicon_creator/rom/` code on the `earlgrey_1.0.0` branch.
   - `rom_ext.nix`: Scans `sw/device/silicon_creator/rom_ext/` code on the `earlgrey_1.0.0` branch.
+  - `rtl.nix`: Scans `hw/top_earlgrey` SystemVerilog RTL (`*.sv`) on the `earlgrey_1.0.0` branch.
