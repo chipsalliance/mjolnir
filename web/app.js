@@ -278,38 +278,64 @@ async function fetchRunsFromGcsBucket() {
       basePath += "/";
     }
     const cleanBasePath = basePath.replace(/^\//, "");
-    const listUrl = new URL(`${cleanBasePath}?prefix=${RUNS_SUBDIR}/`, window.location.origin).href;
-    const res = await fetch(listUrl);
-
-    if (!res.ok) return [];
-
-    const text = await res.text();
     const parser = new DOMParser();
-    const xml = parser.parseFromString(text, "text/xml");
 
-    const keys = Array.from(xml.getElementsByTagNameNS("*", "Key"))
-      .map(node => node.textContent)
-      .filter(key => key && key.endsWith("/metadata.json"));
+    const allKeys = new Set();
+    const keys = [];
+    let marker = "";
+
+    while (true) {
+      const query = marker
+        ? `?prefix=${RUNS_SUBDIR}/&marker=${encodeURIComponent(marker)}`
+        : `?prefix=${RUNS_SUBDIR}/`;
+      const listUrl = new URL(`${cleanBasePath}${query}`, window.location.origin).href;
+      const res = await fetch(listUrl);
+      if (!res.ok) break;
+
+      const text = await res.text();
+      const xml = parser.parseFromString(text, "text/xml");
+
+      for (const node of Array.from(xml.getElementsByTagNameNS("*", "Key"))) {
+        const key = node.textContent;
+        if (!key) continue;
+        allKeys.add(key);
+        if (key.endsWith("/metadata.json")) {
+          keys.push(key);
+        }
+      }
+
+      const isTruncated = xml.getElementsByTagNameNS("*", "IsTruncated")[0]?.textContent === "true";
+      const nextMarker = xml.getElementsByTagNameNS("*", "NextMarker")[0]?.textContent;
+      if (!isTruncated || !nextMarker) break;
+      marker = nextMarker;
+    }
 
     if (keys.length === 0) return [];
 
-    const runPromises = keys.map(async (key) => {
+    // Real GCS listings return all object keys (allKeys.size > keys.length), whereas
+    // local xtask/src/server.rs only emits metadata.json keys.
+    const hasFullKeyListing = allKeys.size > keys.length;
+    const fetchOptionalJson = async (targetKey, fallback) => {
+      if (hasFullKeyListing && !allKeys.has(targetKey)) return fallback;
+      const res = await fetch(getAssetUrl(targetKey));
+      return res.ok ? await res.json() : fallback;
+    };
+
+    const loadSingleRun = async (key) => {
       try {
-        const metaRes = await fetch(getAssetUrl(key));
+        const vulnKey = key.replace("metadata.json", "vulnerabilities.json");
+        const tokenKey = key.replace("metadata.json", "token_usage.json");
+        const toolKey = key.replace("metadata.json", "tool_usage.json");
+
+        const [metaRes, vulns, token_usage, tool_usage] = await Promise.all([
+          fetch(getAssetUrl(key)),
+          fetchOptionalJson(vulnKey, []),
+          fetchOptionalJson(tokenKey, {}),
+          fetchOptionalJson(toolKey, {}),
+        ]);
+
         if (!metaRes.ok) return null;
         const meta = await metaRes.json();
-
-        const vulnKey = key.replace("metadata.json", "vulnerabilities.json");
-        const vulnRes = await fetch(getAssetUrl(vulnKey));
-        const vulns = vulnRes.ok ? await vulnRes.json() : [];
-
-        const tokenKey = key.replace("metadata.json", "token_usage.json");
-        const tokenRes = await fetch(getAssetUrl(tokenKey));
-        const token_usage = tokenRes.ok ? await tokenRes.json() : {};
-
-        const toolKey = key.replace("metadata.json", "tool_usage.json");
-        const toolRes = await fetch(getAssetUrl(toolKey));
-        const tool_usage = toolRes.ok ? await toolRes.json() : {};
 
         const parts = key.split("/");
         const project = meta.project || parts[2] || "default";
@@ -348,9 +374,19 @@ async function fetchRunsFromGcsBucket() {
       } catch (err) {
         return null;
       }
-    });
+    };
 
-    const results = await Promise.all(runPromises);
+    const CONCURRENCY = 32;
+    const results = new Array(keys.length);
+    let nextIdx = 0;
+    const workers = Array.from({ length: Math.min(CONCURRENCY, keys.length) }, async () => {
+      while (nextIdx < keys.length) {
+        const idx = nextIdx++;
+        results[idx] = await loadSingleRun(keys[idx]);
+      }
+    });
+    await Promise.all(workers);
+
     const valid = results.filter(Boolean);
     valid.sort((a, b) => parseRunTime(b) - parseRunTime(a) || String(b.run_id).localeCompare(String(a.run_id)));
     return valid;
