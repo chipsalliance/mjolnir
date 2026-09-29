@@ -21,8 +21,11 @@ def upload_single_run(
     bucket, run_dir: Path, proj_name: str, job_name: str, run_id: str, existing_blobs: set
 ) -> bool:
     meta_file = run_dir / "metadata.json"
-    if not meta_file.is_file():
-        print(f"  Skipping incomplete run (missing metadata.json): {run_dir}")
+    vuln_file = run_dir / "vulnerabilities.json"
+    if not meta_file.is_file() or not vuln_file.is_file():
+        print(
+            f"  Skipping incomplete run (missing metadata.json or vulnerabilities.json): {run_dir}"
+        )
         return False
 
     gcs_run_prefix = f"{RUNS_SUBDIR}/{proj_name}/{job_name}/{run_id}"

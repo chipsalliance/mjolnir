@@ -43,6 +43,7 @@ def run_analysis(
     bucket: str = None,
     project_name: str = None,
     project_output_dir: str = None,
+    test_path_tokens: list[str] | None = None,
 ) -> tuple[list, str]:
     """Instantly returns hardcoded mock findings and compiles a mock flow history for testing."""
 

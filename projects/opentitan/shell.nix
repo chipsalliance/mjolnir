@@ -184,5 +184,9 @@ if target in content:
         f.write(content)
 '
     fi
+
+    if [ -f ".gitignore" ] && ! grep -qxF "obj_dir/" .gitignore; then
+      printf "\n# Verilator simulation artifacts\nobj_dir/\n" >> .gitignore
+    fi
   '';
 }

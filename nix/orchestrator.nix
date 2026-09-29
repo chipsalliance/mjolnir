@@ -24,6 +24,7 @@ let
       srcDirs = job.srcDirs or [ "." ];
       excludeDirs = job.excludeDirs or project.defaultExcludeDirs or [ ];
       excludePatterns = job.excludePatterns or project.defaultExcludePatterns or [ ];
+      testPathTokens = job.testPathTokens or project.defaultTestPathTokens or [ ];
       maxFiles = job.maxFiles or null;
       cmd = job.cmd or null;
       ingestionReport = job.ingestionReport or null;

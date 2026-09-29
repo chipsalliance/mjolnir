@@ -45,4 +45,14 @@
     "*_reg_top.sv"
     "*_reg_pkg.sv"
   ];
+  defaultTestPathTokens = [
+    "dv"
+    "tb"
+    "e2e"
+    "fpv"
+    "functest"
+    "cryptotest"
+    "testlib"
+    "testdata"
+  ];
 }

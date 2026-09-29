@@ -161,6 +161,7 @@ def run_analysis(
     bucket: str = None,
     project_name: str = None,
     project_output_dir: str = None,
+    test_path_tokens: list[str] | None = None,
 ) -> tuple[list[Vulnerability], str]:
     """ADK 2.0 provider pipeline: executes a multi-node workflow graph."""
     logger.info(f"Initializing ADK 2.0 Workflow Engine (mode={mode})...")
@@ -204,6 +205,7 @@ def run_analysis(
         "bucket": bucket,
         "project_name": project_name,
         "project_output_dir": project_output_dir,
+        "test_path_tokens": test_path_tokens or [],
         "enable_project_expert": enable_project_expert,
         "usage_tracker": usage_tracker,
         "project_expert_qa_history": [],
@@ -233,6 +235,7 @@ def run_analysis(
         "bucket": bucket,
         "project_name": project_name,
         "project_output_dir": project_output_dir,
+        "test_path_tokens": test_path_tokens or [],
         "enable_project_expert": enable_project_expert,
     }
 

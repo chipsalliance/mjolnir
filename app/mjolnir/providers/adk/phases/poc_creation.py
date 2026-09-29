@@ -148,6 +148,7 @@ async def poc_creation_phase(
     code_dir = ctx.state.get("code_dir", "target")
     run_dir = ctx.state.get("run_dir") or "."
     min_poc_severity = ctx.state.get("min_poc_severity", "Medium")
+    test_path_tokens = ctx.state.get("test_path_tokens") or []
 
     vulnerabilities = [
         Vulnerability.model_validate(v) if isinstance(v, dict) else v for v in vulnerabilities
@@ -217,6 +218,7 @@ async def poc_creation_phase(
                     source_code_dir=Path(code_dir),
                     workspace_dir=Path(run_dir),
                     vuln_id=vuln.id,
+                    extra_test_path_tokens=test_path_tokens,
                 ) as sandbox:
                     exploit_res = await run_agent_node(
                         ctx,

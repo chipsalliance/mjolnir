@@ -86,11 +86,17 @@ class WorktreeSandbox:
         workspace_dir: Path,
         vuln_id: str,
         keep_worktree: bool = False,
+        extra_test_path_tokens: list[str] | set[str] | None = None,
     ) -> None:
         self.source_code_dir = source_code_dir.resolve()
         self.workspace_dir = workspace_dir.resolve()
         self.vuln_id = vuln_id
         self.keep_worktree = keep_worktree
+        self.test_path_tokens = TEST_PATH_TOKENS | {
+            tok.lower()
+            for raw in (extra_test_path_tokens or ())
+            for tok in PATH_WORD_TOKEN_RE.findall(str(raw))
+        }
         self.worktree_dir = self.workspace_dir / POC_WORKTREES_SUBDIR / "scratch"
         self.artifact_dir = self.workspace_dir / POC_ARTIFACTS_SUBDIR / vuln_id
         self.command_history: list[CommandRecord] = []
@@ -307,7 +313,7 @@ class WorktreeSandbox:
             for part in (*p.parts[:-1], p.stem)
             for tok in PATH_WORD_TOKEN_RE.findall(part)
         }
-        return bool(tokens & TEST_PATH_TOKENS)
+        return bool(tokens & self.test_path_tokens)
 
     def has_production_code_modifications(self) -> bool:
         """Returns True if any non-test, non-harness production source file was modified or added."""

@@ -248,6 +248,7 @@ def _run_orchestrator():
     )
 
     batch_size = job.get("batchSize")
+    test_path_tokens = job.get("testPathTokens") or []
 
     if model_name == "mock":
         vulnerabilities, status = mock.run_analysis(
@@ -263,6 +264,7 @@ def _run_orchestrator():
             bucket=bucket,
             project_name=repo_name,
             project_output_dir=project_output_dir,
+            test_path_tokens=test_path_tokens,
         )
     else:
         vulnerabilities, status = adk.run_analysis(
@@ -280,6 +282,7 @@ def _run_orchestrator():
             bucket=bucket,
             project_name=repo_name,
             project_output_dir=project_output_dir,
+            test_path_tokens=test_path_tokens,
         )
 
     # Update metadata with status

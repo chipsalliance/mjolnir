@@ -26,6 +26,7 @@ async def initialize(ctx: Context, node_input: str) -> Union[list[str], str]:
     ctx.state["ingest_path"] = input_data.get("ingest_path")
     ctx.state["mode"] = input_data["mode"]
     ctx.state["min_poc_severity"] = input_data.get("min_poc_severity", "Medium")
+    ctx.state["test_path_tokens"] = input_data.get("test_path_tokens", [])
     ctx.state["enable_project_expert"] = input_data["enable_project_expert"]
     ctx.state.setdefault("vulnerabilities", [])
     ctx.state.setdefault("project_expert_qa_history", [])
