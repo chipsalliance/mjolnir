@@ -26,6 +26,7 @@ pkgs.mkShell {
     openssl-static
     ncurses5
     zlib
+    llvmPackages.llvm.out
     llvmPackages.libclang.lib
     llvmPackages.libcxx
     libusb1
@@ -40,12 +41,45 @@ pkgs.mkShell {
   PIP_CONFIG_FILE = "/dev/null";
 
   shellHook = ''
+    export PKG_CONFIG_PATH="${pkgs.udev.dev}/lib/pkgconfig:${pkgs.libftdi1}/lib/pkgconfig:${pkgs.zlib.dev}/lib/pkgconfig:${pkgs.libusb1.dev}/lib/pkgconfig"
+    export OPENSSL_LIB_DIR="${openssl-static.out}/lib"
+    export OPENSSL_INCLUDE_DIR="${openssl-static.dev}/include"
+    export LD_LIBRARY_PATH="${pkgs.ncurses5}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export CPATH="${pkgs.zlib.dev}/include:${pkgs.udev.dev}/include:${pkgs.libftdi1}/include:${openssl-static.dev}/include:${pkgs.libusb1.dev}/include"
+    export LIBRARY_PATH="${pkgs.zlib}/lib:${pkgs.udev}/lib:${pkgs.libftdi1}/lib:${openssl-static.out}/lib:${pkgs.libusb1}/lib"
+    export PIP_CONFIG_FILE="/dev/null"
+
     # Shared Bazel caches
     export SHARED_DISK_CACHE="/tmp/opentitan-bazel-shared-disk"
     export SHARED_REPO_CACHE="/tmp/opentitan-bazel-shared-repo"
     mkdir -p "$SHARED_DISK_CACHE" "$SHARED_REPO_CACHE"
 
-    # If inside an OpenTitan source directory, apply idempotent build patches
+    # If inside an OpenTitan source directory, configure .bazelrc-site and apply idempotent build patches
+    if [ -f ".bazelrc" ] && [ -f "third_party/system_libs/extensions.bzl" ]; then
+      cat > .bazelrc-site <<EOF
+common --repository_cache=$SHARED_REPO_CACHE
+build --disk_cache=$SHARED_DISK_CACHE
+build --noincompatible_strict_action_env
+build --action_env=PATH
+build --action_env=PKG_CONFIG_PATH
+build --action_env=OPENSSL_LIB_DIR
+build --action_env=OPENSSL_INCLUDE_DIR
+build --action_env=LD_LIBRARY_PATH
+build --action_env=CPATH
+build --action_env=LIBRARY_PATH
+build --action_env=PIP_CONFIG_FILE
+build --host_action_env=PATH
+build --host_action_env=PKG_CONFIG_PATH
+build --host_action_env=OPENSSL_LIB_DIR
+build --host_action_env=OPENSSL_INCLUDE_DIR
+build --host_action_env=LD_LIBRARY_PATH
+build --host_action_env=CPATH
+build --host_action_env=LIBRARY_PATH
+build --host_action_env=PIP_CONFIG_FILE
+build --sandbox_add_mount_pair=/nix
+EOF
+    fi
+
     if [ -f "third_party/system_libs/extensions.bzl" ]; then
       python3 -c '
 path = "third_party/system_libs/extensions.bzl"

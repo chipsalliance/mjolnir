@@ -53,6 +53,9 @@ let
 
   shellBinPath = pkgs.lib.makeBinPath shellInputs;
   shellHook = if devShell != null && devShell ? shellHook then devShell.shellHook else "";
+  shellHookScript = if shellHook != "" then
+    pkgs.writeShellScript "mjolnir-shell-hook-${project.repoName}" shellHook
+  else null;
 
   # 5. Assemble execution script
   launcher = pkgs.writeShellScriptBin "mjolnir-orchestrator-${project.repoName}-${pkgs.lib.replaceStrings [ " " ] [ "_" ] job.name}" ''
@@ -63,8 +66,9 @@ let
       export PATH="${shellBinPath}:$PATH"
     ''}
 
-    ${pkgs.lib.optionalString (shellHook != "") ''
-      ${shellHook}
+    ${pkgs.lib.optionalString (shellHookScript != null) ''
+      export MJOLNIR_SHELL_HOOK="${shellHookScript}"
+      source "${shellHookScript}"
     ''}
 
     exec ${mjolnir-app}/bin/mjolnir-run --spec "${jobSpecFile}" "$@"

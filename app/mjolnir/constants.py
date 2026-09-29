@@ -130,6 +130,22 @@ SANDBOX_ALLOWED_ENV_VARS = frozenset(
         "LDFLAGS",
         "CMAKE_GENERATOR",
         "NIX_BUILD_TOP",
+        "NIX_CFLAGS_COMPILE",
+        "NIX_LDFLAGS",
+        "NIX_SSL_CERT_FILE",
+        "SSL_CERT_FILE",
+        "PKG_CONFIG_PATH",
+        "OPENSSL_LIB_DIR",
+        "OPENSSL_INCLUDE_DIR",
+        "OPENSSL_STATIC",
+        "LD_LIBRARY_PATH",
+        "CPATH",
+        "LIBRARY_PATH",
+        "PIP_CONFIG_FILE",
+        "SHARED_DISK_CACHE",
+        "SHARED_REPO_CACHE",
+        "BAZELISK_HOME",
+        "MJOLNIR_SHELL_HOOK",
     }
 )
 

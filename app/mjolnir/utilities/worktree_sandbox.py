@@ -198,7 +198,52 @@ class WorktreeSandbox:
             except Exception:
                 pass
         else:
+            self._sync_to_source_head()
             self.reset()
+
+        self._apply_sandbox_shell_hook()
+
+    def _sync_to_source_head(self) -> None:
+        """Ensures an existing worktree is aligned with source_code_dir's current HEAD."""
+        if not (self.source_code_dir / ".git").exists():
+            return
+        src_res = subprocess.run(
+            ["git", "-C", str(self.source_code_dir), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if src_res.returncode != 0 or not src_res.stdout.strip():
+            return
+        src_head = src_res.stdout.strip()
+        wt_head = self._run_git("rev-parse", "HEAD").stdout.strip()
+        wt_parent = self._run_git("rev-parse", "HEAD~1").stdout.strip()
+        wt_subject = self._run_git("log", "-1", "--pretty=%s").stdout.strip()
+        if wt_head == src_head or (
+            wt_subject == "mjolnir-sandbox-env-baseline" and wt_parent == src_head
+        ):
+            return
+        self._run_git("checkout", "--detach", "--force", src_head)
+
+    def _apply_sandbox_shell_hook(self) -> None:
+        """Executes MJOLNIR_SHELL_HOOK inside the sandbox worktree and commits any build patches to baseline."""
+        hook = os.environ.get("MJOLNIR_SHELL_HOOK", "").strip()
+        if not hook or not self.worktree_dir.exists():
+            return
+        cmd = ["bash", hook] if Path(hook).is_file() else ["bash", "-c", hook]
+        subprocess.run(
+            cmd,
+            cwd=str(self.worktree_dir),
+            env=self._build_env(),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if self.get_modified_files():
+            self._run_git("config", "user.email", "mjolnir@local")
+            self._run_git("config", "user.name", "Mjolnir")
+            self._run_git("add", "-A")
+            self._run_git("commit", "-m", "mjolnir-sandbox-env-baseline")
 
     def cleanup(self) -> None:
         """Persists unified diff, command execution logs, and reproduce.sh, then resets worktree."""
